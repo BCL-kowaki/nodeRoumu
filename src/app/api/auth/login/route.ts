@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   const token = await createToken({
     employeeId: employee.id,
     loginId: employee.loginId!,
-    role: employee.role as "admin" | "employee",
+    role: employee.role as "admin" | "manager" | "employee",
     name: employee.name,
   });
 

@@ -14,16 +14,68 @@ type DakokuLog = {
   longitude: number | null;
 };
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
-
-const statusMap: Record<string, { color: string; bg: string }> = {
-  未出勤: { color: "text-gray-500", bg: "bg-gray-100" },
-  勤務中: { color: "text-primary", bg: "bg-primary-light" },
-  休憩中: { color: "text-accent", bg: "bg-orange-50" },
-  退勤済: { color: "text-danger", bg: "bg-danger-light" },
+type EmpShift = {
+  shiftStart: string | null;
+  shiftEnd: string | null;
 };
 
-function getStatus(logs: DakokuLog[]) {
+type Rate = {
+  closedSun: boolean;
+  closedMon: boolean;
+  closedTue: boolean;
+  closedWed: boolean;
+  closedThu: boolean;
+  closedFri: boolean;
+  closedSat: boolean;
+};
+
+type ClosedDateRecord = { date: string };
+
+const todayStr = () => new Date().toISOString().slice(0, 10);
+const DOW_KEYS = ["closedSun", "closedMon", "closedTue", "closedWed", "closedThu", "closedFri", "closedSat"] as const;
+
+function timeToMin(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+// ステータス判定
+function getDayStatus(
+  logs: DakokuLog[],
+  isClosed: boolean,
+  shiftStart: string | null,
+  shiftEnd: string | null,
+  currentTime: string
+): { label: string; color: string; bg: string } {
+  if (isClosed) {
+    return { label: "定休日", color: "text-app-sub", bg: "bg-gray-100" };
+  }
+
+  const last = logs[logs.length - 1];
+
+  if (!last) {
+    if (shiftStart && timeToMin(currentTime) > timeToMin(shiftStart)) {
+      return { label: "遅刻", color: "text-danger", bg: "bg-danger-light" };
+    }
+    return { label: "未出勤", color: "text-gray-500", bg: "bg-gray-100" };
+  }
+
+  if (last.type === "out") {
+    if (shiftEnd && last.time && timeToMin(last.time) < timeToMin(shiftEnd)) {
+      return { label: "早退", color: "text-accent", bg: "bg-orange-50" };
+    }
+    return { label: "退勤済", color: "text-app-sub", bg: "bg-gray-100" };
+  }
+
+  if (last.type === "break_start") {
+    return { label: "休憩中", color: "text-accent", bg: "bg-orange-50" };
+  }
+
+  return { label: "勤務中", color: "text-primary", bg: "bg-primary-light" };
+}
+
+// 打刻ボタン制御用
+function getPunchStatus(logs: DakokuLog[]) {
   const last = logs[logs.length - 1];
   if (!last) return "未出勤";
   if (last.type === "out") return "退勤済";
@@ -36,11 +88,35 @@ export default function EmployeeDakoku() {
   const [now, setNow] = useState(new Date());
   const [logs, setLogs] = useState<DakokuLog[]>([]);
   const [flash, setFlash] = useState<string | null>(null);
+  const [shift, setShift] = useState<EmpShift>({ shiftStart: null, shiftEnd: null });
+  const [dayIsClosed, setDayIsClosed] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // シフト・定休日情報を取得
+  useEffect(() => {
+    if (!user?.employeeId) return;
+    const today = todayStr();
+    const year = today.slice(0, 4);
+
+    Promise.all([
+      fetch("/api/employees").then((r) => r.json()),
+      fetch("/api/rates").then((r) => r.json()),
+      fetch(`/api/closed-dates?year=${year}`).then((r) => r.json()),
+    ]).then(([emps, rates, closedDates]: [Array<EmpShift & { id: string }>, Rate, ClosedDateRecord[]]) => {
+      const me = emps.find((e) => e.id === user.employeeId);
+      if (me) setShift({ shiftStart: me.shiftStart, shiftEnd: me.shiftEnd });
+
+      const dow = new Date(today).getDay();
+      const weekdayClosed = rates[DOW_KEYS[dow]];
+      const dateClosed = closedDates.some((cd) => cd.date.startsWith(today));
+      setDayIsClosed(weekdayClosed || dateClosed);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.employeeId]);
 
   const fetchLogs = useCallback(() => {
     if (!user?.employeeId) return;
@@ -56,11 +132,11 @@ export default function EmployeeDakoku() {
   const hh = String(now.getHours()).padStart(2, "0");
   const mm = String(now.getMinutes()).padStart(2, "0");
   const ss = String(now.getSeconds()).padStart(2, "0");
+  const currentTime = hh + ":" + mm;
 
-  const status = getStatus(logs);
-  const sc = statusMap[status];
+  const dayStatus = getDayStatus(logs, dayIsClosed, shift.shiftStart, shift.shiftEnd, currentTime);
+  const punchStatus = getPunchStatus(logs);
 
-  // GPS位置情報を取得
   const getLocation = (): Promise<{ latitude: number; longitude: number } | null> => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
@@ -100,10 +176,10 @@ export default function EmployeeDakoku() {
   };
 
   const btns = [
-    { type: "in", label: "出勤", icon: "🟢", disabled: status === "勤務中" || status === "退勤済" || status === "休憩中" },
-    { type: "break_start", label: "休憩", icon: "☕", disabled: status !== "勤務中" },
-    { type: "break_end", label: "戻り", icon: "🔄", disabled: status !== "休憩中" },
-    { type: "out", label: "退勤", icon: "🔴", disabled: status === "未出勤" || status === "退勤済" },
+    { type: "in", label: "出勤", icon: "🟢", disabled: punchStatus === "勤務中" || punchStatus === "退勤済" || punchStatus === "休憩中" || dayIsClosed },
+    { type: "break_start", label: "休憩", icon: "☕", disabled: punchStatus !== "勤務中" },
+    { type: "break_end", label: "戻り", icon: "🔄", disabled: punchStatus !== "休憩中" },
+    { type: "out", label: "退勤", icon: "🔴", disabled: punchStatus === "未出勤" || punchStatus === "退勤済" },
   ];
 
   if (authLoading)
@@ -125,9 +201,14 @@ export default function EmployeeDakoku() {
       </Card>
 
       {/* ステータス */}
-      <Card className={`text-center !p-4 ${sc.bg}`}>
+      <Card className={`text-center !p-4 ${dayStatus.bg}`}>
         <div className="text-xs text-app-sub mb-1">現在のステータス</div>
-        <div className={`text-2xl font-extrabold ${sc.color}`}>{status}</div>
+        <div className={`text-2xl font-extrabold ${dayStatus.color}`}>{dayStatus.label}</div>
+        {shift.shiftStart && shift.shiftEnd && !dayIsClosed && (
+          <div className="text-xs text-app-sub mt-1.5">
+            予定: {shift.shiftStart}〜{shift.shiftEnd}
+          </div>
+        )}
       </Card>
 
       {flash && (

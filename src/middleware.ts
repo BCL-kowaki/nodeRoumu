@@ -31,17 +31,17 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // 管理者ルート → adminロールのみ
+  // 管理者ルート → admin または manager ロールのみ
   if (pathname.startsWith("/admin")) {
-    if (session.role !== "admin") {
+    if (session.role !== "admin" && session.role !== "manager") {
       const homeUrl = req.nextUrl.clone();
       homeUrl.pathname = "/";
       return NextResponse.redirect(homeUrl);
     }
   }
 
-  // 従業員ルート → adminがアクセスしたら管理画面へ
-  if (!pathname.startsWith("/admin") && session.role === "admin") {
+  // 従業員ルート → admin/managerがアクセスしたら管理画面へ
+  if (!pathname.startsWith("/admin") && (session.role === "admin" || session.role === "manager")) {
     const adminUrl = req.nextUrl.clone();
     adminUrl.pathname = "/admin";
     return NextResponse.redirect(adminUrl);

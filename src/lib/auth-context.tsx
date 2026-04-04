@@ -7,7 +7,7 @@ type AuthUser = {
   authenticated: boolean;
   employeeId: string;
   loginId: string;
-  role: "admin" | "employee";
+  role: "admin" | "manager" | "employee";
   name: string;
 };
 

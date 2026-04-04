@@ -11,7 +11,7 @@ const COOKIE_NAME = "roumu-session";
 export type SessionPayload = {
   employeeId: string;
   loginId: string;
-  role: "admin" | "employee";
+  role: "admin" | "manager" | "employee";
   name: string;
 };
 
