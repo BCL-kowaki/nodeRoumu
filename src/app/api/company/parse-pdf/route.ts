@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+// ボディサイズ制限を10MBに引き上げ
+export const maxDuration = 30;
+export const runtime = "nodejs";
+
+
 // 謄本PDFをアップロードして企業情報を抽出
 export async function POST(req: NextRequest) {
   try {
