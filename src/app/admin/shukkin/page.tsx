@@ -297,34 +297,39 @@ export default function ShukkinPage() {
                 <div className="text-[13px] font-bold text-primary ml-auto">{h}h</div>
               )}
             </div>
-            <div className="grid grid-cols-4 gap-1.5">
-              <div>
-                <label className="block text-[10px] font-semibold text-app-sub mb-0.5">出勤</label>
-                <input
-                  type="time"
-                  className={`${inputClass} ${!display.hasRecord && display.startTime ? "text-app-sub" : ""}`}
-                  value={display.startTime}
-                  onChange={(e) => upsert(date, "startTime", e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-app-sub mb-0.5">退勤</label>
-                <input
-                  type="time"
-                  className={`${inputClass} ${!display.hasRecord && display.endTime ? "text-app-sub" : ""}`}
-                  value={display.endTime}
-                  onChange={(e) => upsert(date, "endTime", e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-app-sub mb-0.5">休憩</label>
-                <input
-                  type="number"
-                  className={`${inputClass} ${!display.hasRecord && display.breakMinutes ? "text-app-sub" : ""}`}
-                  value={display.breakMinutes}
-                  onChange={(e) => upsert(date, "breakMinutes", e.target.value)}
-                />
-              </div>
+            {/* 定休・公休以外は出退勤入力を表示 */}
+            <div className={`grid gap-1.5 ${currentStatus === "closed" || currentStatus === "public_holiday" ? "grid-cols-1" : "grid-cols-4"}`}>
+              {currentStatus !== "closed" && currentStatus !== "public_holiday" && (
+                <>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-app-sub mb-0.5">出勤</label>
+                    <input
+                      type="time"
+                      className={`${inputClass} ${!display.hasRecord && display.startTime ? "text-app-sub" : ""}`}
+                      value={display.startTime}
+                      onChange={(e) => upsert(date, "startTime", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-app-sub mb-0.5">退勤</label>
+                    <input
+                      type="time"
+                      className={`${inputClass} ${!display.hasRecord && display.endTime ? "text-app-sub" : ""}`}
+                      value={display.endTime}
+                      onChange={(e) => upsert(date, "endTime", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-app-sub mb-0.5">休憩</label>
+                    <input
+                      type="number"
+                      className={`${inputClass} ${!display.hasRecord && display.breakMinutes ? "text-app-sub" : ""}`}
+                      value={display.breakMinutes}
+                      onChange={(e) => upsert(date, "breakMinutes", e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <label className="block text-[10px] font-semibold text-app-sub mb-0.5">状態</label>
                 <select
