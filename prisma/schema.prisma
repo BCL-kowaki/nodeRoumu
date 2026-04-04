@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Employee {
+  id             String    @id @default(cuid())
+  name           String
+  nameKana       String?
+  birthDate      DateTime?
+  gender         String    @default("男")
+  address        String?
+  phone          String?
+  hireDate       DateTime
+  position       String?
+  employmentType String    @default("正社員")
+  resignDate     DateTime?
+  hourlyWage     Int?
+  monthlySalary  Int?
+  memo           String?
+  shiftStart     String?  // 固定シフト開始時刻 "HH:MM"
+  shiftEnd       String?  // 固定シフト終了時刻 "HH:MM"
+  shiftBreak     Int?     // 固定シフト休憩時間（分）
+  healthInsuranceEnrolled  Boolean @default(false) // 健康保険加入
+  pensionEnrolled          Boolean @default(false) // 厚生年金加入
+  employmentInsuranceEnrolled Boolean @default(false) // 雇用保険加入
+  loginId        String?   @unique
+  passwordHash   String?
+  role           String    @default("employee") // "admin" | "employee"
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  attendance Attendance[]
+  payroll    Payroll[]
+  dakoku     Dakoku[]
+}
+
+model Attendance {
+  id           String   @id @default(cuid())
+  employeeId   String
+  date         DateTime @db.Date
+  startTime    String?
+  endTime      String?
+  breakMinutes Int?
+  status       String?  // "normal" | "late" | "early_leave" | "absent"
+  memo         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, date])
+}
+
+model Dakoku {
+  id         String   @id @default(cuid())
+  employeeId String
+  date       DateTime @db.Date
+  time       String
+  type       String   // "in" | "break_start" | "break_end" | "out"
+  latitude   Float?   // GPS緯度
+  longitude  Float?   // GPS経度
+  timestamp  DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, date])
+}
+
+model Payroll {
+  id                  String   @id @default(cuid())
+  employeeId          String
+  month               String   // "YYYY-MM"
+  workDays            Int      @default(0)
+  workHours           Float    @default(0)
+  grossPay            Int      @default(0)
+  overtimePay         Int      @default(0)
+  allowance           Int      @default(0)
+  totalPay            Int      @default(0)
+  healthInsurance     Int      @default(0)
+  pension             Int      @default(0)
+  employmentInsurance Int      @default(0)
+  incomeTax           Int      @default(0)
+  residentTax         Int      @default(0)
+  otherDeduction      Int      @default(0)
+  totalDeduction      Int      @default(0)
+  netPay              Int      @default(0)
+  confirmed           Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, month])
+}
+
+model Rate {
+  id                  String   @id @default(cuid())
+  healthInsurance     Float    @default(10.34)
+  pension             Float    @default(18.3)
+  employmentInsurance Float    @default(0.6)
+  childcare           Float    @default(0.36)
+  label               String?
+  closedSun           Boolean  @default(true)  // 日曜定休
+  closedMon           Boolean  @default(false)
+  closedTue           Boolean  @default(false)
+  closedWed           Boolean  @default(false)
+  closedThu           Boolean  @default(false)
+  closedFri           Boolean  @default(false)
+  closedSat           Boolean  @default(true)  // 土曜定休
+  updatedAt           DateTime @updatedAt
+}
