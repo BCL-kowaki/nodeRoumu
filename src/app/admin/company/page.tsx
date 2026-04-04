@@ -256,6 +256,16 @@ export default function CompanyPage() {
                 value={(form as Record<string, unknown>)[x.k] as string || ""}
                 onChange={(e) => setForm({ ...form, [x.k]: e.target.value })}
               />
+              {x.k === "corporateNumber" && (
+                <a
+                  href="https://www.houjin-bangou.nta.go.jp/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-primary underline mt-1 inline-block"
+                >
+                  国税庁 法人番号公表サイトで確認する →
+                </a>
+              )}
             </div>
           ))}
         </div>
