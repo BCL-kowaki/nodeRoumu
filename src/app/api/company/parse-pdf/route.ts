@@ -2,29 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-// ボディサイズ制限を10MBに引き上げ
-export const maxDuration = 30;
-export const runtime = "nodejs";
-
-
-// 謄本PDFをアップロードして企業情報を抽出
+// クライアントで抽出したPDFテキストを受け取り、正規表現で企業情報を抽出
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
-    const file = formData.get("file") as File;
-    if (!file) {
-      return NextResponse.json({ error: "ファイルが選択されていません" }, { status: 400 });
+    const { text } = await req.json();
+    if (!text) {
+      return NextResponse.json({ error: "テキストが空です" }, { status: 400 });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-
-    // pdf-parse でテキスト抽出
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require("pdf-parse");
-    const data = await pdfParse(buffer);
-    const text: string = data.text;
-
-    // 謄本から情報を抽出（正規表現で各項目を探す）
     const result: Record<string, string> = {};
 
     // 会社名（商号）
@@ -38,7 +23,6 @@ export async function POST(req: NextRequest) {
     // 設立日（成立年月日）
     const estMatch = text.match(/(?:成立|設立)(?:年月日|の年月日)?\s*[:\s]*((?:令和|平成|昭和)?\s*\d+\s*年\s*\d+\s*月\s*\d+\s*日)/);
     if (estMatch) {
-      // 和暦→西暦変換
       result.establishedDate = convertJapaneseDate(estMatch[1].trim());
     }
 
@@ -49,7 +33,6 @@ export async function POST(req: NextRequest) {
     // 代表者
     const repMatch = text.match(/(?:代表社員|代表取締役|代表者)\s*[:\s]*(.+)/);
     if (repMatch) {
-      // 「業務執行社員」等の余分な文字を除去
       let rep = repMatch[1].trim();
       rep = rep.replace(/^(業務執行社員|社員)\s*/, "");
       result.representativeName = rep.split(/\s{2,}|\n/)[0].trim();
@@ -66,10 +49,10 @@ export async function POST(req: NextRequest) {
       result.businessType = purposes;
     }
 
-    return NextResponse.json({ ok: true, extracted: result, rawText: text.slice(0, 2000) });
+    return NextResponse.json({ ok: true, extracted: result });
   } catch (error) {
-    console.error("PDF解析エラー:", error);
-    return NextResponse.json({ error: "PDFの解析に失敗しました" }, { status: 500 });
+    console.error("テキスト解析エラー:", error);
+    return NextResponse.json({ error: "テキストの解析に失敗しました" }, { status: 500 });
   }
 }
 

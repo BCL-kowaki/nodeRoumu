@@ -51,7 +51,7 @@ export default function CompanyPage() {
     setTimeout(() => setSaved(false), 3000);
   };
 
-  // 謄本PDFアップロード → 情報を自動入力
+  // クライアント側でPDFテキスト抽出 → サーバーで正規表現解析
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !form) return;
@@ -59,13 +59,34 @@ export default function CompanyPage() {
     setUploading(true);
     setUploadMsg("");
 
-    const formData = new FormData();
-    formData.append("file", file);
-
     try {
+      // ブラウザ側でPDFからテキスト抽出
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfjsLib = await import("pdfjs-dist");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = "";
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = content.items
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((item: any) => item.str || "")
+          .join(" ");
+        fullText += pageText + "\n";
+      }
+
+      if (!fullText.trim()) {
+        setUploadMsg("PDFからテキストを読み取れませんでした（画像PDFの可能性があります）");
+        return;
+      }
+
+      // 抽出したテキストをサーバーに送信して解析
       const res = await fetch("/api/company/parse-pdf", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: fullText }),
       });
       const data = await res.json();
 
@@ -75,7 +96,6 @@ export default function CompanyPage() {
       }
 
       const ext = data.extracted as Record<string, string>;
-      // 抽出された値をフォームに反映（空でない値のみ上書き）
       setForm({
         ...form,
         name: ext.name || form.name,
@@ -87,8 +107,13 @@ export default function CompanyPage() {
       });
 
       const count = Object.keys(ext).length;
-      setUploadMsg(`${count}件の情報を読み取りました。内容を確認して保存してください`);
-    } catch {
+      setUploadMsg(
+        count > 0
+          ? `${count}件の情報を読み取りました。内容を確認して保存してください`
+          : "情報を読み取れませんでした。手動で入力してください"
+      );
+    } catch (err) {
+      console.error("PDF解析エラー:", err);
       setUploadMsg("PDFの解析中にエラーが発生しました");
     } finally {
       setUploading(false);
