@@ -64,6 +64,12 @@ export default function Header() {
                   >
                     📋 料率設定
                   </button>
+                  <button
+                    onClick={() => { router.push("/admin/holidays"); setMenuOpen(false); }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
+                  >
+                    📅 休日設定
+                  </button>
                   <div className="border-t border-app-border my-1" />
                 </>
               )}
