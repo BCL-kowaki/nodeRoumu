@@ -10,7 +10,6 @@ const ADMIN_TABS: Tab[] = [
   { href: "/admin/meibo", label: "名簿", icon: "👥" },
   { href: "/admin/shukkin", label: "出勤簿", icon: "📅" },
   { href: "/admin/chingin", label: "賃金台帳", icon: "💰" },
-  { href: "/admin/settings", label: "料率設定", icon: "⚙️" },
 ];
 
 const EMPLOYEE_TABS: Tab[] = [
