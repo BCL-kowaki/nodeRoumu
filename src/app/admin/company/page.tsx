@@ -184,9 +184,9 @@ export default function CompanyPage() {
     { k: "phone", l: "電話番号", t: "tel" },
     { k: "email", l: "メールアドレス", t: "email" },
     { k: "establishedDate", l: "設立日", t: "date" },
-    { k: "businessType", l: "事業内容", t: "text" },
+    { k: "businessType", l: "事業内容", t: "textarea" },
     { k: "corporateNumber", l: "法人番号", t: "text" },
-    { k: "memo", l: "備考", t: "text" },
+    { k: "memo", l: "備考", t: "textarea" },
   ];
 
   return (
@@ -250,12 +250,21 @@ export default function CompanyPage() {
           {fields.map((x) => (
             <div key={x.k}>
               <label className={labelClass}>{x.l}</label>
-              <input
-                className={inputClass}
-                type={x.t}
-                value={(form as Record<string, unknown>)[x.k] as string || ""}
-                onChange={(e) => setForm({ ...form, [x.k]: e.target.value })}
-              />
+              {x.t === "textarea" ? (
+                <textarea
+                  className={`${inputClass} min-h-[80px] resize-y`}
+                  rows={3}
+                  value={(form as Record<string, unknown>)[x.k] as string || ""}
+                  onChange={(e) => setForm({ ...form, [x.k]: e.target.value })}
+                />
+              ) : (
+                <input
+                  className={inputClass}
+                  type={x.t}
+                  value={(form as Record<string, unknown>)[x.k] as string || ""}
+                  onChange={(e) => setForm({ ...form, [x.k]: e.target.value })}
+                />
+              )}
               {x.k === "corporateNumber" && (
                 <a
                   href="https://www.houjin-bangou.nta.go.jp/"
