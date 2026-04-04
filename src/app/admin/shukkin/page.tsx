@@ -210,7 +210,7 @@ export default function ShukkinPage() {
   }).length;
 
   const inputClass =
-    "w-full p-1.5 px-2 rounded border border-app-border text-xs bg-white outline-none";
+    "w-full p-1 px-1.5 rounded border border-app-border text-[11px] bg-white outline-none box-border";
 
   if (loading)
     return <div className="text-center text-app-sub py-10">読み込み中...</div>;
@@ -298,7 +298,7 @@ export default function ShukkinPage() {
               )}
             </div>
             {/* 定休・公休以外は出退勤入力を表示 */}
-            <div className={`grid gap-1.5 ${currentStatus === "closed" || currentStatus === "public_holiday" ? "grid-cols-1" : "grid-cols-4"}`}>
+            <div className={`grid gap-1 ${currentStatus === "closed" || currentStatus === "public_holiday" ? "grid-cols-1" : "grid-cols-2"}`}>
               {currentStatus !== "closed" && currentStatus !== "public_holiday" && (
                 <>
                   <div>
@@ -320,7 +320,7 @@ export default function ShukkinPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-app-sub mb-0.5">休憩</label>
+                    <label className="block text-[10px] font-semibold text-app-sub mb-0.5">休憩(分)</label>
                     <input
                       type="number"
                       className={`${inputClass} ${!display.hasRecord && display.breakMinutes ? "text-app-sub" : ""}`}

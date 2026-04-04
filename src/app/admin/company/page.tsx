@@ -17,7 +17,7 @@ type Company = {
   memo: string | null;
 };
 
-const inputClass = "w-full p-2.5 px-3.5 rounded border border-app-border text-sm text-app-text bg-white outline-none";
+const inputClass = "w-full p-2.5 px-3.5 rounded border border-app-border text-sm text-app-text bg-white outline-none box-border max-w-full";
 const labelClass = "block text-xs font-semibold text-app-sub mb-1";
 
 export default function CompanyPage() {

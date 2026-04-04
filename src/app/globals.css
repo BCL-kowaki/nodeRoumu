@@ -17,3 +17,18 @@ input[type="number"]::-webkit-outer-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
 }
+
+/* date/time inputのはみ出し防止 */
+input[type="date"],
+input[type="time"],
+input[type="month"] {
+  max-width: 100%;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+}
+
+/* すべてのinput/select/textareaのはみ出し防止 */
+input, select, textarea {
+  max-width: 100%;
+  box-sizing: border-box;
+}
