@@ -51,22 +51,72 @@ export default function CompanyPage() {
     setTimeout(() => setSaved(false), 3000);
   };
 
-  // クライアント側でPDFテキスト抽出 → サーバーで正規表現解析
+  // PDFページを画像に変換
+  const pageToImage = async (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    page: any
+  ): Promise<string> => {
+    const scale = 2; // 高解像度でOCR精度向上
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext("2d")!;
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    return canvas.toDataURL("image/png");
+  };
+
+  // OCRで画像からテキスト抽出
+  const ocrFromImages = async (imageDataUrls: string[]): Promise<string> => {
+    const Tesseract = await import("tesseract.js");
+    let fullText = "";
+    for (let i = 0; i < imageDataUrls.length; i++) {
+      setUploadMsg(`OCR処理中... (${i + 1}/${imageDataUrls.length}ページ)`);
+      const result = await Tesseract.recognize(imageDataUrls[i], "jpn", {
+        logger: () => {},
+      });
+      fullText += result.data.text + "\n";
+    }
+    return fullText;
+  };
+
+  // 結果をフォームに反映
+  const applyExtracted = (ext: Record<string, string>) => {
+    if (!form) return;
+    setForm({
+      ...form,
+      name: ext.name || form.name,
+      address: ext.address || form.address,
+      establishedDate: ext.establishedDate || form.establishedDate,
+      corporateNumber: ext.corporateNumber || form.corporateNumber,
+      representativeName: ext.representativeName || form.representativeName,
+      businessType: ext.businessType || form.businessType,
+    });
+    const count = Object.keys(ext).length;
+    setUploadMsg(
+      count > 0
+        ? `${count}件の情報を読み取りました。内容を確認して保存してください`
+        : "情報を読み取れませんでした。手動で入力してください"
+    );
+  };
+
+  // PDFアップロード処理
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !form) return;
 
     setUploading(true);
-    setUploadMsg("");
+    setUploadMsg("PDF解析中...");
 
     try {
-      // ブラウザ側でPDFからテキスト抽出
       const arrayBuffer = await file.arrayBuffer();
       const pdfjsLib = await import("pdfjs-dist");
       pdfjsLib.GlobalWorkerOptions.workerSrc =
         `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+      // Step 1: テキストPDFとして読み取りを試みる
       let fullText = "";
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
@@ -78,12 +128,25 @@ export default function CompanyPage() {
         fullText += pageText + "\n";
       }
 
+      // Step 2: テキストが取れなければOCR（スキャンPDF対応）
       if (!fullText.trim()) {
-        setUploadMsg("PDFからテキストを読み取れませんでした（画像PDFの可能性があります）");
+        setUploadMsg("スキャンPDFを検出しました。OCR処理を開始します...");
+        const images: string[] = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const img = await pageToImage(page);
+          images.push(img);
+        }
+        fullText = await ocrFromImages(images);
+      }
+
+      if (!fullText.trim()) {
+        setUploadMsg("テキストを読み取れませんでした");
         return;
       }
 
-      // 抽出したテキストをサーバーに送信して解析
+      // Step 3: サーバーで正規表現解析
+      setUploadMsg("テキストを解析中...");
       const res = await fetch("/api/company/parse-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -96,23 +159,7 @@ export default function CompanyPage() {
         return;
       }
 
-      const ext = data.extracted as Record<string, string>;
-      setForm({
-        ...form,
-        name: ext.name || form.name,
-        address: ext.address || form.address,
-        establishedDate: ext.establishedDate || form.establishedDate,
-        corporateNumber: ext.corporateNumber || form.corporateNumber,
-        representativeName: ext.representativeName || form.representativeName,
-        businessType: ext.businessType || form.businessType,
-      });
-
-      const count = Object.keys(ext).length;
-      setUploadMsg(
-        count > 0
-          ? `${count}件の情報を読み取りました。内容を確認して保存してください`
-          : "情報を読み取れませんでした。手動で入力してください"
-      );
+      applyExtracted(data.extracted);
     } catch (err) {
       console.error("PDF解析エラー:", err);
       setUploadMsg("PDFの解析中にエラーが発生しました");
@@ -152,7 +199,8 @@ export default function CompanyPage() {
       <Card>
         <div className="text-sm font-bold text-app-text mb-2">📄 謄本PDFから読み取り</div>
         <div className="text-[11px] text-app-sub mb-3">
-          登記簿謄本のPDFをアップロードすると、会社名・所在地・設立日・法人番号・代表者・事業内容を自動入力します
+          登記簿謄本のPDFをアップロードすると、会社名・所在地・設立日・法人番号・代表者・事業内容を自動入力します。
+          スキャンPDFにも対応しています（OCR処理に数十秒かかる場合があります）
         </div>
         <div className="flex items-center gap-2">
           <input
@@ -163,15 +211,16 @@ export default function CompanyPage() {
             className="text-xs text-app-sub"
             disabled={uploading}
           />
-          {uploading && <span className="text-xs text-app-sub">解析中...</span>}
         </div>
         {uploadMsg && (
-          <div className={`text-xs mt-2 p-2 rounded ${
-            uploadMsg.includes("失敗") || uploadMsg.includes("エラー")
+          <div className={`text-xs mt-2 p-2.5 rounded ${
+            uploadMsg.includes("失敗") || uploadMsg.includes("エラー") || uploadMsg.includes("読み取れません")
               ? "text-danger bg-danger-light"
+              : uploading
+              ? "text-app-text bg-[#FFF8E1]"
               : "text-primary-dark bg-primary-light"
           }`}>
-            {uploadMsg}
+            {uploading && "⏳ "}{uploadMsg}
           </div>
         )}
       </Card>
