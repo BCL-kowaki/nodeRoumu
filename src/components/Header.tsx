@@ -10,10 +10,6 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const today = new Date().toLocaleDateString("ja-JP", {
-    month: "short",
-    day: "numeric",
-  });
 
   // メニュー外クリックで閉じる
   useEffect(() => {
@@ -39,7 +35,9 @@ export default function Header() {
         />
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-xs text-app-sub">{today}</span>
+        {user && (
+          <span className="text-xs text-app-text font-semibold">{user.name}</span>
+        )}
 
         {/* 設定ドロップダウン */}
         <div className="relative" ref={menuRef}>

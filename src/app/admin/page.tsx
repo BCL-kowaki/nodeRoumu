@@ -105,7 +105,12 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-lg font-bold text-app-text mb-1">管理者ダッシュボード</div>
+      <div className="flex justify-between items-center mb-1">
+        <div className="text-lg font-bold text-app-text">管理者ダッシュボード</div>
+        <div className="text-xs text-app-sub">
+          {new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric", weekday: "long" })}
+        </div>
+      </div>
 
       {/* 料率未設定の警告 */}
       {rates && !rates.updatedAt && (
