@@ -31,6 +31,8 @@ type EmpData = {
   shiftBreak: number | null;
 };
 
+type ClosedDateRecord = { id: string; date: string; name: string; type: string };
+
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const DOW_KEYS = ["closedSun", "closedMon", "closedTue", "closedWed", "closedThu", "closedFri", "closedSat"] as const;
 
@@ -42,10 +44,17 @@ function calcH(rec: AttRecord | undefined) {
   return t > 0 ? (t / 60).toFixed(1) : "0";
 }
 
-function isClosed(date: string, rates: Rate | null) {
+function isClosed(date: string, rates: Rate | null, closedDates: ClosedDateRecord[] = []) {
   if (!rates) return false;
   const dow = new Date(date).getDay(); // 0=Sun
-  return rates[DOW_KEYS[dow]];
+  if (rates[DOW_KEYS[dow]]) return true;
+  return closedDates.some((cd) => cd.date.startsWith(date));
+}
+
+function getClosedDateName(date: string, rates: Rate | null, closedDates: ClosedDateRecord[]): string {
+  const cd = closedDates.find((c) => c.date.startsWith(date));
+  if (cd) return cd.name;
+  return "定休";
 }
 
 export default function EmployeeShukkin() {
@@ -54,11 +63,20 @@ export default function EmployeeShukkin() {
   const [att, setAtt] = useState<AttRecord[]>([]);
   const [rates, setRates] = useState<Rate | null>(null);
   const [empData, setEmpData] = useState<EmpData | null>(null);
+  const [closedDates, setClosedDates] = useState<ClosedDateRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/rates").then((r) => r.json()).then(setRates);
-  }, []);
+    const year = selMonth.slice(0, 4);
+    Promise.all([
+      fetch("/api/rates").then((r) => r.json()),
+      fetch(`/api/closed-dates?year=${year}`).then((r) => r.json()),
+    ]).then(([r, cd]) => {
+      setRates(r);
+      setClosedDates(cd);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selMonth]);
 
   useEffect(() => {
     if (!user?.employeeId) return;
@@ -99,7 +117,7 @@ export default function EmployeeShukkin() {
 
   const totalDays = days.filter((d) => getRec(d)?.startTime).length;
   const totalH = days.reduce((s, d) => s + Number(calcH(getRec(d)) || 0), 0);
-  const scheduledDays = days.filter((d) => !isClosed(d, rates)).length;
+  const scheduledDays = days.filter((d) => !isClosed(d, rates, closedDates)).length;
 
   if (authLoading || loading)
     return <div className="text-center text-app-sub py-10">読み込み中...</div>;
@@ -136,7 +154,7 @@ export default function EmployeeShukkin() {
       {days.map((date) => {
         const rec = getRec(date);
         const dow = new Date(date).toLocaleDateString("ja-JP", { weekday: "short" });
-        const closed = isClosed(date, rates);
+        const closed = isClosed(date, rates, closedDates);
         const h = calcH(rec);
         const today = date === todayStr();
         const isPast = date < todayStr();
@@ -155,7 +173,7 @@ export default function EmployeeShukkin() {
                 {date.slice(5)} ({dow})
               </div>
               {closed && !rec?.startTime && (
-                <Badge type="default">定休</Badge>
+                <Badge type="default">{getClosedDateName(date, rates, closedDates)}</Badge>
               )}
               {isAbsent && <Badge type="danger">欠勤</Badge>}
               {!closed && !rec?.startTime && !isAbsent && (

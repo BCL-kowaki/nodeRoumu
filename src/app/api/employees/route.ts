@@ -15,6 +15,7 @@ export async function GET() {
       monthlySalary: true, memo: true, loginId: true, role: true,
       healthInsuranceEnrolled: true, pensionEnrolled: true,
       employmentInsuranceEnrolled: true,
+      contractEndDate: true,
       shiftStart: true, shiftEnd: true, shiftBreak: true,
       createdAt: true, updatedAt: true,
     },

@@ -34,6 +34,8 @@ type Rate = {
   closedSat: boolean;
 };
 
+type ClosedDateRecord = { id: string; date: string; name: string; type: string };
+
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const DOW_KEYS = ["closedSun", "closedMon", "closedTue", "closedWed", "closedThu", "closedFri", "closedSat"] as const;
 
@@ -45,10 +47,21 @@ function calcH(startTime: string | null, endTime: string | null, breakMinutes: n
   return t > 0 ? (t / 60).toFixed(1) : "0";
 }
 
-function isClosed(date: string, rates: Rate | null) {
+function isClosed(date: string, rates: Rate | null, closedDates: ClosedDateRecord[]) {
   if (!rates) return false;
   const dow = new Date(date).getDay();
-  return rates[DOW_KEYS[dow]];
+  if (rates[DOW_KEYS[dow]]) return true;
+  return closedDates.some((cd) => cd.date.startsWith(date));
+}
+
+function getClosedDateName(date: string, rates: Rate | null, closedDates: ClosedDateRecord[]): string {
+  const cd = closedDates.find((c) => c.date.startsWith(date));
+  if (cd) return cd.name;
+  if (rates) {
+    const dow = new Date(date).getDay();
+    if (rates[DOW_KEYS[dow]]) return "定休";
+  }
+  return "定休";
 }
 
 export default function ShukkinPage() {
@@ -57,16 +70,20 @@ export default function ShukkinPage() {
   const [selEmp, setSelEmp] = useState("");
   const [att, setAtt] = useState<AttRecord[]>([]);
   const [rates, setRates] = useState<Rate | null>(null);
+  const [closedDates, setClosedDates] = useState<ClosedDateRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const year = selMonth.slice(0, 4);
     Promise.all([
       fetch("/api/employees").then((r) => r.json()),
       fetch("/api/rates").then((r) => r.json()),
-    ]).then(([data, r]) => {
+      fetch(`/api/closed-dates?year=${year}`).then((r) => r.json()),
+    ]).then(([data, r, cd]) => {
       const active = data.filter((e: Employee) => !e.resignDate);
       setEmp(active);
       setRates(r);
+      setClosedDates(cd);
       if (active.length > 0 && !selEmp) setSelEmp(active[0].id);
       setLoading(false);
     });
@@ -102,7 +119,7 @@ export default function ShukkinPage() {
   // 表示用: レコードがなければ固定シフトをデフォルト表示
   const getDisplay = (date: string) => {
     const rec = getRec(date);
-    const closed = isClosed(date, rates);
+    const closed = isClosed(date, rates, closedDates);
     if (rec) {
       return {
         startTime: rec.startTime || "",
@@ -151,7 +168,7 @@ export default function ShukkinPage() {
     const rec = getRec(d);
     return s + Number(calcH(rec?.startTime || null, rec?.endTime || null, rec?.breakMinutes || null) || 0);
   }, 0);
-  const scheduledDays = days.filter((d) => !isClosed(d, rates)).length;
+  const scheduledDays = days.filter((d) => !isClosed(d, rates, closedDates)).length;
 
   const inputClass =
     "w-full p-1.5 px-2 rounded border border-app-border text-xs bg-white outline-none";
@@ -204,7 +221,7 @@ export default function ShukkinPage() {
       </Card>
 
       {days.map((date) => {
-        const closed = isClosed(date, rates);
+        const closed = isClosed(date, rates, closedDates);
         const dow = new Date(date).toLocaleDateString("ja-JP", { weekday: "short" });
         const display = getDisplay(date);
         const rec = getRec(date);
@@ -225,7 +242,7 @@ export default function ShukkinPage() {
               <div className={`text-sm font-bold min-w-[70px] ${closed ? "text-app-sub" : "text-app-text"}`}>
                 {date.slice(5)} ({dow})
               </div>
-              {closed && <Badge type="default">定休</Badge>}
+              {closed && <Badge type="default">{getClosedDateName(date, rates, closedDates)}</Badge>}
               {isAbsent && <Badge type="danger">欠勤</Badge>}
               {!closed && !display.hasRecord && !isAbsent && display.startTime && (
                 <Badge type="accent">予定</Badge>

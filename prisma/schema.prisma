@@ -28,6 +28,7 @@ model Employee {
   healthInsuranceEnrolled  Boolean @default(false) // 健康保険加入
   pensionEnrolled          Boolean @default(false) // 厚生年金加入
   employmentInsuranceEnrolled Boolean @default(false) // 雇用保険加入
+  contractEndDate DateTime?  // 契約終了日（契約社員向け）
   loginId        String?   @unique
   passwordHash   String?
   role           String    @default("employee") // "admin" | "employee"
@@ -113,4 +114,28 @@ model Rate {
   closedFri           Boolean  @default(false)
   closedSat           Boolean  @default(true)  // 土曜定休
   updatedAt           DateTime @updatedAt
+}
+
+model Company {
+  id                 String    @id @default(cuid())
+  name               String    @default("")       // 会社名
+  nameKana           String?                       // フリガナ
+  representativeName String?                       // 代表者名
+  address            String?                       // 所在地
+  phone              String?                       // 電話番号
+  email              String?                       // メールアドレス
+  establishedDate    DateTime?                     // 設立日
+  businessType       String?                       // 事業内容
+  corporateNumber    String?                       // 法人番号
+  memo               String?                       // 備考
+  updatedAt          DateTime  @updatedAt
+}
+
+model ClosedDate {
+  id   String   @id @default(cuid())
+  date DateTime @db.Date       // 休日の日付
+  name String                  // 名称（例: "元日"）
+  type String   @default("national") // "national" | "company"
+
+  @@unique([date])
 }
