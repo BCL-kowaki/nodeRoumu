@@ -12,6 +12,9 @@ type Employee = {
   hourlyWage: number | null;
   monthlySalary: number | null;
   resignDate: string | null;
+  healthInsuranceEnrolled: boolean;
+  pensionEnrolled: boolean;
+  employmentInsuranceEnrolled: boolean;
 };
 
 type AttRecord = {
@@ -124,6 +127,11 @@ export default function ChinginPage() {
     else if (e.hourlyWage) g = Math.round(h * e.hourlyWage);
 
     const dd = calcDeductions(g, rates);
+    // 社保未加入の項目は0にする
+    const hi = e.healthInsuranceEnrolled ? dd.healthInsurance : 0;
+    const pn = e.pensionEnrolled ? dd.pension : 0;
+    const ei = e.employmentInsuranceEnrolled ? dd.employmentInsurance : 0;
+    const socialTotal = hi + pn + ei;
     setForm({
       id: "",
       employeeId: e.id,
@@ -134,14 +142,14 @@ export default function ChinginPage() {
       overtimePay: 0,
       allowance: 0,
       totalPay: g,
-      healthInsurance: dd.healthInsurance,
-      pension: dd.pension,
-      employmentInsurance: dd.employmentInsurance,
+      healthInsurance: hi,
+      pension: pn,
+      employmentInsurance: ei,
       incomeTax: 0,
       residentTax: 0,
       otherDeduction: 0,
-      totalDeduction: dd.totalSocial,
-      netPay: g - dd.totalSocial,
+      totalDeduction: socialTotal,
+      netPay: g - socialTotal,
       confirmed: false,
     });
     setEditing(e.id);
@@ -149,21 +157,24 @@ export default function ChinginPage() {
 
   const recalc = (f: PayrollRecord): PayrollRecord => {
     if (!rates) return f;
+    const e = emp.find((x) => x.id === f.employeeId);
     const tp = (f.grossPay || 0) + (f.overtimePay || 0) + (f.allowance || 0);
     const dd = calcDeductions(tp, rates);
+    // 社保未加入の項目は0
+    const hi = e?.healthInsuranceEnrolled ? dd.healthInsurance : 0;
+    const pn = e?.pensionEnrolled ? dd.pension : 0;
+    const ei = e?.employmentInsuranceEnrolled ? dd.employmentInsurance : 0;
     const td =
-      dd.healthInsurance +
-      dd.pension +
-      dd.employmentInsurance +
+      hi + pn + ei +
       (f.incomeTax || 0) +
       (f.residentTax || 0) +
       (f.otherDeduction || 0);
     return {
       ...f,
       totalPay: tp,
-      healthInsurance: dd.healthInsurance,
-      pension: dd.pension,
-      employmentInsurance: dd.employmentInsurance,
+      healthInsurance: hi,
+      pension: pn,
+      employmentInsurance: ei,
       totalDeduction: td,
       netPay: tp - td,
     };
