@@ -36,6 +36,28 @@ type Rate = {
 
 type ClosedDateRecord = { id: string; date: string; name: string; type: string };
 
+// ステータス定義
+const STATUS_OPTIONS = [
+  { value: "", label: "—（自動）" },
+  { value: "scheduled", label: "出勤予定" },
+  { value: "normal", label: "出勤" },
+  { value: "late", label: "遅刻" },
+  { value: "early_leave", label: "早退" },
+  { value: "absent", label: "欠勤" },
+  { value: "public_holiday", label: "公休" },
+  { value: "closed", label: "定休" },
+];
+
+const STATUS_BADGE: Record<string, { text: string; type: "success" | "danger" | "accent" | "default" }> = {
+  scheduled: { text: "予定", type: "accent" },
+  normal: { text: "出勤", type: "success" },
+  late: { text: "遅刻", type: "accent" },
+  early_leave: { text: "早退", type: "accent" },
+  absent: { text: "欠勤", type: "danger" },
+  public_holiday: { text: "公休", type: "default" },
+  closed: { text: "定休", type: "default" },
+};
+
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const DOW_KEYS = ["closedSun", "closedMon", "closedTue", "closedWed", "closedThu", "closedFri", "closedSat"] as const;
 
@@ -62,6 +84,15 @@ function getClosedDateName(date: string, rates: Rate | null, closedDates: Closed
     if (rates[DOW_KEYS[dow]]) return "定休";
   }
   return "定休";
+}
+
+// ステータスの自動判定（手動設定がない場合）
+function autoStatus(date: string, rec: AttRecord | undefined, closed: boolean, isPast: boolean): string {
+  if (rec?.status) return rec.status;
+  if (closed) return "closed";
+  if (rec?.startTime) return "normal";
+  if (isPast) return "absent";
+  return "scheduled";
 }
 
 export default function ShukkinPage() {
@@ -116,7 +147,6 @@ export default function ShukkinPage() {
   const getRec = (date: string) =>
     att.find((a) => a.employeeId === selEmp && a.date.startsWith(date));
 
-  // 表示用: レコードがなければ固定シフトをデフォルト表示
   const getDisplay = (date: string) => {
     const rec = getRec(date);
     const closed = isClosed(date, rates, closedDates);
@@ -128,7 +158,6 @@ export default function ShukkinPage() {
         hasRecord: true,
       };
     }
-    // 定休日でなければ固定シフトをデフォルト表示
     if (!closed && selE?.shiftStart) {
       return {
         startTime: selE.shiftStart || "",
@@ -141,14 +170,12 @@ export default function ShukkinPage() {
   };
 
   const upsert = async (date: string, field: string, val: string) => {
-    // 保存時、レコードがなければ固定シフトの値も一緒に送る
     const rec = getRec(date);
     const body: Record<string, unknown> = {
       employeeId: selEmp,
       date,
       [field]: val,
     };
-    // 初回保存時にシフトデフォルト値を含める
     if (!rec && selE) {
       if (field !== "startTime") body.startTime = selE.shiftStart || undefined;
       if (field !== "endTime") body.endTime = selE.shiftEnd || undefined;
@@ -162,13 +189,25 @@ export default function ShukkinPage() {
     fetchAtt();
   };
 
-  // 集計はレコードベース
-  const totalDays = days.filter((d) => getRec(d)?.startTime).length;
+  // 集計
+  const totalDays = days.filter((d) => {
+    const rec = getRec(d);
+    const st = autoStatus(d, rec, isClosed(d, rates, closedDates), d < todayStr());
+    return st === "normal" || st === "late" || st === "early_leave";
+  }).length;
   const totalH = days.reduce((s, d) => {
     const rec = getRec(d);
     return s + Number(calcH(rec?.startTime || null, rec?.endTime || null, rec?.breakMinutes || null) || 0);
   }, 0);
   const scheduledDays = days.filter((d) => !isClosed(d, rates, closedDates)).length;
+  const absentDays = days.filter((d) => {
+    const rec = getRec(d);
+    return autoStatus(d, rec, isClosed(d, rates, closedDates), d < todayStr()) === "absent";
+  }).length;
+  const lateDays = days.filter((d) => {
+    const rec = getRec(d);
+    return autoStatus(d, rec, isClosed(d, rates, closedDates), d < todayStr()) === "late";
+  }).length;
 
   const inputClass =
     "w-full p-1.5 px-2 rounded border border-app-border text-xs bg-white outline-none";
@@ -205,6 +244,7 @@ export default function ShukkinPage() {
         </div>
       </Card>
 
+      {/* 月間集計 */}
       <Card className="!bg-primary-light !p-3.5">
         <div className="text-[13px] text-primary-dark font-semibold">
           {selE?.name} — {selMonth} 集計
@@ -213,6 +253,12 @@ export default function ShukkinPage() {
           出勤 <strong className="text-primary">{totalDays}日</strong> / 予定{scheduledDays}日 ・ 実働{" "}
           <strong className="text-primary">{totalH.toFixed(1)}h</strong>
         </div>
+        {(lateDays > 0 || absentDays > 0) && (
+          <div className="text-xs mt-0.5">
+            {lateDays > 0 && <span className="text-accent mr-2">遅刻 {lateDays}回</span>}
+            {absentDays > 0 && <span className="text-danger">欠勤 {absentDays}日</span>}
+          </div>
+        )}
         {selE?.shiftStart && selE?.shiftEnd && (
           <div className="text-xs text-app-sub mt-0.5">
             固定シフト: {selE.shiftStart}〜{selE.shiftEnd}（休憩{selE.shiftBreak || 0}分）
@@ -220,6 +266,7 @@ export default function ShukkinPage() {
         )}
       </Card>
 
+      {/* 日別 */}
       {days.map((date) => {
         const closed = isClosed(date, rates, closedDates);
         const dow = new Date(date).toLocaleDateString("ja-JP", { weekday: "short" });
@@ -227,34 +274,30 @@ export default function ShukkinPage() {
         const rec = getRec(date);
         const h = calcH(display.startTime || null, display.endTime || null, typeof display.breakMinutes === "number" ? display.breakMinutes : null);
         const isPast = date < todayStr();
-        const isAbsent = isPast && !closed && !rec?.startTime;
-
-        // ステータスバッジ
-        const statusLabel: Record<string, { text: string; type: "success" | "danger" | "accent" | "default" }> = {
-          normal: { text: "出勤", type: "success" },
-          late: { text: "遅刻", type: "accent" },
-          early_leave: { text: "早退", type: "accent" },
-        };
+        const currentStatus = autoStatus(date, rec, closed, isPast);
+        const badge = STATUS_BADGE[currentStatus];
 
         return (
-          <Card key={date} className={`!p-3 ${closed ? "!bg-gray-50" : ""} ${isAbsent ? "!bg-red-50" : ""}`}>
+          <Card
+            key={date}
+            className={`!p-3 ${
+              currentStatus === "closed" || currentStatus === "public_holiday" ? "!bg-gray-50" : ""
+            } ${currentStatus === "absent" ? "!bg-red-50" : ""}`}
+          >
             <div className="flex items-center gap-2 mb-2">
-              <div className={`text-sm font-bold min-w-[70px] ${closed ? "text-app-sub" : "text-app-text"}`}>
+              <div className={`text-sm font-bold min-w-[70px] ${closed || currentStatus === "public_holiday" ? "text-app-sub" : "text-app-text"}`}>
                 {date.slice(5)} ({dow})
               </div>
-              {closed && <Badge type="default">{getClosedDateName(date, rates, closedDates)}</Badge>}
-              {isAbsent && <Badge type="danger">欠勤</Badge>}
-              {!closed && !display.hasRecord && !isAbsent && display.startTime && (
-                <Badge type="accent">予定</Badge>
-              )}
-              {rec?.status && statusLabel[rec.status] && (
-                <Badge type={statusLabel[rec.status].type}>{statusLabel[rec.status].text}</Badge>
+              {badge && (
+                <Badge type={badge.type}>
+                  {currentStatus === "closed" ? getClosedDateName(date, rates, closedDates) : badge.text}
+                </Badge>
               )}
               {h && (
                 <div className="text-[13px] font-bold text-primary ml-auto">{h}h</div>
               )}
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-4 gap-1.5">
               <div>
                 <label className="block text-[10px] font-semibold text-app-sub mb-0.5">出勤</label>
                 <input
@@ -274,13 +317,29 @@ export default function ShukkinPage() {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-app-sub mb-0.5">休憩(分)</label>
+                <label className="block text-[10px] font-semibold text-app-sub mb-0.5">休憩</label>
                 <input
                   type="number"
                   className={`${inputClass} ${!display.hasRecord && display.breakMinutes ? "text-app-sub" : ""}`}
                   value={display.breakMinutes}
                   onChange={(e) => upsert(date, "breakMinutes", e.target.value)}
                 />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-app-sub mb-0.5">状態</label>
+                <select
+                  className={`${inputClass} ${
+                    currentStatus === "absent" ? "text-danger" :
+                    currentStatus === "late" || currentStatus === "early_leave" ? "text-accent" :
+                    currentStatus === "normal" ? "text-primary" : ""
+                  }`}
+                  value={rec?.status || ""}
+                  onChange={(e) => upsert(date, "status", e.target.value)}
+                >
+                  {STATUS_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </Card>

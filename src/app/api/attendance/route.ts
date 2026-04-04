@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
       startTime: body.startTime ?? undefined,
       endTime: body.endTime ?? undefined,
       breakMinutes: body.breakMinutes != null ? Number(body.breakMinutes) : undefined,
+      status: body.status ?? undefined,
       memo: body.memo ?? undefined,
     },
     create: {
@@ -49,6 +50,7 @@ export async function POST(req: NextRequest) {
       startTime: body.startTime || null,
       endTime: body.endTime || null,
       breakMinutes: body.breakMinutes ? Number(body.breakMinutes) : null,
+      status: body.status || null,
       memo: body.memo || null,
     },
   });
