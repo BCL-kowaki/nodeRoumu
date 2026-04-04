@@ -6,7 +6,7 @@ import { createToken, setSessionCookie } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const { loginId, password } = await req.json();
+  const { loginId, password, remember } = await req.json();
 
   if (!loginId || !password) {
     return NextResponse.json(
@@ -39,9 +39,9 @@ export async function POST(req: NextRequest) {
     loginId: employee.loginId!,
     role: employee.role as "admin" | "manager" | "employee",
     name: employee.name,
-  });
+  }, !!remember);
 
-  setSessionCookie(token);
+  setSessionCookie(token, !!remember);
 
   return NextResponse.json({
     ok: true,

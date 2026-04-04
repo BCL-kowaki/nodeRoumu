@@ -7,6 +7,7 @@ import Card from "@/components/Card";
 export default function LoginPage() {
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -19,7 +20,7 @@ export default function LoginPage() {
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ loginId, password }),
+      body: JSON.stringify({ loginId, password, remember }),
     });
 
     const data = await res.json();
@@ -87,6 +88,15 @@ export default function LoginPage() {
             >
               {loading ? "ログイン中..." : "ログイン"}
             </button>
+            <label className="flex items-center gap-2 justify-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="w-4 h-4 accent-primary"
+              />
+              <span className="text-xs text-app-sub">30日間ログイン状態を保持する</span>
+            </label>
           </form>
         </Card>
       </div>
