@@ -17,8 +17,21 @@ type DakokuLog = {
   type: string;
 };
 
+type Rate = {
+  closedSun: boolean;
+  closedMon: boolean;
+  closedTue: boolean;
+  closedWed: boolean;
+  closedThu: boolean;
+  closedFri: boolean;
+  closedSat: boolean;
+};
+
+type ClosedDateRecord = { date: string };
+
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const curMonth = () => new Date().toISOString().slice(0, 7);
+const DOW_KEYS = ["closedSun", "closedMon", "closedTue", "closedWed", "closedThu", "closedFri", "closedSat"] as const;
 
 function calcHours(rec: AttRecord): number {
   if (!rec.startTime || !rec.endTime) return 0;
@@ -33,6 +46,7 @@ export default function EmployeeDashboard() {
   const [todayLogs, setTodayLogs] = useState<DakokuLog[]>([]);
   const [monthAtt, setMonthAtt] = useState<AttRecord[]>([]);
   const [todayAtt, setTodayAtt] = useState<AttRecord | null>(null);
+  const [dayIsClosed, setDayIsClosed] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,15 +54,25 @@ export default function EmployeeDashboard() {
     const eid = user.employeeId;
     const today = todayStr();
     const month = curMonth();
+    const year = today.slice(0, 4);
 
     Promise.all([
       fetch(`/api/dakoku?employeeId=${eid}&date=${today}`).then((r) => r.json()),
       fetch(`/api/attendance?employeeId=${eid}&month=${month}`).then((r) => r.json()),
-    ]).then(([dak, att]) => {
+      fetch("/api/rates").then((r) => r.json()),
+      fetch(`/api/closed-dates?year=${year}`).then((r) => r.json()),
+    ]).then(([dak, att, rates, closedDates]: [DakokuLog[], AttRecord[], Rate, ClosedDateRecord[]]) => {
       setTodayLogs(dak);
       setMonthAtt(att);
       const todayRec = att.find((a: AttRecord) => a.date.startsWith(today));
       setTodayAtt(todayRec || null);
+
+      // 今日が定休日かどうか
+      const dow = new Date(today).getDay();
+      const weekdayClosed = rates[DOW_KEYS[dow]];
+      const dateClosed = closedDates.some((cd) => cd.date.startsWith(today));
+      setDayIsClosed(weekdayClosed || dateClosed);
+
       setLoading(false);
     });
   }, [user?.employeeId]);
@@ -78,17 +102,26 @@ export default function EmployeeDashboard() {
   });
 
   const last = todayLogs[todayLogs.length - 1];
-  let status = "未出勤";
-  if (last?.type === "out") status = "退勤済";
-  else if (last?.type === "break_start") status = "休憩中";
-  else if (last?.type === "in" || last?.type === "break_end") status = "勤務中";
+  let status: string;
+  if (dayIsClosed) {
+    status = "定休日";
+  } else if (!last) {
+    status = "出勤前";
+  } else if (last.type === "out") {
+    status = "退勤済";
+  } else if (last.type === "break_start") {
+    status = "休憩中";
+  } else {
+    status = "勤務中";
+  }
 
   const todayHours = todayAtt ? calcHours(todayAtt) : 0;
   const monthDays = monthAtt.filter((a) => a.startTime).length;
   const monthHours = monthAtt.reduce((s, a) => s + calcHours(a), 0);
 
   const statusColors: Record<string, { text: string; bg: string }> = {
-    未出勤: { text: "text-gray-500", bg: "bg-gray-100" },
+    定休日: { text: "text-app-sub", bg: "bg-gray-100" },
+    出勤前: { text: "text-gray-500", bg: "bg-gray-100" },
     勤務中: { text: "text-primary", bg: "bg-primary-light" },
     休憩中: { text: "text-accent", bg: "bg-orange-50" },
     退勤済: { text: "text-app-sub", bg: "bg-gray-100" },
