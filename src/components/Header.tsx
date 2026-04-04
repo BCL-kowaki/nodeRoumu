@@ -26,7 +26,7 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "manager";
 
   return (
     <header className="bg-white border-b border-app-border px-4 flex items-center h-14 sticky top-0 z-[100] shadow-[0_1px_4px_rgba(0,0,0,0.04)]">

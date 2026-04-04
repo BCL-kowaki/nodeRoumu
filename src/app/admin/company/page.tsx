@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Card from "@/components/Card";
 
 type Company = {
@@ -24,6 +24,9 @@ export default function CompanyPage() {
   const [form, setForm] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/company")
@@ -46,6 +49,51 @@ export default function CompanyPage() {
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
+  };
+
+  // 謄本PDFアップロード → 情報を自動入力
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !form) return;
+
+    setUploading(true);
+    setUploadMsg("");
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/company/parse-pdf", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setUploadMsg(data.error || "解析に失敗しました");
+        return;
+      }
+
+      const ext = data.extracted as Record<string, string>;
+      // 抽出された値をフォームに反映（空でない値のみ上書き）
+      setForm({
+        ...form,
+        name: ext.name || form.name,
+        address: ext.address || form.address,
+        establishedDate: ext.establishedDate || form.establishedDate,
+        corporateNumber: ext.corporateNumber || form.corporateNumber,
+        representativeName: ext.representativeName || form.representativeName,
+        businessType: ext.businessType || form.businessType,
+      });
+
+      const count = Object.keys(ext).length;
+      setUploadMsg(`${count}件の情報を読み取りました。内容を確認して保存してください`);
+    } catch {
+      setUploadMsg("PDFの解析中にエラーが発生しました");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
   };
 
   if (loading || !form)
@@ -74,6 +122,35 @@ export default function CompanyPage() {
         </Card>
       )}
 
+      {/* 謄本PDFアップロード */}
+      <Card>
+        <div className="text-sm font-bold text-app-text mb-2">📄 謄本PDFから読み取り</div>
+        <div className="text-[11px] text-app-sub mb-3">
+          登記簿謄本のPDFをアップロードすると、会社名・所在地・設立日・法人番号・代表者・事業内容を自動入力します
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".pdf"
+            onChange={handlePdfUpload}
+            className="text-xs text-app-sub"
+            disabled={uploading}
+          />
+          {uploading && <span className="text-xs text-app-sub">解析中...</span>}
+        </div>
+        {uploadMsg && (
+          <div className={`text-xs mt-2 p-2 rounded ${
+            uploadMsg.includes("失敗") || uploadMsg.includes("エラー")
+              ? "text-danger bg-danger-light"
+              : "text-primary-dark bg-primary-light"
+          }`}>
+            {uploadMsg}
+          </div>
+        )}
+      </Card>
+
+      {/* 企業情報フォーム */}
       <Card>
         <div className="flex flex-col gap-3.5">
           {fields.map((x) => (
