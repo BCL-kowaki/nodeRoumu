@@ -26,6 +26,8 @@ export default function CompanyPage() {
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState("");
+  const [rawText, setRawText] = useState("");
+  const [showRawText, setShowRawText] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -56,7 +58,7 @@ export default function CompanyPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     page: any
   ): Promise<string> => {
-    const scale = 2; // 高解像度でOCR精度向上
+    const scale = 3; // 高解像度でOCR精度向上
     const viewport = page.getViewport({ scale });
     const canvas = document.createElement("canvas");
     canvas.width = viewport.width;
@@ -142,6 +144,7 @@ export default function CompanyPage() {
 
       if (!fullText.trim()) {
         setUploadMsg("テキストを読み取れませんでした");
+        setRawText("（テキスト抽出結果なし）");
         return;
       }
 
@@ -159,6 +162,7 @@ export default function CompanyPage() {
         return;
       }
 
+      if (data.rawText) setRawText(data.rawText);
       applyExtracted(data.extracted);
     } catch (err) {
       console.error("PDF解析エラー:", err);
@@ -221,6 +225,21 @@ export default function CompanyPage() {
               : "text-primary-dark bg-primary-light"
           }`}>
             {uploading && "⏳ "}{uploadMsg}
+          </div>
+        )}
+        {rawText && !uploading && (
+          <div className="mt-2">
+            <button
+              onClick={() => setShowRawText((v) => !v)}
+              className="text-[11px] text-app-sub underline cursor-pointer bg-transparent border-none p-0"
+            >
+              {showRawText ? "読み取りテキストを閉じる" : "読み取りテキストを確認する"}
+            </button>
+            {showRawText && (
+              <pre className="mt-1 p-2 bg-gray-50 border border-app-border rounded text-[10px] text-app-sub overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap break-all">
+                {rawText}
+              </pre>
+            )}
           </div>
         )}
       </Card>
