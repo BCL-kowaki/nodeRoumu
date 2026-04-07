@@ -36,6 +36,17 @@ type Rate = {
 
 type ClosedDateRecord = { id: string; date: string; name: string; type: string };
 
+type DakokuLog = {
+  id: string;
+  employeeId: string;
+  date: string;
+  time: string;
+  type: string;
+  latitude: number | null;
+  longitude: number | null;
+  timestamp: string;
+};
+
 // ステータス定義
 const STATUS_OPTIONS = [
   { value: "", label: "—（自動）" },
@@ -103,6 +114,9 @@ export default function ShukkinPage() {
   const [rates, setRates] = useState<Rate | null>(null);
   const [closedDates, setClosedDates] = useState<ClosedDateRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modalDate, setModalDate] = useState<string | null>(null);
+  const [modalLogs, setModalLogs] = useState<DakokuLog[]>([]);
+  const [modalLoading, setModalLoading] = useState(false);
 
   useEffect(() => {
     const year = selMonth.slice(0, 4);
@@ -187,6 +201,22 @@ export default function ShukkinPage() {
       body: JSON.stringify(body),
     });
     fetchAtt();
+  };
+
+  // 打刻履歴モーダルを開く
+  const openDakokuModal = async (date: string) => {
+    setModalDate(date);
+    setModalLoading(true);
+    setModalLogs([]);
+    try {
+      const res = await fetch(`/api/dakoku?employeeId=${selEmp}&date=${date}`);
+      const data: DakokuLog[] = await res.json();
+      setModalLogs(data);
+    } catch {
+      setModalLogs([]);
+    } finally {
+      setModalLoading(false);
+    }
   };
 
   // 集計
@@ -347,9 +377,101 @@ export default function ShukkinPage() {
                 </select>
               </div>
             </div>
+            {/* 打刻履歴ボタン（レコードがある日のみ） */}
+            {display.hasRecord && (
+              <button
+                onClick={() => openDakokuModal(date)}
+                className="mt-1.5 text-[11px] text-primary underline bg-transparent border-none cursor-pointer p-0"
+              >
+                打刻履歴を確認
+              </button>
+            )}
           </Card>
         );
       })}
+
+      {/* 打刻履歴モーダル */}
+      {modalDate && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/30 z-[200]"
+            onClick={() => setModalDate(null)}
+          />
+          <div className="fixed inset-x-4 top-[10%] bottom-[10%] bg-white rounded z-[300] shadow-lg overflow-y-auto max-w-app mx-auto">
+            <div className="sticky top-0 bg-white border-b border-app-border p-4 flex items-center justify-between">
+              <div>
+                <div className="text-sm font-bold text-app-text">打刻履歴</div>
+                <div className="text-xs text-app-sub">
+                  {selE?.name} — {modalDate}
+                </div>
+              </div>
+              <button
+                onClick={() => setModalDate(null)}
+                className="w-8 h-8 flex items-center justify-center rounded text-app-sub hover:bg-gray-100 border-none bg-transparent cursor-pointer text-lg"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4">
+              {modalLoading ? (
+                <div className="text-center text-app-sub py-8">読み込み中...</div>
+              ) : modalLogs.length === 0 ? (
+                <div className="text-center text-app-sub py-8">打刻記録がありません</div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {modalLogs.map((log) => {
+                    const typeLabels: Record<string, { label: string; icon: string; color: string }> = {
+                      in: { label: "出勤", icon: "🟢", color: "text-primary" },
+                      out: { label: "退勤", icon: "🔴", color: "text-danger" },
+                      break_start: { label: "休憩開始", icon: "☕", color: "text-accent" },
+                      break_end: { label: "休憩終了", icon: "🔄", color: "text-primary" },
+                    };
+                    const info = typeLabels[log.type] || { label: log.type, icon: "⏱️", color: "text-app-text" };
+
+                    return (
+                      <div
+                        key={log.id}
+                        className="border border-app-border rounded p-3"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-lg">{info.icon}</span>
+                          <span className={`text-sm font-bold ${info.color}`}>{info.label}</span>
+                          <span className="text-lg font-bold text-app-text tabular-nums ml-auto">
+                            {log.time}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-app-sub">
+                          {new Date(log.timestamp).toLocaleString("ja-JP")}
+                        </div>
+                        {log.latitude && log.longitude ? (
+                          <div className="mt-1.5 flex items-center gap-1.5">
+                            <span className="text-xs">📍</span>
+                            <a
+                              href={`https://maps.google.com/maps?q=${log.latitude},${log.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[11px] text-primary underline"
+                            >
+                              {log.latitude.toFixed(6)}, {log.longitude.toFixed(6)}
+                            </a>
+                            <span className="text-[10px] text-app-sub ml-1">
+                              (Google Mapsで確認)
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="mt-1.5 text-[11px] text-app-sub">
+                            📍 位置情報なし
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
