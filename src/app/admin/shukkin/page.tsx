@@ -106,6 +106,12 @@ function autoStatus(date: string, rec: AttRecord | undefined, closed: boolean, i
   return "scheduled";
 }
 
+// そのステータスが「実働時間を計上すべき」か判定
+// normal / late / early_leave のときだけ計上する
+function isWorkingStatus(status: string): boolean {
+  return status === "normal" || status === "late" || status === "early_leave";
+}
+
 export default function ShukkinPage() {
   const [emp, setEmp] = useState<Employee[]>([]);
   const [selMonth, setSelMonth] = useState(todayStr().slice(0, 7));
@@ -190,7 +196,14 @@ export default function ShukkinPage() {
       date,
       [field]: val,
     };
-    if (!rec && selE) {
+    // ステータスを「勤務扱いにならない」値に変えた場合、実働時間データをクリア
+    // これにより月合計・日別表示の両方から計上されなくなる
+    if (field === "status" && !isWorkingStatus(val) && val !== "") {
+      body.startTime = null;
+      body.endTime = null;
+      body.breakMinutes = null;
+    }
+    if (!rec && selE && field !== "status") {
       if (field !== "startTime") body.startTime = selE.shiftStart || undefined;
       if (field !== "endTime") body.endTime = selE.shiftEnd || undefined;
       if (field !== "breakMinutes") body.breakMinutes = selE.shiftBreak || undefined;
@@ -227,6 +240,9 @@ export default function ShukkinPage() {
   }).length;
   const totalH = days.reduce((s, d) => {
     const rec = getRec(d);
+    const st = autoStatus(d, rec, isClosed(d, rates, closedDates), d < todayStr());
+    // 定休・欠勤・公休・未出勤の日は時刻データがあっても計上しない
+    if (!isWorkingStatus(st)) return s;
     return s + Number(calcH(rec?.startTime || null, rec?.endTime || null, rec?.breakMinutes || null) || 0);
   }, 0);
   const scheduledDays = days.filter((d) => !isClosed(d, rates, closedDates)).length;
@@ -323,10 +339,13 @@ export default function ShukkinPage() {
         const dow = new Date(date).toLocaleDateString("ja-JP", { weekday: "short" });
         const display = getDisplay(date);
         const rec = getRec(date);
-        const h = calcH(display.startTime || null, display.endTime || null, typeof display.breakMinutes === "number" ? display.breakMinutes : null);
         const isPast = date < todayStr();
         const currentStatus = autoStatus(date, rec, closed, isPast);
         const badge = STATUS_BADGE[currentStatus];
+        // 定休・欠勤・公休・未出勤の日は実働時間を表示しない
+        const h = isWorkingStatus(currentStatus)
+          ? calcH(display.startTime || null, display.endTime || null, typeof display.breakMinutes === "number" ? display.breakMinutes : null)
+          : "";
 
         return (
           <Card

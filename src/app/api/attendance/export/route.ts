@@ -65,6 +65,11 @@ function autoStatus(
   return "scheduled";
 }
 
+// 実働時間を計上すべきステータスか
+function isWorkingStatus(status: string): boolean {
+  return status === "normal" || status === "late" || status === "early_leave";
+}
+
 export async function GET(req: NextRequest) {
   // 認証・権限チェック
   const session = await getSession();
@@ -176,6 +181,9 @@ export async function GET(req: NextRequest) {
 
       const holidayName = closedDate?.name || (weekdayClosed ? "定休" : "");
 
+      // 非稼働ステータス（closed/absent/public_holiday）の日は
+      // 時刻列・実働時間列を空欄にして集計に混ざらないようにする
+      const working = isWorkingStatus(status);
       rows.push([
         emp.id,
         emp.name,
@@ -184,14 +192,16 @@ export async function GET(req: NextRequest) {
         DOW_LABELS[dow],
         status,
         STATUS_JP[status] || status,
-        rec?.startTime || "",
-        rec?.endTime || "",
-        rec?.breakMinutes ?? "",
-        calcWorkHours(
-          rec?.startTime || null,
-          rec?.endTime || null,
-          rec?.breakMinutes || null
-        ),
+        working ? rec?.startTime || "" : "",
+        working ? rec?.endTime || "" : "",
+        working ? rec?.breakMinutes ?? "" : "",
+        working
+          ? calcWorkHours(
+              rec?.startTime || null,
+              rec?.endTime || null,
+              rec?.breakMinutes || null
+            )
+          : "",
         holidayName,
         rec?.memo || "",
       ]);

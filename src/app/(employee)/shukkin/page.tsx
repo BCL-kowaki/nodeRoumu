@@ -51,6 +51,11 @@ function isClosed(date: string, rates: Rate | null, closedDates: ClosedDateRecor
   return closedDates.some((cd) => cd.date.startsWith(date));
 }
 
+// 実働時間を計上すべきステータスか
+function isWorkingStatus(status: string | null | undefined): boolean {
+  return status === "normal" || status === "late" || status === "early_leave";
+}
+
 function getClosedDateName(date: string, rates: Rate | null, closedDates: ClosedDateRecord[]): string {
   const cd = closedDates.find((c) => c.date.startsWith(date));
   if (cd) return cd.name;
@@ -115,8 +120,20 @@ export default function EmployeeShukkin() {
   const getRec = (date: string) =>
     att.find((a) => a.date.startsWith(date));
 
-  const totalDays = days.filter((d) => getRec(d)?.startTime).length;
-  const totalH = days.reduce((s, d) => s + Number(calcH(getRec(d)) || 0), 0);
+  // 実働日：startTimeがあり、かつステータスが非稼働（closed等）でない日
+  const totalDays = days.filter((d) => {
+    const rec = getRec(d);
+    if (!rec?.startTime) return false;
+    // ステータスが手動で non-working に設定されていたら除外
+    if (rec.status && !isWorkingStatus(rec.status)) return false;
+    return true;
+  }).length;
+  // 実働時間：ステータスが closed/absent/public_holiday の日はカウントしない
+  const totalH = days.reduce((s, d) => {
+    const rec = getRec(d);
+    if (rec?.status && !isWorkingStatus(rec.status)) return s;
+    return s + Number(calcH(rec) || 0);
+  }, 0);
   const scheduledDays = days.filter((d) => !isClosed(d, rates, closedDates)).length;
 
   if (authLoading || loading)
@@ -155,7 +172,8 @@ export default function EmployeeShukkin() {
         const rec = getRec(date);
         const dow = new Date(date).toLocaleDateString("ja-JP", { weekday: "short" });
         const closed = isClosed(date, rates, closedDates);
-        const h = calcH(rec);
+        // ステータスが closed/absent/public_holiday なら時間表示しない
+        const h = rec?.status && !isWorkingStatus(rec.status) ? "" : calcH(rec);
         const today = date === todayStr();
         const isPast = date < todayStr();
         const isAbsent = isPast && !closed && !rec?.startTime;
