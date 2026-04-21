@@ -39,7 +39,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/employees").then((r) => r.json()),
+      fetch("/api/employees?scope=workers").then((r) => r.json()),
       fetch("/api/rates").then((r) => r.json()),
       fetch(`/api/payroll?month=${curMonth()}`).then((r) => r.json()),
       fetch(`/api/dakoku?date=${todayStr()}`).then((r) => r.json()),

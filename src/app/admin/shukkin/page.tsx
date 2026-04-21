@@ -121,7 +121,7 @@ export default function ShukkinPage() {
   useEffect(() => {
     const year = selMonth.slice(0, 4);
     Promise.all([
-      fetch("/api/employees").then((r) => r.json()),
+      fetch("/api/employees?scope=workers").then((r) => r.json()),
       fetch("/api/rates").then((r) => r.json()),
       fetch(`/api/closed-dates?year=${year}`).then((r) => r.json()),
     ]).then(([data, r, cd]) => {

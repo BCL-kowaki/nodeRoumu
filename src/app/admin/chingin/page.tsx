@@ -94,7 +94,7 @@ export default function ChinginPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/employees").then((r) => r.json()),
+      fetch("/api/employees?scope=workers").then((r) => r.json()),
       fetch("/api/rates").then((r) => r.json()),
     ]).then(([e, r]) => {
       setEmp(e.filter((x: Employee) => !x.resignDate));
