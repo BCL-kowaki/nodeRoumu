@@ -50,32 +50,57 @@ export default function EmployeeDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.employeeId) return;
+    // 認証状態の確認が終わるまで待つ
+    if (authLoading) return;
+    // 未ログイン（セッション失効等）なら何もせず、ローディング解除だけする
+    if (!user?.employeeId) {
+      setLoading(false);
+      return;
+    }
     const eid = user.employeeId;
     const today = todayStr();
     const month = curMonth();
     const year = today.slice(0, 4);
 
+    // fetchの失敗・JSONパース失敗があってもUIが固まらないよう
+    // 個別にcatchしてデフォルト値を返す
+    const safeFetch = async <T,>(url: string, fallback: T): Promise<T> => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return fallback;
+        return (await res.json()) as T;
+      } catch {
+        return fallback;
+      }
+    };
+
     Promise.all([
-      fetch(`/api/dakoku?employeeId=${eid}&date=${today}`).then((r) => r.json()),
-      fetch(`/api/attendance?employeeId=${eid}&month=${month}`).then((r) => r.json()),
-      fetch("/api/rates").then((r) => r.json()),
-      fetch(`/api/closed-dates?year=${year}`).then((r) => r.json()),
-    ]).then(([dak, att, rates, closedDates]: [DakokuLog[], AttRecord[], Rate, ClosedDateRecord[]]) => {
-      setTodayLogs(dak);
-      setMonthAtt(att);
-      const todayRec = att.find((a: AttRecord) => a.date.startsWith(today));
-      setTodayAtt(todayRec || null);
+      safeFetch<DakokuLog[]>(`/api/dakoku?employeeId=${eid}&date=${today}`, []),
+      safeFetch<AttRecord[]>(`/api/attendance?employeeId=${eid}&month=${month}`, []),
+      safeFetch<Rate | null>("/api/rates", null),
+      safeFetch<ClosedDateRecord[]>(`/api/closed-dates?year=${year}`, []),
+    ])
+      .then(([dak, att, rates, closedDates]) => {
+        setTodayLogs(dak);
+        setMonthAtt(att);
+        const todayRec = att.find((a: AttRecord) => a.date.startsWith(today));
+        setTodayAtt(todayRec || null);
 
-      // 今日が定休日かどうか
-      const dow = new Date(today).getDay();
-      const weekdayClosed = rates[DOW_KEYS[dow]];
-      const dateClosed = closedDates.some((cd) => cd.date.startsWith(today));
-      setDayIsClosed(weekdayClosed || dateClosed);
-
-      setLoading(false);
-    });
-  }, [user?.employeeId]);
+        // 今日が定休日かどうか（rates取得失敗時はfalse扱い）
+        const dow = new Date(today).getDay();
+        const weekdayClosed = rates ? rates[DOW_KEYS[dow]] : false;
+        const dateClosed = closedDates.some((cd) => cd.date.startsWith(today));
+        setDayIsClosed(weekdayClosed || dateClosed);
+      })
+      .catch((err) => {
+        // 想定外エラー（個人情報を含まない範囲でのみログ出力）
+        console.error("ホーム画面データ取得エラー:", err);
+      })
+      .finally(() => {
+        // 成功・失敗に関わらず必ずローディングを解除
+        setLoading(false);
+      });
+  }, [authLoading, user?.employeeId]);
 
   const now = new Date();
   const thisMonth = now.getMonth() + 1;
