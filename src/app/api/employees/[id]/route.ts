@@ -1,14 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import { canWriteEmployees } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
-// 従業員更新
+// 従業員更新（代表者のみ）
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  if (!canWriteEmployees(session.role)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   const body = await req.json();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,11 +57,19 @@ export async function PUT(
   return NextResponse.json(employee);
 }
 
-// 従業員削除
+// 従業員削除（代表者のみ）
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  if (!canWriteEmployees(session.role)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   await prisma.employee.delete({ where: { id: params.id } });
   return NextResponse.json({ ok: true });
 }

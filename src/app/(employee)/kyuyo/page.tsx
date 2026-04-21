@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Card from "@/components/Card";
 import { useAuth } from "@/lib/auth-context";
+import { getClosingDate, getPayDate, formatDateJP } from "@/lib/payroll-date";
 
 type PayrollRecord = {
   month: string;
@@ -23,6 +24,12 @@ type PayrollRecord = {
   confirmed: boolean;
 };
 
+type CompanyInfo = {
+  name: string;
+  address: string | null;
+  representativeName: string | null;
+};
+
 const curMonth = () => new Date().toISOString().slice(0, 7);
 const fmt = (n: number) => n.toLocaleString("ja-JP");
 
@@ -30,6 +37,7 @@ export default function EmployeeKyuyo() {
   const { user, loading: authLoading } = useAuth();
   const [selMonth, setSelMonth] = useState(curMonth());
   const [pay, setPay] = useState<PayrollRecord | null>(null);
+  const [company, setCompany] = useState<CompanyInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchPay = useCallback(() => {
@@ -49,14 +57,74 @@ export default function EmployeeKyuyo() {
     fetchPay();
   }, [fetchPay]);
 
+  // 発行元（会社情報）を取得 — PDF保存時の発行元表示に使用
+  useEffect(() => {
+    fetch("/api/company")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setCompany(data))
+      .catch(() => setCompany(null));
+  }, []);
+
+  // 対象月の表示（YYYY年MM月）
+  const monthLabel = selMonth
+    ? `${selMonth.slice(0, 4)}年${selMonth.slice(5, 7)}月`
+    : "";
+  const issueDate = new Date().toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
   if (authLoading || loading)
     return <div className="text-center text-app-sub py-10">読み込み中...</div>;
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-lg font-bold">給与明細</div>
+      {/* 印刷時のみ表示される発行ヘッダー（画面では非表示） */}
+      <div className="hidden print:block mb-4">
+        {company && (
+          <div className="text-right text-xs text-app-sub mb-2">
+            <div className="text-sm font-bold text-app-text">{company.name}</div>
+            {company.address && <div>{company.address}</div>}
+            {company.representativeName && <div>代表者 {company.representativeName}</div>}
+          </div>
+        )}
+        <div className="border-b border-app-border pb-2 mb-3">
+          <div className="text-xl font-bold text-app-text">給与明細書</div>
+          <div className="flex justify-between mt-2 text-sm">
+            <div>
+              <span className="text-app-sub">対象月: </span>
+              <span className="font-bold">{monthLabel}</span>
+            </div>
+            <div>
+              <span className="text-app-sub">発行日: </span>
+              <span>{issueDate}</span>
+            </div>
+          </div>
+          <div className="flex justify-between mt-1 text-sm">
+            <div>
+              <span className="text-app-sub">締日: </span>
+              <span>{formatDateJP(getClosingDate(selMonth))}</span>
+            </div>
+            <div>
+              <span className="text-app-sub">支払日: </span>
+              <span className="font-bold">{formatDateJP(getPayDate(selMonth))}</span>
+            </div>
+          </div>
+          {user?.name && (
+            <div className="mt-2 text-sm">
+              <span className="text-app-sub">氏名: </span>
+              <span className="font-bold">{user.name}</span> 様
+            </div>
+          )}
+        </div>
+      </div>
 
-      <Card className="!p-4">
+      {/* 画面用タイトル（印刷時は非表示） */}
+      <div className="text-lg font-bold print:hidden">給与明細</div>
+
+      {/* 月選択（印刷時は非表示） */}
+      <Card className="!p-4 print:hidden">
         <label className="block text-xs font-semibold text-app-sub mb-1">月</label>
         <input
           type="month"
@@ -65,6 +133,16 @@ export default function EmployeeKyuyo() {
           className="w-full p-2 rounded border border-app-border text-sm bg-white outline-none"
         />
       </Card>
+
+      {/* PDF保存ボタン（確定済みレコードがある時のみ表示・印刷時は非表示） */}
+      {pay?.confirmed && (
+        <button
+          onClick={() => window.print()}
+          className="print:hidden w-full py-3 rounded bg-primary text-white text-sm font-bold border-none cursor-pointer"
+        >
+          この明細をPDFとして保存
+        </button>
+      )}
 
       {!pay ? (
         <Card className="text-center !py-10 text-app-sub">
@@ -76,6 +154,24 @@ export default function EmployeeKyuyo() {
         </Card>
       ) : (
         <>
+          {/* 締日・支払日（画面用・印刷時は上部ヘッダーで表示済みのため非表示） */}
+          <Card className="print:hidden">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-app-bg rounded p-3 text-center">
+                <div className="text-[11px] text-app-sub">締日</div>
+                <div className="text-sm font-bold text-app-text">
+                  {formatDateJP(getClosingDate(selMonth))}
+                </div>
+              </div>
+              <div className="bg-primary-light rounded p-3 text-center">
+                <div className="text-[11px] text-app-sub">支払日</div>
+                <div className="text-sm font-bold text-primary">
+                  {formatDateJP(getPayDate(selMonth))}
+                </div>
+              </div>
+            </div>
+          </Card>
+
           {/* 勤務情報 */}
           <Card>
             <div className="grid grid-cols-2 gap-2">

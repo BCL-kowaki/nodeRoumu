@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
+import { useAuth } from "@/lib/auth-context";
+import { canWriteEmployees } from "@/lib/permissions";
 
 type Employee = {
   id: string;
@@ -72,13 +74,15 @@ const inputClass = "w-full p-2.5 px-3.5 rounded border border-app-border text-sm
 const labelClass = "block text-xs font-semibold text-app-sub mb-1";
 
 export default function AdminMeiboPage() {
+  const { user } = useAuth();
+  const canWrite = canWriteEmployees(user?.role);
   const [emp, setEmp] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<"new" | "edit" | null>(null);
   const [form, setForm] = useState<EmployeeForm>(EMPTY as EmployeeForm);
 
   useEffect(() => {
-    fetch("/api/employees")
+    fetch("/api/employees?scope=workers")
       .then((r) => r.json())
       .then((data) => {
         setEmp(data);
@@ -87,7 +91,7 @@ export default function AdminMeiboPage() {
   }, []);
 
   const reload = () =>
-    fetch("/api/employees")
+    fetch("/api/employees?scope=workers")
       .then((r) => r.json())
       .then(setEmp);
 
@@ -249,13 +253,20 @@ export default function AdminMeiboPage() {
     <div className="flex flex-col gap-3">
       <div className="flex justify-between items-center">
         <div className="text-lg font-bold">労働者名簿（管理）</div>
-        <button
-          onClick={startNew}
-          className="px-6 py-3 rounded bg-primary text-white text-sm font-bold border-none cursor-pointer"
-        >
-          + 追加
-        </button>
+        {canWrite && (
+          <button
+            onClick={startNew}
+            className="px-6 py-3 rounded bg-primary text-white text-sm font-bold border-none cursor-pointer"
+          >
+            + 追加
+          </button>
+        )}
       </div>
+      {!canWrite && (
+        <div className="text-xs text-app-sub bg-app-bg rounded px-3 py-2">
+          閲覧のみ可能です（追加・編集・削除は代表者権限が必要）
+        </div>
+      )}
       {emp.length === 0 ? (
         <Card className="text-center !py-10 text-app-sub">
           従業員が登録されていません
@@ -307,20 +318,22 @@ export default function AdminMeiboPage() {
                   : "シフト未設定"}
               </div>
             </div>
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={() => startEdit(e)}
-                className="px-3.5 py-1.5 rounded border border-primary text-primary text-xs font-semibold bg-transparent cursor-pointer"
-              >
-                編集
-              </button>
-              <button
-                onClick={() => del(e.id)}
-                className="px-3.5 py-1.5 rounded border border-danger text-danger text-xs font-semibold bg-transparent cursor-pointer"
-              >
-                削除
-              </button>
-            </div>
+            {canWrite && (
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => startEdit(e)}
+                  className="px-3.5 py-1.5 rounded border border-primary text-primary text-xs font-semibold bg-transparent cursor-pointer"
+                >
+                  編集
+                </button>
+                <button
+                  onClick={() => del(e.id)}
+                  className="px-3.5 py-1.5 rounded border border-danger text-danger text-xs font-semibold bg-transparent cursor-pointer"
+                >
+                  削除
+                </button>
+              </div>
+            )}
           </Card>
         ))
       )}

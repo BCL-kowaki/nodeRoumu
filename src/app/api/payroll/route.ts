@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import { canWritePayroll } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +23,16 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(records);
 }
 
-// 賃金台帳のupsert（保存・確定）
+// 賃金台帳のupsert（保存・確定）— 代表者のみ
 export async function POST(req: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  if (!canWritePayroll(session.role)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   const body = await req.json();
 
   const record = await prisma.payroll.upsert({

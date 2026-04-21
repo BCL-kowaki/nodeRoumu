@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import { calcDeductions, type RateValues } from "@/lib/calc";
+import { getClosingDate, getPayDate, formatDateJP } from "@/lib/payroll-date";
+import { useAuth } from "@/lib/auth-context";
+import { canWritePayroll } from "@/lib/permissions";
 
 type Employee = {
   id: string;
@@ -78,6 +81,8 @@ const inputClass =
 const labelClass = "block text-xs font-semibold text-app-sub mb-1";
 
 export default function ChinginPage() {
+  const { user } = useAuth();
+  const canWrite = canWritePayroll(user?.role);
   const [emp, setEmp] = useState<Employee[]>([]);
   const [att, setAtt] = useState<AttRecord[]>([]);
   const [pay, setPay] = useState<PayrollRecord[]>([]);
@@ -205,6 +210,21 @@ export default function ChinginPage() {
           <div className="text-base font-bold">
             {e?.name} — {selMonth}
           </div>
+          {/* 締日・支払日（月末締め・翌月末支払い） */}
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <div className="bg-app-bg rounded-xl p-3 text-center">
+              <div className="text-[11px] text-app-sub">締日</div>
+              <div className="text-sm font-bold text-app-text">
+                {formatDateJP(getClosingDate(selMonth))}
+              </div>
+            </div>
+            <div className="bg-primary-light rounded-xl p-3 text-center">
+              <div className="text-[11px] text-app-sub">支払日</div>
+              <div className="text-sm font-bold text-primary">
+                {formatDateJP(getPayDate(selMonth))}
+              </div>
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-2 mt-3">
             <div className="bg-app-bg rounded-xl p-3 text-center">
               <div className="text-[11px] text-app-sub">出勤日数</div>
@@ -303,13 +323,21 @@ export default function ChinginPage() {
           </div>
         </Card>
 
+        {!canWrite && (
+          <div className="text-xs text-app-sub bg-app-bg rounded p-3">
+            閲覧のみ可能です（確定・保存は代表者権限が必要）。入力した値はサーバーに保存されません。
+          </div>
+        )}
+
         <div className="flex gap-2.5">
-          <button
-            onClick={savePay}
-            className="px-6 py-3 rounded-xl bg-primary text-white text-sm font-bold border-none cursor-pointer"
-          >
-            確定・保存
-          </button>
+          {canWrite && (
+            <button
+              onClick={savePay}
+              className="px-6 py-3 rounded-xl bg-primary text-white text-sm font-bold border-none cursor-pointer"
+            >
+              確定・保存
+            </button>
+          )}
           <button
             onClick={() => {
               setEditing(null);
@@ -324,6 +352,11 @@ export default function ChinginPage() {
     );
   }
 
+  // 選択月の確定済み件数（CSVエクスポート可否判定に使用）
+  const confirmedCount = pay.filter(
+    (p) => p.month === selMonth && p.confirmed
+  ).length;
+
   // 一覧画面
   return (
     <div className="flex flex-col gap-3">
@@ -336,6 +369,21 @@ export default function ChinginPage() {
           className="w-36 p-2.5 px-3.5 rounded-xl border border-app-border text-sm bg-white outline-none"
         />
       </div>
+
+      {/* CSVエクスポート（確定済みが1件以上ある月のみ有効） */}
+      <a
+        href={confirmedCount > 0 ? `/api/payroll/export?month=${selMonth}` : undefined}
+        aria-disabled={confirmedCount === 0}
+        className={`text-center py-2.5 rounded-xl text-sm font-bold no-underline ${
+          confirmedCount > 0
+            ? "bg-primary text-white cursor-pointer"
+            : "bg-gray-100 text-app-sub pointer-events-none"
+        }`}
+      >
+        {confirmedCount > 0
+          ? `CSVダウンロード（${confirmedCount}名分）`
+          : "確定済みの給与がありません"}
+      </a>
 
       {emp.map((e) => {
         const rec = pay.find(
@@ -383,7 +431,9 @@ export default function ChinginPage() {
               onClick={() => startEdit(e)}
               className="w-full px-6 py-3 rounded-xl bg-primary text-white text-sm font-bold border-none cursor-pointer"
             >
-              {rec?.confirmed ? "修正" : "給与計算"}
+              {canWrite
+                ? rec?.confirmed ? "修正" : "給与計算"
+                : rec?.confirmed ? "内容を確認" : "計算内容を確認"}
             </button>
           </Card>
         );

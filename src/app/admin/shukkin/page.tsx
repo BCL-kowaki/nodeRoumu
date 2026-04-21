@@ -274,6 +274,27 @@ export default function ShukkinPage() {
         </div>
       </Card>
 
+      {/* CSVエクスポート：全員一括 / 選択従業員のみ */}
+      <div className="flex gap-2">
+        <a
+          href={`/api/attendance/export?month=${selMonth}`}
+          className="flex-1 text-center py-2.5 rounded-xl text-sm font-bold bg-primary text-white no-underline cursor-pointer"
+        >
+          全員分CSV
+        </a>
+        <a
+          href={selEmp ? `/api/attendance/export?month=${selMonth}&employeeId=${selEmp}` : undefined}
+          aria-disabled={!selEmp}
+          className={`flex-1 text-center py-2.5 rounded-xl text-sm font-bold no-underline ${
+            selEmp
+              ? "bg-white text-primary border border-primary cursor-pointer"
+              : "bg-gray-100 text-app-sub pointer-events-none"
+          }`}
+        >
+          {selE ? `${selE.name}のみCSV` : "従業員未選択"}
+        </a>
+      </div>
+
       {/* 月間集計 */}
       <Card className="!bg-primary-light !p-3.5">
         <div className="text-[13px] text-primary-dark font-semibold">

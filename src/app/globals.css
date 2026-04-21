@@ -32,3 +32,20 @@ input, select, textarea {
   max-width: 100%;
   box-sizing: border-box;
 }
+
+/* 印刷用スタイル（給与明細PDF保存向け） */
+@media print {
+  /* ヘッダー・印刷非表示マーク付き要素を隠す */
+  header,
+  [data-no-print] {
+    display: none !important;
+  }
+  /* 白背景で印刷（カード影・背景色を抑える） */
+  body {
+    background: white !important;
+  }
+  /* A4余白 */
+  @page {
+    margin: 12mm;
+  }
+}
