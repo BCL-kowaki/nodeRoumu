@@ -120,17 +120,18 @@ export default function EmployeeShukkin() {
   const getRec = (date: string) =>
     att.find((a) => a.date.startsWith(date));
 
-  // 実働日：startTimeがあり、かつステータスが非稼働（closed等）でない日
+  // 実働日：startTimeがあり、かつ非稼働日（定休・closed status）でない日
   const totalDays = days.filter((d) => {
     const rec = getRec(d);
     if (!rec?.startTime) return false;
-    // ステータスが手動で non-working に設定されていたら除外
+    if (isClosed(d, rates, closedDates)) return false; // 定休日は除外
     if (rec.status && !isWorkingStatus(rec.status)) return false;
     return true;
   }).length;
-  // 実働時間：ステータスが closed/absent/public_holiday の日はカウントしない
+  // 実働時間：定休日・ステータスが closed/absent/public_holiday の日はカウントしない
   const totalH = days.reduce((s, d) => {
     const rec = getRec(d);
+    if (isClosed(d, rates, closedDates)) return s;
     if (rec?.status && !isWorkingStatus(rec.status)) return s;
     return s + Number(calcH(rec) || 0);
   }, 0);
@@ -172,8 +173,11 @@ export default function EmployeeShukkin() {
         const rec = getRec(date);
         const dow = new Date(date).toLocaleDateString("ja-JP", { weekday: "short" });
         const closed = isClosed(date, rates, closedDates);
-        // ステータスが closed/absent/public_holiday なら時間表示しない
-        const h = rec?.status && !isWorkingStatus(rec.status) ? "" : calcH(rec);
+        // 非稼働ステータス（closed/absent/public_holiday）か、定休日として扱う日
+        const nonWorking =
+          (rec?.status && !isWorkingStatus(rec.status)) || closed;
+        // 非稼働日は時間表示しない
+        const h = nonWorking ? "" : calcH(rec);
         const today = date === todayStr();
         const isPast = date < todayStr();
         const isAbsent = isPast && !closed && !rec?.startTime;
@@ -190,17 +194,18 @@ export default function EmployeeShukkin() {
               <div className={`text-sm font-bold min-w-[70px] ${closed ? "text-app-sub" : "text-app-text"}`}>
                 {date.slice(5)} ({dow})
               </div>
-              {closed && !rec?.startTime && (
+              {closed && (
                 <Badge type="default">{getClosedDateName(date, rates, closedDates)}</Badge>
               )}
               {isAbsent && <Badge type="danger">欠勤</Badge>}
               {!closed && !rec?.startTime && !isAbsent && (
                 <Badge type="accent">予定</Badge>
               )}
-              {rec?.status && statusLabel[rec.status] && (
+              {!closed && rec?.status && statusLabel[rec.status] && (
                 <Badge type={statusLabel[rec.status].type}>{statusLabel[rec.status].text}</Badge>
               )}
-              {rec?.startTime && (
+              {/* 非稼働日は時刻を表示しない（古いデータが残っていても隠す） */}
+              {!nonWorking && rec?.startTime && (
                 <div className="text-xs text-app-sub">
                   {rec.startTime}〜{rec.endTime || "—"} （休憩{rec.breakMinutes || 0}分）
                 </div>
