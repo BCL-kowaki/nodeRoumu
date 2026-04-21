@@ -62,6 +62,16 @@ export default function Header() {
                 👤 アカウント
               </button>
 
+              {/* ステータス（従業員のみ：自分の基本情報） */}
+              {!isAdminOrManager && (
+                <button
+                  onClick={() => { router.push("/status"); setMenuOpen(false); }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
+                >
+                  📋 ステータス
+                </button>
+              )}
+
               {/* 管理系（admin/manager） */}
               {isAdminOrManager && (
                 <>

@@ -17,7 +17,7 @@ const EMPLOYEE_TABS: Tab[] = [
   { href: "/dakoku", label: "打刻", icon: "⏱️" },
   { href: "/shukkin", label: "出勤簿", icon: "📅" },
   { href: "/kyuyo", label: "給与明細", icon: "💰" },
-  { href: "/status", label: "ステータス", icon: "👤" },
+  { href: "/faq", label: "FAQ", icon: "💬" },
 ];
 
 export default function TabBar({ variant }: { variant: "admin" | "employee" }) {
