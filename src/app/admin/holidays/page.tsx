@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import { getNationalHolidays } from "@/lib/holidays";
+import { useAuth } from "@/lib/auth-context";
+import { canWriteHolidays } from "@/lib/permissions";
 
 type Rate = {
   id: string;
@@ -23,6 +25,8 @@ const inputClass =
 const labelClass = "block text-xs font-semibold text-app-sub mb-1";
 
 export default function HolidaysPage() {
+  const { user } = useAuth();
+  const canWrite = canWriteHolidays(user?.role);
   const [rates, setRates] = useState<Rate | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
@@ -152,6 +156,12 @@ export default function HolidaysPage() {
     <div className="flex flex-col gap-3">
       <div className="text-lg font-bold">休日設定</div>
 
+      {!canWrite && (
+        <div className="text-xs text-app-sub bg-app-bg rounded px-3 py-2">
+          閲覧のみ可能です（編集は代表者権限が必要）
+        </div>
+      )}
+
       {saved && (
         <Card className="!bg-primary-light text-center !p-3">
           <div className="text-sm font-bold text-primary-dark">保存しました</div>
@@ -170,7 +180,9 @@ export default function HolidaysPage() {
             return (
               <label
                 key={d.k}
-                className={`flex-1 text-center py-2.5 rounded border cursor-pointer text-sm font-semibold transition-colors ${
+                className={`flex-1 text-center py-2.5 rounded border text-sm font-semibold transition-colors ${
+                  canWrite ? "cursor-pointer" : "cursor-default opacity-70"
+                } ${
                   checked
                     ? "bg-danger text-white border-danger"
                     : "bg-white text-app-sub border-app-border"
@@ -179,9 +191,11 @@ export default function HolidaysPage() {
                 <input
                   type="checkbox"
                   checked={checked}
-                  onChange={(e) =>
-                    setRates({ ...rates, [d.k]: e.target.checked })
-                  }
+                  onChange={(e) => {
+                    if (!canWrite) return;
+                    setRates({ ...rates, [d.k]: e.target.checked });
+                  }}
+                  disabled={!canWrite}
                   className="hidden"
                 />
                 {d.l}
@@ -189,12 +203,14 @@ export default function HolidaysPage() {
             );
           })}
         </div>
-        <button
-          onClick={doSaveClosedDays}
-          className="px-6 py-3 rounded bg-primary text-white text-sm font-bold border-none cursor-pointer"
-        >
-          定休日を保存
-        </button>
+        {canWrite && (
+          <button
+            onClick={doSaveClosedDays}
+            className="px-6 py-3 rounded bg-primary text-white text-sm font-bold border-none cursor-pointer"
+          >
+            定休日を保存
+          </button>
+        )}
       </Card>
 
       {/* 特定休日管理 */}
@@ -218,22 +234,24 @@ export default function HolidaysPage() {
           />
         </div>
 
-        {/* 一括登録・追加ボタン */}
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={handleBulkRegister}
-            disabled={bulkLoading}
-            className="px-4 py-2 rounded bg-accent text-white text-xs font-bold border-none cursor-pointer disabled:opacity-50"
-          >
-            {bulkLoading ? "登録中..." : "祝日一括登録"}
-          </button>
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="px-4 py-2 rounded bg-primary text-white text-xs font-bold border-none cursor-pointer"
-          >
-            {showAddForm ? "閉じる" : "追加"}
-          </button>
-        </div>
+        {/* 一括登録・追加ボタン（manager は非表示） */}
+        {canWrite && (
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={handleBulkRegister}
+              disabled={bulkLoading}
+              className="px-4 py-2 rounded bg-accent text-white text-xs font-bold border-none cursor-pointer disabled:opacity-50"
+            >
+              {bulkLoading ? "登録中..." : "祝日一括登録"}
+            </button>
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="px-4 py-2 rounded bg-primary text-white text-xs font-bold border-none cursor-pointer"
+            >
+              {showAddForm ? "閉じる" : "追加"}
+            </button>
+          </div>
+        )}
 
         {holidayMessage && (
           <div className="text-xs font-semibold text-primary-dark bg-primary-light rounded p-2.5 mb-3 text-center">
@@ -292,13 +310,15 @@ export default function HolidaysPage() {
                     {cd.type === "national" ? "祝日" : "会社"}
                   </Badge>
                 </div>
-                <button
-                  onClick={() => handleDeleteClosedDate(cd.id)}
-                  className="ml-2 w-7 h-7 flex items-center justify-center rounded-full text-app-sub hover:bg-danger-light hover:text-danger transition-colors text-sm font-bold border-none bg-transparent cursor-pointer shrink-0"
-                  title="削除"
-                >
-                  ✕
-                </button>
+                {canWrite && (
+                  <button
+                    onClick={() => handleDeleteClosedDate(cd.id)}
+                    className="ml-2 w-7 h-7 flex items-center justify-center rounded-full text-app-sub hover:bg-danger-light hover:text-danger transition-colors text-sm font-bold border-none bg-transparent cursor-pointer shrink-0"
+                    title="削除"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             ))}
             <div className="text-[11px] text-app-sub mt-1">

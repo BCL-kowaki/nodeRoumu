@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import { canWriteHolidays } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +20,16 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(records);
 }
 
-// 特定休日追加
+// 特定休日追加（代表者のみ）
 export async function POST(req: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  if (!canWriteHolidays(session.role)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   const body = await req.json();
 
   // 一括登録対応（配列が来た場合）

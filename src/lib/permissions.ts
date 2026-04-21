@@ -22,3 +22,18 @@ export function canAccessAdminArea(role: Role | string | undefined): boolean {
 export function canManageAdminUsers(role: Role | string | undefined): boolean {
   return role === "admin";
 }
+
+// 企業情報の編集（代表者のみ／社労士は閲覧のみ）
+export function canWriteCompany(role: Role | string | undefined): boolean {
+  return role === "admin";
+}
+
+// 休日設定の編集（代表者のみ／社労士は閲覧のみ）
+export function canWriteHolidays(role: Role | string | undefined): boolean {
+  return role === "admin";
+}
+
+// 出勤簿の打刻時刻の編集（代表者のみ／社労士はステータスのみ編集可）
+export function canWriteAttendanceTime(role: Role | string | undefined): boolean {
+  return role === "admin";
+}

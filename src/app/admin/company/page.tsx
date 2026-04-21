@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import Card from "@/components/Card";
+import { useAuth } from "@/lib/auth-context";
+import { canWriteCompany } from "@/lib/permissions";
 
 type Company = {
   id: string;
@@ -21,6 +23,8 @@ const inputClass = "w-full p-2.5 px-3.5 rounded border border-app-border text-sm
 const labelClass = "block text-xs font-semibold text-app-sub mb-1";
 
 export default function CompanyPage() {
+  const { user } = useAuth();
+  const canWrite = canWriteCompany(user?.role);
   const [form, setForm] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
@@ -193,13 +197,20 @@ export default function CompanyPage() {
     <div className="flex flex-col gap-3">
       <div className="text-lg font-bold">企業情報</div>
 
+      {!canWrite && (
+        <div className="text-xs text-app-sub bg-app-bg rounded px-3 py-2">
+          閲覧のみ可能です（編集は代表者権限が必要）
+        </div>
+      )}
+
       {saved && (
         <Card className="!bg-primary-light text-center !p-3">
           <div className="text-sm font-bold text-primary-dark">✅ 保存しました</div>
         </Card>
       )}
 
-      {/* 謄本PDFアップロード */}
+      {/* 謄本PDFアップロード（manager は非表示） */}
+      {canWrite && (
       <Card>
         <div className="text-sm font-bold text-app-text mb-2">📄 謄本PDFから読み取り</div>
         <div className="text-[11px] text-app-sub mb-3">
@@ -243,6 +254,7 @@ export default function CompanyPage() {
           </div>
         )}
       </Card>
+      )}
 
       {/* 企業情報フォーム */}
       <Card>
@@ -252,17 +264,19 @@ export default function CompanyPage() {
               <label className={labelClass}>{x.l}</label>
               {x.t === "textarea" ? (
                 <textarea
-                  className={`${inputClass} min-h-[80px] resize-y`}
+                  className={`${inputClass} min-h-[80px] resize-y ${!canWrite ? "bg-gray-50" : ""}`}
                   rows={3}
                   value={(form as Record<string, unknown>)[x.k] as string || ""}
                   onChange={(e) => setForm({ ...form, [x.k]: e.target.value })}
+                  readOnly={!canWrite}
                 />
               ) : (
                 <input
-                  className={inputClass}
+                  className={`${inputClass} ${!canWrite ? "bg-gray-50" : ""}`}
                   type={x.t}
                   value={(form as Record<string, unknown>)[x.k] as string || ""}
                   onChange={(e) => setForm({ ...form, [x.k]: e.target.value })}
+                  readOnly={!canWrite}
                 />
               )}
               {x.k === "corporateNumber" && (
@@ -279,12 +293,14 @@ export default function CompanyPage() {
           ))}
         </div>
 
-        <button
-          onClick={doSave}
-          className="mt-5 px-6 py-3 rounded bg-primary text-white text-sm font-bold border-none cursor-pointer"
-        >
-          保存する
-        </button>
+        {canWrite && (
+          <button
+            onClick={doSave}
+            className="mt-5 px-6 py-3 rounded bg-primary text-white text-sm font-bold border-none cursor-pointer"
+          >
+            保存する
+          </button>
+        )}
       </Card>
     </div>
   );

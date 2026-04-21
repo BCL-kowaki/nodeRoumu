@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
+import { useAuth } from "@/lib/auth-context";
+import { canWriteAttendanceTime } from "@/lib/permissions";
 
 type Employee = {
   id: string;
@@ -113,6 +115,8 @@ function isWorkingStatus(status: string): boolean {
 }
 
 export default function ShukkinPage() {
+  const { user } = useAuth();
+  const canEditTime = canWriteAttendanceTime(user?.role);
   const [emp, setEmp] = useState<Employee[]>([]);
   const [selMonth, setSelMonth] = useState(todayStr().slice(0, 7));
   const [selEmp, setSelEmp] = useState("");
@@ -264,6 +268,11 @@ export default function ShukkinPage() {
   return (
     <div className="flex flex-col gap-3">
       <div className="text-lg font-bold">出勤簿</div>
+      {!canEditTime && (
+        <div className="text-xs text-app-sub bg-app-bg rounded px-3 py-2">
+          打刻時間は閲覧のみ可能です（時刻の修正は代表者権限が必要。状態の変更は可能）
+        </div>
+      )}
       <Card className="!p-4">
         <div className="flex gap-2.5">
           <div className="flex-1">
@@ -375,27 +384,30 @@ export default function ShukkinPage() {
                     <label className="block text-[10px] font-semibold text-app-sub mb-0.5">出勤</label>
                     <input
                       type="time"
-                      className={`${inputClass} ${!display.hasRecord && display.startTime ? "text-app-sub" : ""}`}
+                      className={`${inputClass} ${!display.hasRecord && display.startTime ? "text-app-sub" : ""} ${!canEditTime ? "bg-gray-50" : ""}`}
                       value={display.startTime}
-                      onChange={(e) => upsert(date, "startTime", e.target.value)}
+                      onChange={(e) => canEditTime && upsert(date, "startTime", e.target.value)}
+                      readOnly={!canEditTime}
                     />
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold text-app-sub mb-0.5">退勤</label>
                     <input
                       type="time"
-                      className={`${inputClass} ${!display.hasRecord && display.endTime ? "text-app-sub" : ""}`}
+                      className={`${inputClass} ${!display.hasRecord && display.endTime ? "text-app-sub" : ""} ${!canEditTime ? "bg-gray-50" : ""}`}
                       value={display.endTime}
-                      onChange={(e) => upsert(date, "endTime", e.target.value)}
+                      onChange={(e) => canEditTime && upsert(date, "endTime", e.target.value)}
+                      readOnly={!canEditTime}
                     />
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold text-app-sub mb-0.5">休憩(分)</label>
                     <input
                       type="number"
-                      className={`${inputClass} ${!display.hasRecord && display.breakMinutes ? "text-app-sub" : ""}`}
+                      className={`${inputClass} ${!display.hasRecord && display.breakMinutes ? "text-app-sub" : ""} ${!canEditTime ? "bg-gray-50" : ""}`}
                       value={display.breakMinutes}
-                      onChange={(e) => upsert(date, "breakMinutes", e.target.value)}
+                      onChange={(e) => canEditTime && upsert(date, "breakMinutes", e.target.value)}
+                      readOnly={!canEditTime}
                     />
                   </div>
                 </>

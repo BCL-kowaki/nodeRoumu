@@ -76,10 +76,14 @@ const labelClass = "block text-xs font-semibold text-app-sub mb-1";
 export default function AdminMeiboPage() {
   const { user } = useAuth();
   const canWrite = canWriteEmployees(user?.role);
+  // 社労士（manager）には編集不可なので代わりに「詳細確認」モーダルを提供する
+  const isManager = user?.role === "manager";
   const [emp, setEmp] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<"new" | "edit" | null>(null);
   const [form, setForm] = useState<EmployeeForm>(EMPTY as EmployeeForm);
+  // 詳細確認モーダル（manager専用）
+  const [detailEmp, setDetailEmp] = useState<Employee | null>(null);
 
   useEffect(() => {
     fetch("/api/employees?scope=workers")
@@ -334,8 +338,112 @@ export default function AdminMeiboPage() {
                 </button>
               </div>
             )}
+            {isManager && (
+              <div className="mt-3">
+                <button
+                  onClick={() => setDetailEmp(e)}
+                  className="px-3.5 py-1.5 rounded border border-primary text-primary text-xs font-semibold bg-transparent cursor-pointer"
+                >
+                  詳細確認
+                </button>
+              </div>
+            )}
           </Card>
         ))
+      )}
+
+      {/* 詳細確認モーダル（manager専用） */}
+      {detailEmp && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/30 z-[200]"
+            onClick={() => setDetailEmp(null)}
+          />
+          <div className="fixed inset-x-4 top-[10%] bottom-[10%] bg-white rounded z-[300] shadow-lg overflow-y-auto max-w-app mx-auto">
+            <div className="sticky top-0 bg-white border-b border-app-border p-4 flex items-center justify-between">
+              <div className="text-sm font-bold text-app-text">{detailEmp.name} の詳細</div>
+              <button
+                onClick={() => setDetailEmp(null)}
+                className="w-8 h-8 flex items-center justify-center rounded text-app-sub hover:bg-gray-100 border-none bg-transparent cursor-pointer text-lg"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 flex flex-col gap-3">
+              {/* 基本情報 */}
+              <div>
+                <div className="text-xs font-bold text-app-sub mb-1.5">基本情報</div>
+                {[
+                  { l: "氏名", v: detailEmp.name },
+                  { l: "フリガナ", v: detailEmp.nameKana || "—" },
+                  { l: "雇用形態", v: detailEmp.employmentType },
+                  { l: "入社日", v: detailEmp.hireDate?.slice(0, 10) || "—" },
+                  { l: "退職日", v: detailEmp.resignDate ? detailEmp.resignDate.slice(0, 10) : "在籍中" },
+                  { l: "職種・役職", v: detailEmp.position || "—" },
+                ].map((x) => (
+                  <div key={x.l} className="flex py-1.5 border-b border-app-border last:border-0 text-sm">
+                    <div className="text-xs text-app-sub w-24 shrink-0">{x.l}</div>
+                    <div className="text-app-text">{x.v}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 給与情報 */}
+              <div>
+                <div className="text-xs font-bold text-app-sub mb-1.5">給与情報</div>
+                <div className="flex py-1.5 border-b border-app-border text-sm">
+                  <div className="text-xs text-app-sub w-24 shrink-0">月給</div>
+                  <div className="text-app-text">{detailEmp.monthlySalary ? "¥" + fmt(detailEmp.monthlySalary) : "—"}</div>
+                </div>
+                <div className="flex py-1.5 border-b border-app-border text-sm last:border-0">
+                  <div className="text-xs text-app-sub w-24 shrink-0">時給</div>
+                  <div className="text-app-text">{detailEmp.hourlyWage ? "¥" + fmt(detailEmp.hourlyWage) : "—"}</div>
+                </div>
+              </div>
+
+              {/* 勤務シフト */}
+              <div>
+                <div className="text-xs font-bold text-app-sub mb-1.5">固定シフト</div>
+                {detailEmp.shiftStart && detailEmp.shiftEnd ? (
+                  <div className="text-sm text-app-text">
+                    {detailEmp.shiftStart}〜{detailEmp.shiftEnd}（休憩{detailEmp.shiftBreak || 0}分）
+                  </div>
+                ) : (
+                  <div className="text-sm text-app-sub">シフト未設定</div>
+                )}
+              </div>
+
+              {/* 社会保険加入状況 */}
+              <div>
+                <div className="text-xs font-bold text-app-sub mb-1.5">社会保険加入状況</div>
+                <div className="flex flex-col gap-1.5">
+                  {[
+                    { l: "健康保険", v: detailEmp.healthInsuranceEnrolled },
+                    { l: "厚生年金", v: detailEmp.pensionEnrolled },
+                    { l: "雇用保険", v: detailEmp.employmentInsuranceEnrolled },
+                  ].map((x) => (
+                    <div key={x.l} className="flex items-center justify-between text-sm">
+                      <span className="text-app-sub">{x.l}</span>
+                      {x.v ? (
+                        <Badge type="success">加入</Badge>
+                      ) : (
+                        <Badge type="default">未加入</Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 備考 */}
+              {detailEmp.memo && (
+                <div>
+                  <div className="text-xs font-bold text-app-sub mb-1.5">備考</div>
+                  <div className="text-sm text-app-text whitespace-pre-wrap">{detailEmp.memo}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
