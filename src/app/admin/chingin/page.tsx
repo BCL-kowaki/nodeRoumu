@@ -26,7 +26,20 @@ type AttRecord = {
   startTime: string | null;
   endTime: string | null;
   breakMinutes: number | null;
+  status: string | null;
 };
+
+// 実働日として集計すべきステータスか
+// null（自動判定）は startTime があれば normal 扱い
+function isCountableWork(rec: AttRecord): boolean {
+  if (!rec.startTime || !rec.endTime) return false;
+  // 手動でステータス設定されているときはそれに従う
+  if (rec.status) {
+    return rec.status === "normal" || rec.status === "late" || rec.status === "early_leave";
+  }
+  // ステータス未設定 + 時刻ありは出勤扱い
+  return true;
+}
 
 type PayrollRecord = {
   id: string;
@@ -62,9 +75,10 @@ function calcMonthHours(att: AttRecord[], empId: string, month: string) {
   return att
     .filter((a) => a.employeeId === empId && a.date?.startsWith(month))
     .reduce((s, r) => {
-      if (!r.startTime || !r.endTime) return s;
-      const [sh, sm] = r.startTime.split(":").map(Number);
-      const [eh, em] = r.endTime.split(":").map(Number);
+      // 出勤扱いのレコードのみ実働時間を計上
+      if (!isCountableWork(r)) return s;
+      const [sh, sm] = r.startTime!.split(":").map(Number);
+      const [eh, em] = r.endTime!.split(":").map(Number);
       const t = eh * 60 + em - (sh * 60 + sm) - (r.breakMinutes || 0);
       return s + (t > 0 ? t / 60 : 0);
     }, 0);
@@ -72,7 +86,7 @@ function calcMonthHours(att: AttRecord[], empId: string, month: string) {
 
 function calcMonthDays(att: AttRecord[], empId: string, month: string) {
   return att.filter(
-    (a) => a.employeeId === empId && a.date?.startsWith(month) && a.startTime
+    (a) => a.employeeId === empId && a.date?.startsWith(month) && isCountableWork(a)
   ).length;
 }
 
@@ -119,14 +133,21 @@ export default function ChinginPage() {
 
   const startEdit = (e: Employee) => {
     if (!rates) return;
+    // 最新の出勤簿データから出勤日数・実働時間を再計算
+    const h = calcMonthHours(att, e.id, selMonth);
+    const d = calcMonthDays(att, e.id, selMonth);
     const ex = pay.find((p) => p.employeeId === e.id && p.month === selMonth);
     if (ex) {
-      setForm({ ...ex });
+      // 既存レコードがあっても、出勤日数と実働時間は最新の出勤簿から再計算した値で上書き
+      // （ステータス変更や打刻修正が反映されるようにする）
+      setForm({
+        ...ex,
+        workDays: d,
+        workHours: Math.round(h * 10) / 10,
+      });
       setEditing(e.id);
       return;
     }
-    const h = calcMonthHours(att, e.id, selMonth);
-    const d = calcMonthDays(att, e.id, selMonth);
     let g = 0;
     if (e.monthlySalary) g = e.monthlySalary;
     else if (e.hourlyWage) g = Math.round(h * e.hourlyWage);
