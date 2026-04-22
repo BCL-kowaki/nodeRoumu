@@ -137,7 +137,22 @@ export default function EmployeeKyuyo() {
       {/* PDF保存ボタン（確定済みレコードがある時のみ表示・印刷時は非表示） */}
       {pay?.confirmed && (
         <button
-          onClick={() => window.print()}
+          onClick={() => {
+            // 「YYYY年MM月支払分給与明細_氏名.pdf」になるよう document.title を一時的に書き換える
+            // ブラウザの「PDFとして保存」はデフォルトでページタイトルをファイル名に使う
+            const payMonth = getPayDate(selMonth).slice(0, 7); // 支払月（YYYY-MM）
+            const payY = payMonth.slice(0, 4);
+            const payM = payMonth.slice(5, 7);
+            const personName = user?.name || "";
+            const suggestedTitle = `${payY}年${payM}月支払分給与明細_${personName}`;
+            const originalTitle = document.title;
+            document.title = suggestedTitle;
+            window.print();
+            // 印刷ダイアログが閉じた後に元のタイトルに戻す
+            setTimeout(() => {
+              document.title = originalTitle;
+            }, 1000);
+          }}
           className="print:hidden w-full py-3 rounded bg-primary text-white text-sm font-bold border-none cursor-pointer"
         >
           この明細をPDFとして保存

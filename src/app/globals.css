@@ -35,8 +35,9 @@ input, select, textarea {
 
 /* 印刷用スタイル（給与明細PDF保存向け） */
 @media print {
-  /* ヘッダー・印刷非表示マーク付き要素を隠す */
+  /* ヘッダー・タブバー・印刷非表示マーク付き要素を隠す */
   header,
+  nav,
   [data-no-print] {
     display: none !important;
   }
@@ -44,8 +45,18 @@ input, select, textarea {
   body {
     background: white !important;
   }
-  /* A4余白 */
+  /* A4余白を狭めに（1ページに収めやすくする） */
   @page {
-    margin: 12mm;
+    margin: 8mm;
+  }
+  /* カード等のまとまりを途中で改ページしない */
+  [class*="rounded"],
+  [class*="Card"] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* 印刷時のフォントサイズを詰めて1ページ収納を優先 */
+  body {
+    font-size: 11px;
   }
 }

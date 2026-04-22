@@ -26,7 +26,10 @@ export default function TabBar({ variant }: { variant: "admin" | "employee" }) {
   const tabs = variant === "admin" ? ADMIN_TABS : EMPLOYEE_TABS;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-app-border flex z-[100] shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
+    <div
+      data-no-print
+      className="fixed bottom-0 left-0 right-0 bg-white border-t border-app-border flex z-[100] shadow-[0_-2px_8px_rgba(0,0,0,0.04)]"
+    >
       {tabs.map((t) => {
         const active =
           variant === "admin"
