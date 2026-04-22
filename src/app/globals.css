@@ -45,8 +45,9 @@ input, select, textarea {
   body {
     background: white !important;
   }
-  /* A4余白を狭めに（1ページに収めやすくする） */
+  /* A4縦設定・余白を狭めに */
   @page {
+    size: A4 portrait;
     margin: 8mm;
   }
   /* カード等のまとまりを途中で改ページしない */
@@ -55,8 +56,11 @@ input, select, textarea {
     break-inside: avoid;
     page-break-inside: avoid;
   }
-  /* 印刷時のフォントサイズを詰めて1ページ収納を優先 */
-  body {
-    font-size: 11px;
+  /* 給与明細は data-print-scale="95" を指定した要素を 95% に縮小 */
+  /* 印刷範囲ちょうど1枚に収めるため、印刷プレビューでオーバーフローせずに済む */
+  [data-print-scale="95"] {
+    transform: scale(0.95);
+    transform-origin: top left;
+    width: 105.26%; /* 1 / 0.95 = 1.0526 で幅を拡張してから縮小 */
   }
 }

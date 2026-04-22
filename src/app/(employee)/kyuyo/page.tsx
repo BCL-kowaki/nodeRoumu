@@ -79,7 +79,8 @@ export default function EmployeeKyuyo() {
     return <div className="text-center text-app-sub py-10">読み込み中...</div>;
 
   return (
-    <div className="flex flex-col gap-3">
+    // data-print-scale="95" で印刷時に 95% 縮小して1ページに収まりやすくする
+    <div className="flex flex-col gap-3" data-print-scale="95">
       {/* 印刷時のみ表示される発行ヘッダー（画面では非表示） */}
       <div className="hidden print:block mb-4">
         {company && (
