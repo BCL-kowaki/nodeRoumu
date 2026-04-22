@@ -329,7 +329,7 @@ export default function ChinginPage() {
               <label className={labelClass}>{x.l}</label>
               <input
                 type="number"
-                className={inputClass}
+                className={`${inputClass} ${!canWrite ? "bg-gray-50" : ""}`}
                 value={(form[x.k as keyof PayrollRecord] as number) || ""}
                 onChange={(e) =>
                   setForm(
@@ -339,6 +339,7 @@ export default function ChinginPage() {
                     })
                   )
                 }
+                readOnly={!canWrite}
               />
             </div>
           ))}
@@ -367,7 +368,7 @@ export default function ChinginPage() {
               <label className={labelClass}>{x.l}</label>
               <input
                 type="number"
-                className={inputClass}
+                className={`${inputClass} ${!canWrite ? "bg-gray-50" : ""}`}
                 value={(form[x.k as keyof PayrollRecord] as number) || ""}
                 onChange={(e) => {
                   const u = {
@@ -383,6 +384,7 @@ export default function ChinginPage() {
                     u.otherDeduction;
                   setForm({ ...u, totalDeduction: td, netPay: u.totalPay - td });
                 }}
+                readOnly={!canWrite}
               />
             </div>
           ))}
@@ -402,7 +404,7 @@ export default function ChinginPage() {
 
         {!canWrite && (
           <div className="text-xs text-app-sub bg-app-bg rounded p-3">
-            閲覧のみ可能です（確定・保存は代表者権限が必要）。入力した値はサーバーに保存されません。
+            閲覧のみ可能です（編集・確定は代表者権限が必要）
           </div>
         )}
 

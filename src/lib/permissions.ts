@@ -33,7 +33,8 @@ export function canWriteHolidays(role: Role | string | undefined): boolean {
   return role === "admin";
 }
 
-// 出勤簿の打刻時刻の編集（代表者のみ／社労士はステータスのみ編集可）
+// 出勤簿の編集（打刻時刻・状態・備考すべて、代表者のみ）
+// 社労士は閲覧のみ
 export function canWriteAttendanceTime(role: Role | string | undefined): boolean {
   return role === "admin";
 }

@@ -270,7 +270,7 @@ export default function ShukkinPage() {
       <div className="text-lg font-bold">出勤簿</div>
       {!canEditTime && (
         <div className="text-xs text-app-sub bg-app-bg rounded px-3 py-2">
-          打刻時間は閲覧のみ可能です（時刻の修正は代表者権限が必要。状態の変更は可能）
+          閲覧のみ可能です（編集は代表者権限が必要）
         </div>
       )}
       <Card className="!p-4">
@@ -419,9 +419,10 @@ export default function ShukkinPage() {
                     currentStatus === "absent" ? "text-danger" :
                     currentStatus === "late" || currentStatus === "early_leave" ? "text-accent" :
                     currentStatus === "normal" ? "text-primary" : ""
-                  }`}
+                  } ${!canEditTime ? "bg-gray-50" : ""}`}
                   value={rec?.status || ""}
-                  onChange={(e) => upsert(date, "status", e.target.value)}
+                  onChange={(e) => canEditTime && upsert(date, "status", e.target.value)}
+                  disabled={!canEditTime}
                 >
                   {STATUS_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>

@@ -248,7 +248,7 @@ export default function HolidaysPage() {
               onClick={() => setShowAddForm(!showAddForm)}
               className="px-4 py-2 rounded bg-primary text-white text-xs font-bold border-none cursor-pointer"
             >
-              {showAddForm ? "閉じる" : "追加"}
+              {showAddForm ? "閉じる" : "+ 休日を追加"}
             </button>
           </div>
         )}
@@ -263,12 +263,25 @@ export default function HolidaysPage() {
         {showAddForm && (
           <div className="border border-app-border rounded p-4 mb-4 bg-gray-50">
             <div className="mb-3">
-              <label className={labelClass}>日付</label>
-              <input type="date" className={inputClass} value={newDate} onChange={(e) => setNewDate(e.target.value)} />
+              <label className={labelClass}>日付 *</label>
+              <div className="text-[11px] text-app-sub mb-1">タップしてカレンダーから選択</div>
+              <input
+                type="date"
+                className={inputClass}
+                value={newDate}
+                onChange={(e) => setNewDate(e.target.value)}
+              />
             </div>
             <div className="mb-3">
-              <label className={labelClass}>名称</label>
-              <input type="text" className={inputClass} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="例: 創立記念日" />
+              <label className={labelClass}>理由・名称 *</label>
+              <div className="text-[11px] text-app-sub mb-1">休日にする理由を入力（例: 創業記念日、夏季休暇、棚卸し など）</div>
+              <input
+                type="text"
+                className={inputClass}
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="例: 創業記念日"
+              />
             </div>
             <div className="mb-3">
               <label className={labelClass}>種別</label>
