@@ -157,8 +157,8 @@ export default function AdminUsersPage() {
                 onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
                 className={inputClass}
               >
-                <option value="admin">代表者（admin）</option>
-                <option value="manager">社労士（manager）</option>
+                <option value="admin">代表者</option>
+                <option value="manager">社労士</option>
               </select>
             </div>
 

@@ -29,18 +29,6 @@ type AttRecord = {
   status: string | null;
 };
 
-// 実働日として集計すべきステータスか
-// null（自動判定）は startTime があれば normal 扱い
-function isCountableWork(rec: AttRecord): boolean {
-  if (!rec.startTime || !rec.endTime) return false;
-  // 手動でステータス設定されているときはそれに従う
-  if (rec.status) {
-    return rec.status === "normal" || rec.status === "late" || rec.status === "early_leave";
-  }
-  // ステータス未設定 + 時刻ありは出勤扱い
-  return true;
-}
-
 type PayrollRecord = {
   id: string;
   employeeId: string;
@@ -66,28 +54,91 @@ type Rate = RateValues & {
   childcare: number;
   label: string | null;
   updatedAt: string | null;
+  closedSun?: boolean;
+  closedMon?: boolean;
+  closedTue?: boolean;
+  closedWed?: boolean;
+  closedThu?: boolean;
+  closedFri?: boolean;
+  closedSat?: boolean;
 };
+
+type ClosedDateRecord = { date: string };
 
 const curMonth = () => new Date().toISOString().slice(0, 7);
 const fmt = (n: number) => n.toLocaleString("ja-JP");
+const DOW_KEYS = [
+  "closedSun",
+  "closedMon",
+  "closedTue",
+  "closedWed",
+  "closedThu",
+  "closedFri",
+  "closedSat",
+] as const;
 
-function calcMonthHours(att: AttRecord[], empId: string, month: string) {
+// 指定日が定休日（曜日指定 or ClosedDate 登録）かどうか
+function isClosedDay(
+  date: string,
+  rates: Rate | null,
+  closedDates: ClosedDateRecord[]
+): boolean {
+  if (!rates) return false;
+  const dow = new Date(date).getDay();
+  if (rates[DOW_KEYS[dow]]) return true;
+  return closedDates.some((cd) => cd.date.startsWith(date));
+}
+
+// 出勤日として計上すべきか
+// 出勤簿側の autoStatus と揃えたロジック：
+// - 手動ステータス設定あり → そのステータスが working か
+// - 定休日・祝日 → 計上しない
+// - startTime あり → 計上
+function isCountableDay(
+  rec: AttRecord | undefined,
+  closed: boolean
+): boolean {
+  if (!rec) return false;
+  if (rec.status) {
+    return rec.status === "normal" || rec.status === "late" || rec.status === "early_leave";
+  }
+  if (closed) return false;
+  return !!(rec.startTime && rec.endTime);
+}
+
+function calcMonthHours(
+  att: AttRecord[],
+  empId: string,
+  month: string,
+  rates: Rate | null,
+  closedDates: ClosedDateRecord[]
+) {
   return att
     .filter((a) => a.employeeId === empId && a.date?.startsWith(month))
     .reduce((s, r) => {
-      // 出勤扱いのレコードのみ実働時間を計上
-      if (!isCountableWork(r)) return s;
-      const [sh, sm] = r.startTime!.split(":").map(Number);
-      const [eh, em] = r.endTime!.split(":").map(Number);
+      const dateStr = r.date.slice(0, 10);
+      const closed = isClosedDay(dateStr, rates, closedDates);
+      if (!isCountableDay(r, closed)) return s;
+      if (!r.startTime || !r.endTime) return s;
+      const [sh, sm] = r.startTime.split(":").map(Number);
+      const [eh, em] = r.endTime.split(":").map(Number);
       const t = eh * 60 + em - (sh * 60 + sm) - (r.breakMinutes || 0);
       return s + (t > 0 ? t / 60 : 0);
     }, 0);
 }
 
-function calcMonthDays(att: AttRecord[], empId: string, month: string) {
-  return att.filter(
-    (a) => a.employeeId === empId && a.date?.startsWith(month) && isCountableWork(a)
-  ).length;
+function calcMonthDays(
+  att: AttRecord[],
+  empId: string,
+  month: string,
+  rates: Rate | null,
+  closedDates: ClosedDateRecord[]
+) {
+  return att.filter((a) => {
+    if (a.employeeId !== empId || !a.date?.startsWith(month)) return false;
+    const dateStr = a.date.slice(0, 10);
+    return isCountableDay(a, isClosedDay(dateStr, rates, closedDates));
+  }).length;
 }
 
 const inputClass =
@@ -101,6 +152,7 @@ export default function ChinginPage() {
   const [att, setAtt] = useState<AttRecord[]>([]);
   const [pay, setPay] = useState<PayrollRecord[]>([]);
   const [rates, setRates] = useState<Rate | null>(null);
+  const [closedDates, setClosedDates] = useState<ClosedDateRecord[]>([]);
   const [selMonth, setSelMonth] = useState(curMonth());
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState<PayrollRecord | null>(null);
@@ -118,12 +170,15 @@ export default function ChinginPage() {
   }, []);
 
   const fetchData = useCallback(() => {
+    const year = selMonth.slice(0, 4);
     Promise.all([
       fetch(`/api/attendance?month=${selMonth}`).then((r) => r.json()),
       fetch(`/api/payroll?month=${selMonth}`).then((r) => r.json()),
-    ]).then(([a, p]) => {
+      fetch(`/api/closed-dates?year=${year}`).then((r) => r.json()),
+    ]).then(([a, p, cd]) => {
       setAtt(a);
       setPay(p);
+      setClosedDates(cd);
     });
   }, [selMonth]);
 
@@ -134,8 +189,9 @@ export default function ChinginPage() {
   const startEdit = (e: Employee) => {
     if (!rates) return;
     // 最新の出勤簿データから出勤日数・実働時間を再計算
-    const h = calcMonthHours(att, e.id, selMonth);
-    const d = calcMonthDays(att, e.id, selMonth);
+    // 定休日・祝日は計上しない
+    const h = calcMonthHours(att, e.id, selMonth, rates, closedDates);
+    const d = calcMonthDays(att, e.id, selMonth, rates, closedDates);
     const ex = pay.find((p) => p.employeeId === e.id && p.month === selMonth);
     if (ex) {
       // 既存レコードがあっても、出勤日数と実働時間は最新の出勤簿から再計算した値で上書き
@@ -410,8 +466,8 @@ export default function ChinginPage() {
         const rec = pay.find(
           (p) => p.employeeId === e.id && p.month === selMonth
         );
-        const mD = calcMonthDays(att, e.id, selMonth);
-        const mH = calcMonthHours(att, e.id, selMonth);
+        const mD = calcMonthDays(att, e.id, selMonth, rates, closedDates);
+        const mH = calcMonthHours(att, e.id, selMonth, rates, closedDates);
 
         return (
           <Card key={e.id} className="!p-4">

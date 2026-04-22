@@ -6,6 +6,7 @@ import Badge from "@/components/Badge";
 import PasswordInput from "@/components/PasswordInput";
 import { useAuth } from "@/lib/auth-context";
 import { canWriteEmployees } from "@/lib/permissions";
+import { roleLabel } from "@/lib/roles";
 
 type Employee = {
   id: string;
@@ -203,7 +204,9 @@ export default function AdminMeiboPage() {
                   onChange={(e) => setForm({ ...form, [x.k]: e.target.value })}
                 >
                   {x.opts!.map((o) => (
-                    <option key={o} value={o}>{o}</option>
+                    <option key={o} value={o}>
+                      {x.k === "role" ? roleLabel(o) : o}
+                    </option>
                   ))}
                 </select>
               ) : x.t === "password" ? (
@@ -322,7 +325,7 @@ export default function AdminMeiboPage() {
                   ? "時給¥" + fmt(e.hourlyWage)
                   : "—"}
               </div>
-              <div>権限: {e.role}</div>
+              <div>権限: {roleLabel(e.role)}</div>
               <div>
                 {e.shiftStart && e.shiftEnd
                   ? `勤務 ${e.shiftStart}〜${e.shiftEnd}`
@@ -349,9 +352,9 @@ export default function AdminMeiboPage() {
               <div className="mt-3">
                 <button
                   onClick={() => setDetailEmp(e)}
-                  className="px-3.5 py-1.5 rounded border border-primary text-primary text-xs font-semibold bg-transparent cursor-pointer"
+                  className="w-full px-4 py-2.5 rounded bg-primary text-white text-sm font-bold border-none cursor-pointer"
                 >
-                  詳細確認
+                  詳細閲覧
                 </button>
               </div>
             )}
@@ -377,16 +380,18 @@ export default function AdminMeiboPage() {
               </button>
             </div>
             <div className="p-4 flex flex-col gap-3">
-              {/* 基本情報 */}
+              <div className="text-[11px] text-app-sub bg-app-bg rounded p-2">
+                給与計算・社会保険手続きに必要な最小限の情報のみ表示しています
+              </div>
+
+              {/* 基本情報（社外の顧問として必要な最小限） */}
               <div>
                 <div className="text-xs font-bold text-app-sub mb-1.5">基本情報</div>
                 {[
                   { l: "氏名", v: detailEmp.name },
-                  { l: "フリガナ", v: detailEmp.nameKana || "—" },
                   { l: "雇用形態", v: detailEmp.employmentType },
                   { l: "入社日", v: detailEmp.hireDate?.slice(0, 10) || "—" },
                   { l: "退職日", v: detailEmp.resignDate ? detailEmp.resignDate.slice(0, 10) : "在籍中" },
-                  { l: "職種・役職", v: detailEmp.position || "—" },
                 ].map((x) => (
                   <div key={x.l} className="flex py-1.5 border-b border-app-border last:border-0 text-sm">
                     <div className="text-xs text-app-sub w-24 shrink-0">{x.l}</div>
@@ -408,7 +413,7 @@ export default function AdminMeiboPage() {
                 </div>
               </div>
 
-              {/* 勤務シフト */}
+              {/* 勤務シフト（労働時間把握用） */}
               <div>
                 <div className="text-xs font-bold text-app-sub mb-1.5">固定シフト</div>
                 {detailEmp.shiftStart && detailEmp.shiftEnd ? (
@@ -441,13 +446,8 @@ export default function AdminMeiboPage() {
                 </div>
               </div>
 
-              {/* 備考 */}
-              {detailEmp.memo && (
-                <div>
-                  <div className="text-xs font-bold text-app-sub mb-1.5">備考</div>
-                  <div className="text-sm text-app-text whitespace-pre-wrap">{detailEmp.memo}</div>
-                </div>
-              )}
+              {/* ※ 住所・電話番号・生年月日・フリガナ・職種・備考は */}
+              {/*    顧問社労士への開示は不要なため表示しない */}
             </div>
           </div>
         </>
