@@ -37,3 +37,9 @@ export function canWriteHolidays(role: Role | string | undefined): boolean {
 export function canWriteAttendanceTime(role: Role | string | undefined): boolean {
   return role === "admin";
 }
+
+// FAQ書類のアップロード・削除（代表者のみ）
+// 閲覧は全ロールが可能
+export function canWriteFaqDocuments(role: Role | string | undefined): boolean {
+  return role === "admin";
+}

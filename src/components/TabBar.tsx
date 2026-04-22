@@ -6,10 +6,11 @@ import { usePathname } from "next/navigation";
 type Tab = { href: string; label: string; icon: string };
 
 const ADMIN_TABS: Tab[] = [
-  { href: "/admin", label: "ダッシュボード", icon: "📊" },
+  { href: "/admin", label: "ホーム", icon: "📊" },
   { href: "/admin/meibo", label: "名簿", icon: "👥" },
   { href: "/admin/shukkin", label: "出勤簿", icon: "📅" },
   { href: "/admin/chingin", label: "賃金台帳", icon: "💰" },
+  { href: "/admin/faq", label: "FAQ", icon: "💬" },
 ];
 
 const EMPLOYEE_TABS: Tab[] = [

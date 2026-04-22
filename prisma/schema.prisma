@@ -8,32 +8,32 @@ datasource db {
 }
 
 model Employee {
-  id             String    @id @default(cuid())
-  name           String
-  nameKana       String?
-  birthDate      DateTime?
-  gender         String    @default("男")
-  address        String?
-  phone          String?
-  hireDate       DateTime
-  position       String?
-  employmentType String    @default("正社員")
-  resignDate     DateTime?
-  hourlyWage     Int?
-  monthlySalary  Int?
-  memo           String?
-  shiftStart     String?  // 固定シフト開始時刻 "HH:MM"
-  shiftEnd       String?  // 固定シフト終了時刻 "HH:MM"
-  shiftBreak     Int?     // 固定シフト休憩時間（分）
-  healthInsuranceEnrolled  Boolean @default(false) // 健康保険加入
-  pensionEnrolled          Boolean @default(false) // 厚生年金加入
-  employmentInsuranceEnrolled Boolean @default(false) // 雇用保険加入
-  contractEndDate DateTime?  // 契約終了日（契約社員向け）
-  loginId        String?   @unique
-  passwordHash   String?
-  role           String    @default("employee") // "admin" | "employee"
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id                          String    @id @default(cuid())
+  name                        String
+  nameKana                    String?
+  birthDate                   DateTime?
+  gender                      String    @default("男")
+  address                     String?
+  phone                       String?
+  hireDate                    DateTime
+  position                    String?
+  employmentType              String    @default("正社員")
+  resignDate                  DateTime?
+  hourlyWage                  Int?
+  monthlySalary               Int?
+  memo                        String?
+  shiftStart                  String? // 固定シフト開始時刻 "HH:MM"
+  shiftEnd                    String? // 固定シフト終了時刻 "HH:MM"
+  shiftBreak                  Int? // 固定シフト休憩時間（分）
+  healthInsuranceEnrolled     Boolean   @default(false) // 健康保険加入
+  pensionEnrolled             Boolean   @default(false) // 厚生年金加入
+  employmentInsuranceEnrolled Boolean   @default(false) // 雇用保険加入
+  contractEndDate             DateTime? // 契約終了日（契約社員向け）
+  loginId                     String?   @unique
+  passwordHash                String?
+  role                        String    @default("employee") // "admin" | "employee"
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
 
   attendance Attendance[]
   payroll    Payroll[]
@@ -47,7 +47,7 @@ model Attendance {
   startTime    String?
   endTime      String?
   breakMinutes Int?
-  status       String?  // "normal" | "late" | "early_leave" | "absent"
+  status       String? // "normal" | "late" | "early_leave" | "absent"
   memo         String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -62,9 +62,9 @@ model Dakoku {
   employeeId String
   date       DateTime @db.Date
   time       String
-  type       String   // "in" | "break_start" | "break_end" | "out"
-  latitude   Float?   // GPS緯度
-  longitude  Float?   // GPS経度
+  type       String // "in" | "break_start" | "break_end" | "out"
+  latitude   Float? // GPS緯度
+  longitude  Float? // GPS経度
   timestamp  DateTime @default(now())
 
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -75,7 +75,7 @@ model Dakoku {
 model Payroll {
   id                  String   @id @default(cuid())
   employeeId          String
-  month               String   // "YYYY-MM"
+  month               String // "YYYY-MM"
   workDays            Int      @default(0)
   workHours           Float    @default(0)
   grossPay            Int      @default(0)
@@ -106,36 +106,56 @@ model Rate {
   employmentInsurance Float    @default(0.6)
   childcare           Float    @default(0.36)
   label               String?
-  closedSun           Boolean  @default(true)  // 日曜定休
+  closedSun           Boolean  @default(true) // 日曜定休
   closedMon           Boolean  @default(false)
   closedTue           Boolean  @default(false)
   closedWed           Boolean  @default(false)
   closedThu           Boolean  @default(false)
   closedFri           Boolean  @default(false)
-  closedSat           Boolean  @default(true)  // 土曜定休
+  closedSat           Boolean  @default(true) // 土曜定休
   updatedAt           DateTime @updatedAt
 }
 
 model Company {
   id                 String    @id @default(cuid())
-  name               String    @default("")       // 会社名
-  nameKana           String?                       // フリガナ
-  representativeName String?                       // 代表者名
-  address            String?                       // 所在地
-  phone              String?                       // 電話番号
-  email              String?                       // メールアドレス
-  establishedDate    DateTime?                     // 設立日
-  businessType       String?                       // 事業内容
-  corporateNumber    String?                       // 法人番号
-  memo               String?                       // 備考
+  name               String    @default("") // 会社名
+  nameKana           String? // フリガナ
+  representativeName String? // 代表者名
+  address            String? // 所在地
+  phone              String? // 電話番号
+  email              String? // メールアドレス
+  establishedDate    DateTime? // 設立日
+  businessType       String? // 事業内容
+  corporateNumber    String? // 法人番号
+  memo               String? // 備考
   updatedAt          DateTime  @updatedAt
 }
 
 model ClosedDate {
   id   String   @id @default(cuid())
-  date DateTime @db.Date       // 休日の日付
-  name String                  // 名称（例: "元日"）
+  date DateTime @db.Date // 休日の日付
+  name String // 名称（例: "元日"）
   type String   @default("national") // "national" | "company"
 
   @@unique([date])
+}
+
+// FAQ書類（就業規則・社内ルールなどのPDF）
+// 管理者がアップロードし、全ロールが閲覧できる
+// 将来的にAIチャットボットのRAGソースとして利用予定
+model FaqDocument {
+  id          String   @id @default(cuid())
+  title       String // 表示タイトル
+  category    String? // カテゴリ（例: "就業規則"）
+  description String? // 補足説明
+  fileName    String // 元ファイル名
+  fileSize    Int // バイトサイズ
+  mimeType    String   @default("application/pdf")
+  dataBase64  String   @db.Text // Base64エンコード済みファイル本体
+  uploadedBy  String // 作成者のEmployee.id
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([createdAt])
 }
