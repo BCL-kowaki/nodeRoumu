@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Card from "@/components/Card";
+import PasswordInput from "@/components/PasswordInput";
 import { useAuth } from "@/lib/auth-context";
 import { roleLabel } from "@/lib/roles";
 
@@ -92,10 +93,9 @@ export default function AccountPanel() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div>
             <label className={labelClass}>現在のパスワード</label>
-            <input
-              type="password"
+            <PasswordInput
               value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
+              onChange={setCurrentPassword}
               className={inputClass}
               autoComplete="current-password"
             />
@@ -103,20 +103,18 @@ export default function AccountPanel() {
           <div>
             <label className={labelClass}>新しいパスワード</label>
             <div className="text-[11px] text-app-sub mb-1">8文字以上・英字と数字を含む</div>
-            <input
-              type="password"
+            <PasswordInput
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
+              onChange={setNewPassword}
               className={inputClass}
               autoComplete="new-password"
             />
           </div>
           <div>
             <label className={labelClass}>新しいパスワード（確認）</label>
-            <input
-              type="password"
+            <PasswordInput
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={setConfirmPassword}
               className={inputClass}
               autoComplete="new-password"
             />

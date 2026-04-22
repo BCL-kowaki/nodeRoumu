@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
+import PasswordInput from "@/components/PasswordInput";
 import { useAuth } from "@/lib/auth-context";
 import { roleLabel } from "@/lib/roles";
 
@@ -142,10 +143,9 @@ export default function AdminUsersPage() {
             <div>
               <label className={labelClass}>初期パスワード</label>
               <div className="text-[11px] text-app-sub mb-1">8文字以上・英字と数字を含む</div>
-              <input
-                type="text"
+              <PasswordInput
                 value={addForm.password}
-                onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
+                onChange={(v) => setAddForm({ ...addForm, password: v })}
                 className={inputClass}
                 autoComplete="off"
               />
@@ -231,10 +231,9 @@ export default function AdminUsersPage() {
               新しいパスワードを設定します。設定後、対象者に新パスワードを直接お伝えください。
             </div>
             <label className={labelClass}>新しいパスワード</label>
-            <input
-              type="text"
+            <PasswordInput
               value={resetPassword}
-              onChange={(e) => setResetPassword(e.target.value)}
+              onChange={setResetPassword}
               className={inputClass}
               autoComplete="off"
             />

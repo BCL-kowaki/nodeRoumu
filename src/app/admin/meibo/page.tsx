@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
+import PasswordInput from "@/components/PasswordInput";
 import { useAuth } from "@/lib/auth-context";
 import { canWriteEmployees } from "@/lib/permissions";
 
@@ -205,6 +206,12 @@ export default function AdminMeiboPage() {
                     <option key={o} value={o}>{o}</option>
                   ))}
                 </select>
+              ) : x.t === "password" ? (
+                <PasswordInput
+                  className={inputClass}
+                  value={(form as Record<string, unknown>)[x.k] as string || ""}
+                  onChange={(v) => setForm({ ...form, [x.k]: v })}
+                />
               ) : (
                 <input
                   className={inputClass}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Card from "@/components/Card";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function LoginPage() {
   const [loginId, setLoginId] = useState("");
@@ -68,10 +69,9 @@ export default function LoginPage() {
               <label className="block text-xs font-semibold text-app-sub mb-1">
                 パスワード
               </label>
-              <input
-                type="password"
+              <PasswordInput
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={setPassword}
                 className="w-full p-3 rounded border border-app-border text-sm bg-white outline-none"
                 autoComplete="current-password"
               />
