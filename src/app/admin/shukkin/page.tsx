@@ -38,6 +38,27 @@ type Rate = {
 
 type ClosedDateRecord = { id: string; date: string; name: string; type: string };
 
+// 手入力で編集する3項目
+type TimeField = "startTime" | "endTime" | "breakMinutes";
+const TIME_FIELDS: TimeField[] = ["startTime", "endTime", "breakMinutes"];
+
+// 画面に表示する値（保存済みレコード or 既定シフト由来）
+type DisplayValues = {
+  startTime: string;
+  endTime: string;
+  breakMinutes: number | string;
+  hasRecord: boolean;
+};
+
+// 入力中の下書き（日付 → 項目 → 入力値）
+type DayDraft = Partial<Record<TimeField, string>>;
+
+// 表示値を文字列に揃える（下書きと比較するため）
+function displayValue(display: DisplayValues, field: TimeField): string {
+  const v = display[field];
+  return v === null || v === undefined ? "" : String(v);
+}
+
 type DakokuLog = {
   id: string;
   employeeId: string;
@@ -127,6 +148,10 @@ export default function ShukkinPage() {
   const [modalDate, setModalDate] = useState<string | null>(null);
   const [modalLogs, setModalLogs] = useState<DakokuLog[]>([]);
   const [modalLoading, setModalLoading] = useState(false);
+  // 入力中の値。保存が終わるまでサーバ値で上書きしない（入力の巻き戻し防止）
+  const [drafts, setDrafts] = useState<Record<string, DayDraft>>({});
+  const [savingDate, setSavingDate] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     const year = selMonth.slice(0, 4);
@@ -145,14 +170,18 @@ export default function ShukkinPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 保存直後に「再取得の完了」を待てるよう Promise を返す
   const fetchAtt = useCallback(() => {
-    if (!selEmp) return;
-    fetch(`/api/attendance?employeeId=${selEmp}&month=${selMonth}`)
+    if (!selEmp) return Promise.resolve();
+    return fetch(`/api/attendance?employeeId=${selEmp}&month=${selMonth}`)
       .then((r) => r.json())
       .then(setAtt);
   }, [selEmp, selMonth]);
 
   useEffect(() => {
+    // 従業員・月を切り替えたら入力中の下書きとエラー表示は破棄する
+    setDrafts({});
+    setSaveError(null);
     fetchAtt();
   }, [fetchAtt]);
 
@@ -171,7 +200,7 @@ export default function ShukkinPage() {
   const getRec = (date: string) =>
     att.find((a) => a.employeeId === selEmp && a.date.startsWith(date));
 
-  const getDisplay = (date: string) => {
+  const getDisplay = (date: string): DisplayValues => {
     const rec = getRec(date);
     const closed = isClosed(date, rates, closedDates);
     if (rec) {
@@ -193,31 +222,102 @@ export default function ShukkinPage() {
     return { startTime: "", endTime: "", breakMinutes: "", hasRecord: false };
   };
 
-  const upsert = async (date: string, field: string, val: string) => {
-    const rec = getRec(date);
+  // --- 下書き操作 ---
+  const setDraftField = (date: string, field: TimeField, value: string) =>
+    setDrafts((prev) => ({ ...prev, [date]: { ...prev[date], [field]: value } }));
+
+  const clearDraft = (date: string) =>
+    setDrafts((prev) => {
+      if (!prev[date]) return prev;
+      const next = { ...prev };
+      delete next[date];
+      return next;
+    });
+
+  const clearDraftField = (date: string, field: TimeField) =>
+    setDrafts((prev) => {
+      if (prev[date]?.[field] === undefined) return prev;
+      const day = { ...prev[date] };
+      delete day[field];
+      return { ...prev, [date]: day };
+    });
+
+  // 出勤簿への保存。成功時だけ下書きを破棄し、失敗時は入力値を残してエラーを表示する
+  const save = async (date: string, body: Record<string, unknown>) => {
+    setSavingDate(date);
+    setSaveError(null);
+    try {
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        setSaveError(
+          res.status === 403
+            ? "保存できませんでした（出勤簿の編集は代表者のみ可能です）"
+            : res.status === 401
+            ? "保存できませんでした（ログインの有効期限が切れています。再ログインしてください）"
+            : `保存できませんでした（エラー ${res.status}）`
+        );
+        return;
+      }
+      await fetchAtt();
+      clearDraft(date);
+    } catch {
+      setSaveError("保存できませんでした（通信エラー）。少し時間をおいて再度お試しください。");
+    } finally {
+      setSavingDate(null);
+    }
+  };
+
+  // 時刻・休憩の確定保存。
+  // 打鍵ごとではなくフォーカスが外れた時（またはEnter）に保存する。
+  // ※ type="time" は入力途中の値が不正な間 "" を返すため、
+  //    打鍵ごとに保存すると空値がDBに書かれ、再取得で入力が巻き戻ってしまう
+  const commitTime = async (date: string, field: TimeField) => {
+    if (!canEditTime) return;
+    const draftVal = drafts[date]?.[field];
+    if (draftVal === undefined) return;
+
+    const display = getDisplay(date);
+    // 値が変わっていなければ保存しない
+    if (draftVal === displayValue(display, field)) {
+      clearDraftField(date, field);
+      return;
+    }
+
     const body: Record<string, unknown> = {
       employeeId: selEmp,
       date,
-      [field]: val,
+      [field]: draftVal === "" ? null : draftVal,
     };
-    // ステータスを「勤務扱いにならない」値に変えた場合、実働時間データをクリア
+
+    // まだレコードが無い日は、画面に出ている他項目（既定シフト・入力中の値）も一緒に保存する
+    if (!getRec(date)) {
+      for (const other of TIME_FIELDS) {
+        if (other === field) continue;
+        const v = drafts[date]?.[other] ?? displayValue(display, other);
+        if (v !== "") body[other] = v;
+      }
+    }
+
+    await save(date, body);
+  };
+
+  // 状態（プルダウン）は選択が確定値なので即保存する
+  const changeStatus = async (date: string, val: string) => {
+    if (!canEditTime) return;
+    const body: Record<string, unknown> = { employeeId: selEmp, date, status: val };
+    // 「勤務扱いにならない」状態に変えた場合、実働時間データをクリア
     // これにより月合計・日別表示の両方から計上されなくなる
-    if (field === "status" && !isWorkingStatus(val) && val !== "") {
+    if (!isWorkingStatus(val) && val !== "") {
       body.startTime = null;
       body.endTime = null;
       body.breakMinutes = null;
+      clearDraft(date);
     }
-    if (!rec && selE && field !== "status") {
-      if (field !== "startTime") body.startTime = selE.shiftStart || undefined;
-      if (field !== "endTime") body.endTime = selE.shiftEnd || undefined;
-      if (field !== "breakMinutes") body.breakMinutes = selE.shiftBreak || undefined;
-    }
-    await fetch("/api/attendance", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    fetchAtt();
+    await save(date, body);
   };
 
   // 打刻履歴モーダルを開く
@@ -271,6 +371,11 @@ export default function ShukkinPage() {
       {!canEditTime && (
         <div className="text-xs text-app-sub bg-app-bg rounded px-3 py-2">
           閲覧のみ可能です（編集は代表者権限が必要）
+        </div>
+      )}
+      {saveError && (
+        <div className="text-xs text-danger bg-red-50 border border-red-200 rounded px-3 py-2">
+          {saveError}
         </div>
       )}
       <Card className="!p-4">
@@ -347,13 +452,21 @@ export default function ShukkinPage() {
         const closed = isClosed(date, rates, closedDates);
         const dow = new Date(date).toLocaleDateString("ja-JP", { weekday: "short" });
         const display = getDisplay(date);
+        const draft = drafts[date] || {};
+        // 入力済みで未保存の項目があるか
+        const isDirty = TIME_FIELDS.some(
+          (f) => draft[f] !== undefined && draft[f] !== displayValue(display, f)
+        );
         const rec = getRec(date);
         const isPast = date < todayStr();
         const currentStatus = autoStatus(date, rec, closed, isPast);
         const badge = STATUS_BADGE[currentStatus];
         // 定休・欠勤・公休・未出勤の日は実働時間を表示しない
+        const shownStart = draft.startTime ?? displayValue(display, "startTime");
+        const shownEnd = draft.endTime ?? displayValue(display, "endTime");
+        const shownBreak = draft.breakMinutes ?? displayValue(display, "breakMinutes");
         const h = isWorkingStatus(currentStatus)
-          ? calcH(display.startTime || null, display.endTime || null, typeof display.breakMinutes === "number" ? display.breakMinutes : null)
+          ? calcH(shownStart || null, shownEnd || null, shownBreak === "" ? null : Number(shownBreak))
           : "";
 
         return (
@@ -372,6 +485,11 @@ export default function ShukkinPage() {
                   {currentStatus === "closed" ? getClosedDateName(date, rates, closedDates) : badge.text}
                 </Badge>
               )}
+              {savingDate === date ? (
+                <span className="text-[10px] text-app-sub">保存中…</span>
+              ) : isDirty ? (
+                <span className="text-[10px] text-accent font-semibold">未保存</span>
+              ) : null}
               {h && (
                 <div className="text-[13px] font-bold text-primary ml-auto">{h}h</div>
               )}
@@ -384,9 +502,11 @@ export default function ShukkinPage() {
                     <label className="block text-[10px] font-semibold text-app-sub mb-0.5">出勤</label>
                     <input
                       type="time"
-                      className={`${inputClass} ${!display.hasRecord && display.startTime ? "text-app-sub" : ""} ${!canEditTime ? "bg-gray-50" : ""}`}
-                      value={display.startTime}
-                      onChange={(e) => canEditTime && upsert(date, "startTime", e.target.value)}
+                      className={`${inputClass} ${!display.hasRecord && draft.startTime === undefined && display.startTime ? "text-app-sub" : ""} ${!canEditTime ? "bg-gray-50" : ""}`}
+                      value={shownStart}
+                      onChange={(e) => setDraftField(date, "startTime", e.target.value)}
+                      onBlur={() => commitTime(date, "startTime")}
+                      onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
                       readOnly={!canEditTime}
                     />
                   </div>
@@ -394,9 +514,11 @@ export default function ShukkinPage() {
                     <label className="block text-[10px] font-semibold text-app-sub mb-0.5">退勤</label>
                     <input
                       type="time"
-                      className={`${inputClass} ${!display.hasRecord && display.endTime ? "text-app-sub" : ""} ${!canEditTime ? "bg-gray-50" : ""}`}
-                      value={display.endTime}
-                      onChange={(e) => canEditTime && upsert(date, "endTime", e.target.value)}
+                      className={`${inputClass} ${!display.hasRecord && draft.endTime === undefined && display.endTime ? "text-app-sub" : ""} ${!canEditTime ? "bg-gray-50" : ""}`}
+                      value={shownEnd}
+                      onChange={(e) => setDraftField(date, "endTime", e.target.value)}
+                      onBlur={() => commitTime(date, "endTime")}
+                      onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
                       readOnly={!canEditTime}
                     />
                   </div>
@@ -404,9 +526,13 @@ export default function ShukkinPage() {
                     <label className="block text-[10px] font-semibold text-app-sub mb-0.5">休憩(分)</label>
                     <input
                       type="number"
-                      className={`${inputClass} ${!display.hasRecord && display.breakMinutes ? "text-app-sub" : ""} ${!canEditTime ? "bg-gray-50" : ""}`}
-                      value={display.breakMinutes}
-                      onChange={(e) => canEditTime && upsert(date, "breakMinutes", e.target.value)}
+                      inputMode="numeric"
+                      min={0}
+                      className={`${inputClass} ${!display.hasRecord && draft.breakMinutes === undefined && display.breakMinutes ? "text-app-sub" : ""} ${!canEditTime ? "bg-gray-50" : ""}`}
+                      value={shownBreak}
+                      onChange={(e) => setDraftField(date, "breakMinutes", e.target.value)}
+                      onBlur={() => commitTime(date, "breakMinutes")}
+                      onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
                       readOnly={!canEditTime}
                     />
                   </div>
@@ -421,8 +547,8 @@ export default function ShukkinPage() {
                     currentStatus === "normal" ? "text-primary" : ""
                   } ${!canEditTime ? "bg-gray-50" : ""}`}
                   value={rec?.status || ""}
-                  onChange={(e) => canEditTime && upsert(date, "status", e.target.value)}
-                  disabled={!canEditTime}
+                  onChange={(e) => changeStatus(date, e.target.value)}
+                  disabled={!canEditTime || savingDate === date}
                 >
                   {STATUS_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
