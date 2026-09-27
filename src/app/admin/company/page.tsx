@@ -120,7 +120,8 @@ export default function CompanyPage() {
       pdfjsLib.GlobalWorkerOptions.workerSrc =
         `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      // isEvalSupported: false … 細工したPDFで任意のJSが実行される脆弱性（CVE-2024-4367）の回避策
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer, isEvalSupported: false }).promise;
 
       // Step 1: テキストPDFとして読み取りを試みる
       let fullText = "";
