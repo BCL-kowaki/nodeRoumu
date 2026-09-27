@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 // dataBase64 を含めて返す（モーダルでのPDF表示用）
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
   if (!session) {
@@ -17,7 +17,7 @@ export async function GET(
   }
 
   const record = await prisma.faqDocument.findUnique({
-    where: { id: params.id },
+    where: { id: (await params).id },
   });
   if (!record) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
@@ -28,7 +28,7 @@ export async function GET(
 // FAQ書類の削除（代表者のみ）
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
   if (!session) {
@@ -38,6 +38,6 @@ export async function DELETE(
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  await prisma.faqDocument.delete({ where: { id: params.id } });
+  await prisma.faqDocument.delete({ where: { id: (await params).id } });
   return NextResponse.json({ ok: true });
 }

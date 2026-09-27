@@ -35,11 +35,11 @@ export async function verifyToken(token: string): Promise<SessionPayload | null>
 }
 
 // セッションCookieをセット（remember: trueなら30日保持）
-export function setSessionCookie(token: string, remember = false) {
+export async function setSessionCookie(token: string, remember = false) {
   const maxAge = remember
     ? 60 * 60 * 24 * 30  // 30日
     : 60 * 60 * 24 * 7;  // 7日
-  cookies().set(COOKIE_NAME, token, {
+  (await cookies()).set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -49,13 +49,13 @@ export function setSessionCookie(token: string, remember = false) {
 }
 
 // セッションCookieを削除
-export function clearSessionCookie() {
-  cookies().delete(COOKIE_NAME);
+export async function clearSessionCookie() {
+  (await cookies()).delete(COOKIE_NAME);
 }
 
 // Cookieからセッション取得（Server ComponentやAPI Routeで使用）
 export async function getSession(): Promise<SessionPayload | null> {
-  const cookie = cookies().get(COOKIE_NAME);
+  const cookie = (await cookies()).get(COOKIE_NAME);
   if (!cookie?.value) return null;
   return verifyToken(cookie.value);
 }

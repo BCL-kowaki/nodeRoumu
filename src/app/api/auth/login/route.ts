@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     name: employee.name,
   }, !!remember);
 
-  setSessionCookie(token, !!remember);
+  await setSessionCookie(token, !!remember);
 
   return NextResponse.json({
     ok: true,

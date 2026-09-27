@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 // 従業員更新（代表者のみ）
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
   if (!session) {
@@ -51,7 +51,7 @@ export async function PUT(
   }
 
   const employee = await prisma.employee.update({
-    where: { id: params.id },
+    where: { id: (await params).id },
     data,
   });
   return NextResponse.json(employee);
@@ -60,7 +60,7 @@ export async function PUT(
 // 従業員削除（代表者のみ）
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
   if (!session) {
@@ -70,6 +70,6 @@ export async function DELETE(
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  await prisma.employee.delete({ where: { id: params.id } });
+  await prisma.employee.delete({ where: { id: (await params).id } });
   return NextResponse.json({ ok: true });
 }

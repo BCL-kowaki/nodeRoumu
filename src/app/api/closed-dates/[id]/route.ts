@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 // 特定休日削除（代表者のみ）
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
   if (!session) {
@@ -18,6 +18,6 @@ export async function DELETE(
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  await prisma.closedDate.delete({ where: { id: params.id } });
+  await prisma.closedDate.delete({ where: { id: (await params).id } });
   return NextResponse.json({ ok: true });
 }

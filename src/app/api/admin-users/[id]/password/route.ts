@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 // body: { newPassword }
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
   if (!session) {
@@ -33,7 +33,7 @@ export async function PATCH(
 
   // 対象が admin/manager であることを確認
   const target = await prisma.employee.findUnique({
-    where: { id: params.id },
+    where: { id: (await params).id },
     select: { id: true, role: true },
   });
   if (!target || (target.role !== "admin" && target.role !== "manager")) {
@@ -42,7 +42,7 @@ export async function PATCH(
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
   await prisma.employee.update({
-    where: { id: params.id },
+    where: { id: (await params).id },
     data: { passwordHash },
   });
 
