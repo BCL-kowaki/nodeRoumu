@@ -2,10 +2,21 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { NextRequest } from "next/server";
 
-const SECRET = new TextEncoder().encode(
-  process.env.AUTH_SECRET || "roumu-default-secret"
-);
 const COOKIE_NAME = "roumu-session";
+const MIN_SECRET_LENGTH = 32;
+
+// JWT署名鍵を環境変数から取得する。
+// 未設定・短すぎる場合は固定値で代用せずエラーにする（固定値だと誰でもログイン状態を偽造できるため）。
+// ビルド時に環境変数が無くても落ちないよう、モジュール読み込み時ではなく使用時に検証する。
+function getSecret(): Uint8Array {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret || secret.length < MIN_SECRET_LENGTH) {
+    throw new Error(
+      `環境変数 AUTH_SECRET が未設定か短すぎます（${MIN_SECRET_LENGTH}文字以上のランダムな文字列を設定してください）`
+    );
+  }
+  return new TextEncoder().encode(secret);
+}
 
 // セッション情報の型
 export type SessionPayload = {
@@ -21,13 +32,15 @@ export async function createToken(payload: SessionPayload, remember = false): Pr
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime(remember ? "30d" : "7d")
     .setIssuedAt()
-    .sign(SECRET);
+    .sign(getSecret());
 }
 
 // JWTトークン検証
 export async function verifyToken(token: string): Promise<SessionPayload | null> {
+  // 鍵の設定漏れは「未ログイン扱い」で握りつぶさず、エラーとして表に出す
+  const secret = getSecret();
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, secret);
     return payload as unknown as SessionPayload;
   } catch {
     return null;
