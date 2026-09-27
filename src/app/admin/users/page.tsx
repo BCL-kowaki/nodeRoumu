@@ -32,6 +32,10 @@ export default function AdminUsersPage() {
   const [resetPassword, setResetPassword] = useState("");
   const [resetMsg, setResetMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
+  // 権限変更の結果表示
+  const [roleMsg, setRoleMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
+
   const fetchUsers = useCallback(() => {
     fetch("/api/admin-users")
       .then((r) => (r.ok ? r.json() : []))
@@ -86,6 +90,35 @@ export default function AdminUsersPage() {
       return;
     }
     setResetMsg({ type: "ok", text: `パスワードをリセットしました。新しいパスワードを対象者に伝えてください（この画面を閉じると再表示できません）。` });
+  };
+
+  // 代表者 ⇔ 社労士 の切り替え
+  const doChangeRole = async (target: AdminUser) => {
+    const nextRole = target.role === "admin" ? "manager" : "admin";
+    if (!window.confirm(`${target.name} の権限を「${roleLabel(nextRole)}」に変更しますか？`)) return;
+    setRoleMsg(null);
+    setChangingRoleId(target.id);
+    try {
+      const res = await fetch(`/api/admin-users/${target.id}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: nextRole }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setRoleMsg({ type: "err", text: data.error || "権限の変更に失敗しました" });
+        return;
+      }
+      setRoleMsg({
+        type: "ok",
+        text: `${target.name} の権限を「${roleLabel(nextRole)}」に変更しました。対象者が再ログインすると反映されます。`,
+      });
+      fetchUsers();
+    } catch {
+      setRoleMsg({ type: "err", text: "権限の変更に失敗しました（通信エラー）" });
+    } finally {
+      setChangingRoleId(null);
+    }
   };
 
   const closeResetModal = () => {
@@ -184,6 +217,18 @@ export default function AdminUsersPage() {
         </Card>
       )}
 
+      {roleMsg && (
+        <div
+          className={`text-sm rounded p-3 text-center ${
+            roleMsg.type === "ok"
+              ? "text-primary-dark bg-primary-light"
+              : "text-danger bg-danger-light"
+          }`}
+        >
+          {roleMsg.text}
+        </div>
+      )}
+
       {/* 一覧 */}
       {users.length === 0 ? (
         <Card className="text-center !py-10 text-app-sub">
@@ -206,12 +251,26 @@ export default function AdminUsersPage() {
                 {roleLabel(u.role)}
               </Badge>
             </div>
-            <button
-              onClick={() => setResetUser(u)}
-              className="px-3.5 py-1.5 rounded border border-primary text-primary text-xs font-semibold bg-transparent cursor-pointer"
-            >
-              パスワードをリセット
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setResetUser(u)}
+                className="px-3.5 py-1.5 rounded border border-primary text-primary text-xs font-semibold bg-transparent cursor-pointer"
+              >
+                パスワードをリセット
+              </button>
+              {/* 自分自身の権限は変更できない（API側でも拒否） */}
+              {u.id !== user?.employeeId && (
+                <button
+                  onClick={() => doChangeRole(u)}
+                  disabled={changingRoleId === u.id}
+                  className="px-3.5 py-1.5 rounded border border-app-border text-app-text text-xs font-semibold bg-transparent cursor-pointer disabled:opacity-50"
+                >
+                  {changingRoleId === u.id
+                    ? "変更中…"
+                    : `${roleLabel(u.role === "admin" ? "manager" : "admin")}に変更`}
+                </button>
+              )}
+            </div>
           </Card>
         ))
       )}
