@@ -21,11 +21,17 @@ npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/
 # 4. ベースラインを適用済みとして記録（テーブルは変更されない）
 npx prisma migrate resolve --applied 0_init
 
+# 4-2. 0_init が適用済み、それより新しい変更だけが未適用と表示されることを確認
+npx prisma migrate status
+
 # 5. 本番の接続先ファイルを削除する
 rm .env.production.local
 ```
 
 差分が出た場合は、本番DBが schema.prisma とずれている。記録せずに相談すること。
+
+- 順序を必ず守る（記録 → 適用）。記録せずに `migrate deploy` すると 0_init のテーブル作成が既存テーブルと衝突して失敗する（巻き戻るので壊れはしない）。
+- 本番の DATABASE_URL が接続プーラー経由（Supabase の 6543 番ポート・pgbouncer など）の場合、migrate が失敗することがある。その場合は直接接続の URL で実行する。
 
 ## 普段のスキーマ変更
 

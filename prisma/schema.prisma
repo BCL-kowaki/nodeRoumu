@@ -38,6 +38,10 @@ model Employee {
   attendance Attendance[]
   payroll    Payroll[]
   dakoku     Dakoku[]
+
+  // 業務管理（代表者のみ利用）
+  workProjects WorkProject[]
+  workTasks    WorkTask[]
 }
 
 model Attendance {
@@ -158,4 +162,50 @@ model FaqDocument {
 
   @@index([category])
   @@index([createdAt])
+}
+
+// ===== 業務管理（代表者のみ利用） =====
+// どのデータも ownerId（Employee.id）で持ち主を持ち、検索・更新は必ず ownerId で絞る。
+// 持ち主の従業員レコードを誤って削除して業務データが消えないよう onDelete: Restrict にしている。
+
+model WorkProject {
+  id          String    @id @default(cuid())
+  ownerId     String
+  name        String
+  description String?   @db.Text
+  status      String    @default("active") // "active" | "on_hold" | "done" | "archived"
+  color       String? // "#rrggbb"
+  startDate   DateTime? @db.Date
+  dueDate     DateTime? @db.Date
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  owner Employee   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  tasks WorkTask[]
+
+  @@index([ownerId, status])
+}
+
+model WorkTask {
+  id             String    @id @default(cuid())
+  ownerId        String
+  projectId      String?
+  title          String
+  description    String?   @db.Text
+  status         String    @default("todo") // "todo" | "doing" | "done" | "canceled"
+  priority       Int       @default(2) // 1=高 2=中 3=低
+  dueDate        DateTime? @db.Date
+  plannedMinutes Int?
+  completedAt    DateTime?
+  sortOrder      Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  owner   Employee     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  // プロジェクトを削除してもタスクは残し、プロジェクト未設定に戻す
+  project WorkProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId, status, dueDate])
+  @@index([projectId])
 }

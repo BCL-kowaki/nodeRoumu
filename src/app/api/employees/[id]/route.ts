@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { canWriteEmployees } from "@/lib/permissions";
@@ -70,6 +71,17 @@ export async function DELETE(
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  await prisma.employee.delete({ where: { id: (await params).id } });
+  try {
+    await prisma.employee.delete({ where: { id: (await params).id } });
+  } catch (e) {
+    // 業務管理のデータ（プロジェクト・タスク）を持つ従業員は、データ保護のため削除できない（onDelete: Restrict）
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2003") {
+      return NextResponse.json(
+        { error: "業務管理のデータが残っているため削除できません。退職日の設定で対応してください" },
+        { status: 409 }
+      );
+    }
+    throw e;
+  }
   return NextResponse.json({ ok: true });
 }

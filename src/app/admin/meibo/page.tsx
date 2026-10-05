@@ -152,7 +152,11 @@ export default function AdminMeiboPage() {
 
   const del = async (id: string) => {
     if (!confirm("削除しますか？")) return;
-    await fetch(`/api/employees/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/employees/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || `削除できませんでした（エラー ${res.status}）`);
+    }
     await reload();
   };
 
