@@ -45,6 +45,7 @@ model Employee {
   routines     Routine[]
   workPlans    WorkPlan[]
   timeEntries  TimeEntry[]
+  githubRepos  GithubRepo[]
 }
 
 model Attendance {
@@ -194,26 +195,35 @@ model WorkProject {
 }
 
 model WorkTask {
-  id             String    @id @default(cuid())
-  ownerId        String
-  projectId      String?
-  title          String
-  description    String?   @db.Text
-  status         String    @default("todo") // "todo" | "doing" | "done" | "canceled"
-  priority       Int       @default(2) // 1=高 2=中 3=低
-  dueDate        DateTime? @db.Date
-  plannedMinutes Int?
-  completedAt    DateTime?
-  sortOrder      Int       @default(0)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  ownerId           String
+  projectId         String?
+  title             String
+  description       String?   @db.Text
+  status            String    @default("todo") // "todo" | "doing" | "done" | "canceled"
+  priority          Int       @default(2) // 1=高 2=中 3=低
+  dueDate           DateTime? @db.Date
+  plannedMinutes    Int?
+  completedAt       DateTime?
+  sortOrder         Int       @default(0)
+  // GitHub Issue 連携（手入力のタスクはすべて NULL）
+  githubRepoId      String?
+  githubIssueNumber Int?
+  githubState       String? // "open" | "closed"
+  githubUpdatedAt   DateTime? // GitHub 側の updated_at（取り込み済みかの判定に使う）
+  githubHtmlUrl     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  owner   Employee     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  owner      Employee     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   // プロジェクトを削除してもタスクは残し、プロジェクト未設定に戻す
-  project WorkProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  plans   WorkPlan[]
-  entries TimeEntry[]
+  project    WorkProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  githubRepo GithubRepo?  @relation(fields: [githubRepoId], references: [id], onDelete: SetNull)
+  plans      WorkPlan[]
+  entries    TimeEntry[]
 
+  // 同じ Issue を二重に取り込まない（手入力のタスクは列が NULL なので重複扱いにならない）
+  @@unique([ownerId, githubRepoId, githubIssueNumber])
   @@index([ownerId, status, dueDate])
   @@index([projectId])
 }
@@ -308,4 +318,29 @@ model TimeEntry {
 
   @@index([ownerId, date])
   @@index([ownerId, endedAt])
+}
+
+// GitHub のリポジトリ（アクセストークンで見えるもの）。syncIssues が true のものだけ Issue をタスクに同期する
+model GithubRepo {
+  id              String    @id @default(cuid())
+  ownerId         String
+  githubId        String // GitHub 側の repo id（桁が大きくなりうるため文字列で持つ）
+  fullName        String // "owner/name"
+  description     String?
+  isPrivate       Boolean
+  isArchived      Boolean   @default(false)
+  htmlUrl         String
+  defaultBranch   String
+  openIssuesCount Int       @default(0) // プルリクエストを含まない件数（同期時に更新）
+  openPrCount     Int       @default(0)
+  pushedAt        DateTime?
+  syncIssues      Boolean   @default(false)
+  lastSyncedAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  owner Employee   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  tasks WorkTask[]
+
+  @@unique([ownerId, githubId])
 }
