@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import BrandLogo from "@/components/BrandLogo";
 
@@ -23,7 +23,9 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
 
+  const pathname = usePathname();
   const isAdmin = user?.role === "admin";
+  const inWork = pathname === "/admin/work" || pathname.startsWith("/admin/work/");
   const isAdminOrManager = user?.role === "admin" || user?.role === "manager";
 
   return (
@@ -93,10 +95,16 @@ export default function Header() {
                 </>
               )}
 
-              {/* 管理ユーザー一覧（admin のみ） */}
+              {/* 管理ユーザー一覧・業務管理（admin のみ） */}
               {isAdmin && (
                 <>
                   <div className="border-t border-app-border my-1" />
+                  <button
+                    onClick={() => { router.push(inWork ? "/admin" : "/admin/work"); setMenuOpen(false); }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
+                  >
+                    {inWork ? "📋 労務管理へ戻る" : "✅ 業務管理"}
+                  </button>
                   <button
                     onClick={() => { router.push("/admin/users"); setMenuOpen(false); }}
                     className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"

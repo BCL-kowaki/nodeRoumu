@@ -13,6 +13,17 @@ const ADMIN_TABS: Tab[] = [
   { href: "/admin/faq", label: "FAQ", icon: "💬" },
 ];
 
+// 業務管理（/admin/work 配下・代表者のみ）表示中のタブ
+const WORK_TABS: Tab[] = [
+  { href: "/admin/work", label: "今日", icon: "✅" },
+  { href: "/admin/work/tasks", label: "タスク", icon: "📝" },
+  { href: "/admin/work/projects", label: "プロジェクト", icon: "🗂️" },
+  { href: "/admin", label: "労務へ", icon: "↩️" },
+];
+
+// 下の各タブを「完全一致」で選択中にするパス（それ以外は前方一致）
+const EXACT_MATCH = ["/admin", "/admin/work"];
+
 const EMPLOYEE_TABS: Tab[] = [
   { href: "/", label: "ホーム", icon: "📊" },
   { href: "/dakoku", label: "打刻", icon: "⏱️" },
@@ -23,7 +34,8 @@ const EMPLOYEE_TABS: Tab[] = [
 
 export default function TabBar({ variant }: { variant: "admin" | "employee" }) {
   const pathname = usePathname();
-  const tabs = variant === "admin" ? ADMIN_TABS : EMPLOYEE_TABS;
+  const inWork = variant === "admin" && (pathname === "/admin/work" || pathname.startsWith("/admin/work/"));
+  const tabs = inWork ? WORK_TABS : variant === "admin" ? ADMIN_TABS : EMPLOYEE_TABS;
 
   return (
     <div
@@ -33,8 +45,8 @@ export default function TabBar({ variant }: { variant: "admin" | "employee" }) {
       {tabs.map((t) => {
         const active =
           variant === "admin"
-            ? t.href === "/admin"
-              ? pathname === "/admin"
+            ? EXACT_MATCH.includes(t.href)
+              ? pathname === t.href
               : pathname.startsWith(t.href)
             : pathname === t.href;
         return (
