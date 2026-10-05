@@ -42,6 +42,7 @@ model Employee {
   // 業務管理（代表者のみ利用）
   workProjects WorkProject[]
   workTasks    WorkTask[]
+  routines     Routine[]
 }
 
 model Attendance {
@@ -181,8 +182,9 @@ model WorkProject {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  owner Employee   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  tasks WorkTask[]
+  owner    Employee   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  tasks    WorkTask[]
+  routines Routine[]
 
   @@index([ownerId, status])
 }
@@ -208,4 +210,46 @@ model WorkTask {
 
   @@index([ownerId, status, dueDate])
   @@index([projectId])
+}
+
+// ルーティン（繰り返し業務）。実施日は保存せず src/lib/work/recurrence.ts で毎回計算する
+model Routine {
+  id             String    @id @default(cuid())
+  ownerId        String
+  projectId      String?
+  title          String
+  description    String?   @db.Text
+  frequency      String // "daily" | "weekly" | "monthly"
+  weekdays       Int       @default(0) // 毎週: 曜日のビット（日=1, 月=2, 火=4, 水=8, 木=16, 金=32, 土=64）
+  monthDay       Int? // 毎月: 1〜31、-1 は月末
+  skipClosedDays Boolean   @default(false) // 休日（定休・会社休日）は実施日にしない
+  plannedMinutes Int?
+  active         Boolean   @default(true)
+  startDate      DateTime  @db.Date
+  endDate        DateTime? @db.Date
+  sortOrder      Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  owner   Employee       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  project WorkProject?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  checks  RoutineCheck[]
+
+  @@index([ownerId, active])
+  @@index([projectId])
+}
+
+// ルーティンの実施記録。チェックした日だけ行を作る（ルーティンを削除すると記録も消える）
+model RoutineCheck {
+  id        String   @id @default(cuid())
+  routineId String
+  date      DateTime @db.Date
+  status    String   @default("done") // "done" | "skipped"
+  note      String?
+  checkedAt DateTime @default(now())
+
+  routine Routine @relation(fields: [routineId], references: [id], onDelete: Cascade)
+
+  @@unique([routineId, date])
+  @@index([date])
 }
