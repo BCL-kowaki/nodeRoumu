@@ -7,6 +7,8 @@ import { calcDeductions, type RateValues } from "@/lib/calc";
 import { getClosingDate, getPayDate, formatDateJP } from "@/lib/payroll-date";
 import { useAuth } from "@/lib/auth-context";
 import { canWritePayroll } from "@/lib/permissions";
+// 出勤日の判定は出勤簿と共通（出勤時刻があれば退勤なしでも出勤日として数える）
+import { isClosedDay, isCountableDay, workMinutes } from "@/lib/attendance-status";
 
 type Employee = {
   id: string;
@@ -67,44 +69,6 @@ type ClosedDateRecord = { date: string };
 
 const curMonth = () => new Date().toISOString().slice(0, 7);
 const fmt = (n: number) => n.toLocaleString("ja-JP");
-const DOW_KEYS = [
-  "closedSun",
-  "closedMon",
-  "closedTue",
-  "closedWed",
-  "closedThu",
-  "closedFri",
-  "closedSat",
-] as const;
-
-// 指定日が定休日（曜日指定 or ClosedDate 登録）かどうか
-function isClosedDay(
-  date: string,
-  rates: Rate | null,
-  closedDates: ClosedDateRecord[]
-): boolean {
-  if (!rates) return false;
-  const dow = new Date(date).getDay();
-  if (rates[DOW_KEYS[dow]]) return true;
-  return closedDates.some((cd) => cd.date.startsWith(date));
-}
-
-// 出勤日として計上すべきか
-// 出勤簿側の autoStatus と揃えたロジック：
-// - 手動ステータス設定あり → そのステータスが working か
-// - 定休日・祝日 → 計上しない
-// - startTime あり → 計上
-function isCountableDay(
-  rec: AttRecord | undefined,
-  closed: boolean
-): boolean {
-  if (!rec) return false;
-  if (rec.status) {
-    return rec.status === "normal" || rec.status === "late" || rec.status === "early_leave";
-  }
-  if (closed) return false;
-  return !!(rec.startTime && rec.endTime);
-}
 
 function calcMonthHours(
   att: AttRecord[],
@@ -119,11 +83,8 @@ function calcMonthHours(
       const dateStr = r.date.slice(0, 10);
       const closed = isClosedDay(dateStr, rates, closedDates);
       if (!isCountableDay(r, closed)) return s;
-      if (!r.startTime || !r.endTime) return s;
-      const [sh, sm] = r.startTime.split(":").map(Number);
-      const [eh, em] = r.endTime.split(":").map(Number);
-      const t = eh * 60 + em - (sh * 60 + sm) - (r.breakMinutes || 0);
-      return s + (t > 0 ? t / 60 : 0);
+      // 時間は日ごとに丸めず、分単位の合計から算出する（給与計算用）
+      return s + (workMinutes(r.startTime, r.endTime, r.breakMinutes) ?? 0) / 60;
     }, 0);
 }
 

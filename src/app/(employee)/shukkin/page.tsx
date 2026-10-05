@@ -4,6 +4,14 @@ import { useEffect, useState, useCallback } from "react";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import { useAuth } from "@/lib/auth-context";
+// 出勤簿（管理者画面）と同じ判定を使う
+import {
+  autoStatus,
+  closedDayName,
+  isClosedDay as isClosed,
+  isWorkingStatus,
+  workHoursLabel,
+} from "@/lib/attendance-status";
 
 type AttRecord = {
   id: string;
@@ -34,34 +42,6 @@ type EmpData = {
 type ClosedDateRecord = { id: string; date: string; name: string; type: string };
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
-const DOW_KEYS = ["closedSun", "closedMon", "closedTue", "closedWed", "closedThu", "closedFri", "closedSat"] as const;
-
-function calcH(rec: AttRecord | undefined) {
-  if (!rec?.startTime || !rec?.endTime) return "";
-  const [sh, sm] = rec.startTime.split(":").map(Number);
-  const [eh, em] = rec.endTime.split(":").map(Number);
-  const t = eh * 60 + em - (sh * 60 + sm) - (rec.breakMinutes || 0);
-  return t > 0 ? (t / 60).toFixed(1) : "0";
-}
-
-function isClosed(date: string, rates: Rate | null, closedDates: ClosedDateRecord[] = []) {
-  if (!rates) return false;
-  const dow = new Date(date).getDay(); // 0=Sun
-  if (rates[DOW_KEYS[dow]]) return true;
-  return closedDates.some((cd) => cd.date.startsWith(date));
-}
-
-// 実働時間を計上すべきステータスか
-function isWorkingStatus(status: string | null | undefined): boolean {
-  return status === "normal" || status === "late" || status === "early_leave";
-}
-
-function getClosedDateName(date: string, rates: Rate | null, closedDates: ClosedDateRecord[]): string {
-  const cd = closedDates.find((c) => c.date.startsWith(date));
-  if (cd) return cd.name;
-  return "定休";
-}
-
 export default function EmployeeShukkin() {
   const { user, loading: authLoading } = useAuth();
   const [selMonth, setSelMonth] = useState(todayStr().slice(0, 7));
@@ -120,20 +100,13 @@ export default function EmployeeShukkin() {
   const getRec = (date: string) =>
     att.find((a) => a.date.startsWith(date));
 
-  // 実働日：startTimeがあり、かつ非稼働日（定休・closed status）でない日
-  const totalDays = days.filter((d) => {
-    const rec = getRec(d);
-    if (!rec?.startTime) return false;
-    if (isClosed(d, rates, closedDates)) return false; // 定休日は除外
-    if (rec.status && !isWorkingStatus(rec.status)) return false;
-    return true;
-  }).length;
-  // 実働時間：定休日・ステータスが closed/absent/public_holiday の日はカウントしない
+  const statusOf = (d: string) =>
+    autoStatus(getRec(d), isClosed(d, rates, closedDates), d < todayStr());
+  // 出勤日数・実働時間：出勤・遅刻・早退の日だけ数える（定休・欠勤・公休は数えない）
+  const totalDays = days.filter((d) => isWorkingStatus(statusOf(d))).length;
   const totalH = days.reduce((s, d) => {
-    const rec = getRec(d);
-    if (isClosed(d, rates, closedDates)) return s;
-    if (rec?.status && !isWorkingStatus(rec.status)) return s;
-    return s + Number(calcH(rec) || 0);
+    if (!isWorkingStatus(statusOf(d))) return s;
+    return s + Number(workHoursLabel(getRec(d)) || 0);
   }, 0);
   const scheduledDays = days.filter((d) => !isClosed(d, rates, closedDates)).length;
 
@@ -172,20 +145,20 @@ export default function EmployeeShukkin() {
       {days.map((date) => {
         const rec = getRec(date);
         const dow = new Date(date).toLocaleDateString("ja-JP", { weekday: "short" });
-        const closed = isClosed(date, rates, closedDates);
-        // 非稼働ステータス（closed/absent/public_holiday）か、定休日として扱う日
-        const nonWorking =
-          (rec?.status && !isWorkingStatus(rec.status)) || closed;
-        // 非稼働日は時間表示しない
-        const h = nonWorking ? "" : calcH(rec);
+        const st = statusOf(date);
+        // 休日扱い（定休・公休）はグレー表示
+        const closed = st === "closed" || st === "public_holiday";
+        // 非稼働日（定休・欠勤・公休・予定）は時間表示しない
+        const nonWorking = !isWorkingStatus(st);
+        const h = nonWorking ? "" : workHoursLabel(rec);
         const today = date === todayStr();
-        const isPast = date < todayStr();
-        const isAbsent = isPast && !closed && !rec?.startTime;
+        const isAbsent = st === "absent";
 
         const statusLabel: Record<string, { text: string; type: "success" | "danger" | "accent" | "default" }> = {
           normal: { text: "出勤", type: "success" },
           late: { text: "遅刻", type: "accent" },
           early_leave: { text: "早退", type: "accent" },
+          public_holiday: { text: "公休", type: "default" },
         };
 
         return (
@@ -194,15 +167,13 @@ export default function EmployeeShukkin() {
               <div className={`text-sm font-bold min-w-[70px] ${closed ? "text-app-sub" : "text-app-text"}`}>
                 {date.slice(5)} ({dow})
               </div>
-              {closed && (
-                <Badge type="default">{getClosedDateName(date, rates, closedDates)}</Badge>
+              {st === "closed" && (
+                <Badge type="default">{closedDayName(date, closedDates)}</Badge>
               )}
               {isAbsent && <Badge type="danger">欠勤</Badge>}
-              {!closed && !rec?.startTime && !isAbsent && (
-                <Badge type="accent">予定</Badge>
-              )}
-              {!closed && rec?.status && statusLabel[rec.status] && (
-                <Badge type={statusLabel[rec.status].type}>{statusLabel[rec.status].text}</Badge>
+              {st === "scheduled" && <Badge type="accent">予定</Badge>}
+              {statusLabel[st] && (
+                <Badge type={statusLabel[st].type}>{statusLabel[st].text}</Badge>
               )}
               {/* 非稼働日は時刻を表示しない（古いデータが残っていても隠す） */}
               {!nonWorking && rec?.startTime && (

@@ -5,6 +5,13 @@ import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import { useAuth } from "@/lib/auth-context";
 import { canWriteAttendanceTime } from "@/lib/permissions";
+import {
+  autoStatus,
+  closedDayName,
+  isClosedDay as isClosed,
+  isWorkingStatus,
+  workHoursLabel,
+} from "@/lib/attendance-status";
 
 type Employee = {
   id: string;
@@ -93,46 +100,9 @@ const STATUS_BADGE: Record<string, { text: string; type: "success" | "danger" | 
 };
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
-const DOW_KEYS = ["closedSun", "closedMon", "closedTue", "closedWed", "closedThu", "closedFri", "closedSat"] as const;
-
+// 1日の実働時間（表示用）。入力途中の値でも計算できるよう時刻を個別に受け取る
 function calcH(startTime: string | null, endTime: string | null, breakMinutes: number | null) {
-  if (!startTime || !endTime) return "";
-  const [sh, sm] = startTime.split(":").map(Number);
-  const [eh, em] = endTime.split(":").map(Number);
-  const t = eh * 60 + em - (sh * 60 + sm) - (breakMinutes || 0);
-  return t > 0 ? (t / 60).toFixed(1) : "0";
-}
-
-function isClosed(date: string, rates: Rate | null, closedDates: ClosedDateRecord[]) {
-  if (!rates) return false;
-  const dow = new Date(date).getDay();
-  if (rates[DOW_KEYS[dow]]) return true;
-  return closedDates.some((cd) => cd.date.startsWith(date));
-}
-
-function getClosedDateName(date: string, rates: Rate | null, closedDates: ClosedDateRecord[]): string {
-  const cd = closedDates.find((c) => c.date.startsWith(date));
-  if (cd) return cd.name;
-  if (rates) {
-    const dow = new Date(date).getDay();
-    if (rates[DOW_KEYS[dow]]) return "定休";
-  }
-  return "定休";
-}
-
-// ステータスの自動判定（手動設定がない場合）
-function autoStatus(date: string, rec: AttRecord | undefined, closed: boolean, isPast: boolean): string {
-  if (rec?.status) return rec.status;
-  if (closed) return "closed";
-  if (rec?.startTime) return "normal";
-  if (isPast) return "absent";
-  return "scheduled";
-}
-
-// そのステータスが「実働時間を計上すべき」か判定
-// normal / late / early_leave のときだけ計上する
-function isWorkingStatus(status: string): boolean {
-  return status === "normal" || status === "late" || status === "early_leave";
+  return workHoursLabel({ status: null, startTime, endTime, breakMinutes });
 }
 
 export default function ShukkinPage() {
@@ -339,12 +309,12 @@ export default function ShukkinPage() {
   // 集計
   const totalDays = days.filter((d) => {
     const rec = getRec(d);
-    const st = autoStatus(d, rec, isClosed(d, rates, closedDates), d < todayStr());
+    const st = autoStatus(rec, isClosed(d, rates, closedDates), d < todayStr());
     return st === "normal" || st === "late" || st === "early_leave";
   }).length;
   const totalH = days.reduce((s, d) => {
     const rec = getRec(d);
-    const st = autoStatus(d, rec, isClosed(d, rates, closedDates), d < todayStr());
+    const st = autoStatus(rec, isClosed(d, rates, closedDates), d < todayStr());
     // 定休・欠勤・公休・未出勤の日は時刻データがあっても計上しない
     if (!isWorkingStatus(st)) return s;
     return s + Number(calcH(rec?.startTime || null, rec?.endTime || null, rec?.breakMinutes || null) || 0);
@@ -352,11 +322,11 @@ export default function ShukkinPage() {
   const scheduledDays = days.filter((d) => !isClosed(d, rates, closedDates)).length;
   const absentDays = days.filter((d) => {
     const rec = getRec(d);
-    return autoStatus(d, rec, isClosed(d, rates, closedDates), d < todayStr()) === "absent";
+    return autoStatus(rec, isClosed(d, rates, closedDates), d < todayStr()) === "absent";
   }).length;
   const lateDays = days.filter((d) => {
     const rec = getRec(d);
-    return autoStatus(d, rec, isClosed(d, rates, closedDates), d < todayStr()) === "late";
+    return autoStatus(rec, isClosed(d, rates, closedDates), d < todayStr()) === "late";
   }).length;
 
   const inputClass =
@@ -459,7 +429,7 @@ export default function ShukkinPage() {
         );
         const rec = getRec(date);
         const isPast = date < todayStr();
-        const currentStatus = autoStatus(date, rec, closed, isPast);
+        const currentStatus = autoStatus(rec, closed, isPast);
         const badge = STATUS_BADGE[currentStatus];
         // 定休・欠勤・公休・未出勤の日は実働時間を表示しない
         const shownStart = draft.startTime ?? displayValue(display, "startTime");
@@ -482,7 +452,7 @@ export default function ShukkinPage() {
               </div>
               {badge && (
                 <Badge type={badge.type}>
-                  {currentStatus === "closed" ? getClosedDateName(date, rates, closedDates) : badge.text}
+                  {currentStatus === "closed" ? closedDayName(date, closedDates) : badge.text}
                 </Badge>
               )}
               {savingDate === date ? (

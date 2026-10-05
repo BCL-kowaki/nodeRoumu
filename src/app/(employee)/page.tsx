@@ -4,12 +4,15 @@ import { useEffect, useState, useMemo } from "react";
 import Card from "@/components/Card";
 import { useAuth } from "@/lib/auth-context";
 import { EMPLOYEE_SCHEDULE } from "@/lib/employee-schedule";
+// 出勤日数・実働時間は出勤簿と同じ判定を使う
+import { isClosedDay, isCountableDay, workMinutes } from "@/lib/attendance-status";
 
 type AttRecord = {
   date: string;
   startTime: string | null;
   endTime: string | null;
   breakMinutes: number | null;
+  status: string | null;
 };
 
 type DakokuLog = {
@@ -31,14 +34,9 @@ type ClosedDateRecord = { date: string };
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const curMonth = () => new Date().toISOString().slice(0, 7);
-const DOW_KEYS = ["closedSun", "closedMon", "closedTue", "closedWed", "closedThu", "closedFri", "closedSat"] as const;
 
 function calcHours(rec: AttRecord): number {
-  if (!rec.startTime || !rec.endTime) return 0;
-  const [sh, sm] = rec.startTime.split(":").map(Number);
-  const [eh, em] = rec.endTime.split(":").map(Number);
-  const t = (eh * 60 + em) - (sh * 60 + sm) - (rec.breakMinutes || 0);
-  return t > 0 ? t / 60 : 0;
+  return (workMinutes(rec.startTime, rec.endTime, rec.breakMinutes) ?? 0) / 60;
 }
 
 export default function EmployeeDashboard() {
@@ -47,6 +45,8 @@ export default function EmployeeDashboard() {
   const [monthAtt, setMonthAtt] = useState<AttRecord[]>([]);
   const [todayAtt, setTodayAtt] = useState<AttRecord | null>(null);
   const [dayIsClosed, setDayIsClosed] = useState(false);
+  const [rates, setRates] = useState<Rate | null>(null);
+  const [closedDates, setClosedDates] = useState<ClosedDateRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -86,11 +86,10 @@ export default function EmployeeDashboard() {
         const todayRec = att.find((a: AttRecord) => a.date.startsWith(today));
         setTodayAtt(todayRec || null);
 
+        setRates(rates);
+        setClosedDates(closedDates);
         // 今日が定休日かどうか（rates取得失敗時はfalse扱い）
-        const dow = new Date(today).getDay();
-        const weekdayClosed = rates ? rates[DOW_KEYS[dow]] : false;
-        const dateClosed = closedDates.some((cd) => cd.date.startsWith(today));
-        setDayIsClosed(weekdayClosed || dateClosed);
+        setDayIsClosed(isClosedDay(today, rates, closedDates));
       })
       .catch((err) => {
         // 想定外エラー（個人情報を含まない範囲でのみログ出力）
@@ -141,8 +140,12 @@ export default function EmployeeDashboard() {
   }
 
   const todayHours = todayAtt ? calcHours(todayAtt) : 0;
-  const monthDays = monthAtt.filter((a) => a.startTime).length;
-  const monthHours = monthAtt.reduce((s, a) => s + calcHours(a), 0);
+  // 定休・欠勤・公休の日は時刻が残っていても数えない（出勤簿と同じ）
+  const countable = monthAtt.filter((a) =>
+    isCountableDay(a, isClosedDay(a.date, rates, closedDates))
+  );
+  const monthDays = countable.length;
+  const monthHours = countable.reduce((s, a) => s + calcHours(a), 0);
 
   const statusColors: Record<string, { text: string; bg: string }> = {
     定休日: { text: "text-app-sub", bg: "bg-gray-100" },

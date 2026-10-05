@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Card from "@/components/Card";
 import { useAuth } from "@/lib/auth-context";
+import { isClosedDay } from "@/lib/attendance-status";
 
 type DakokuLog = {
   id: string;
@@ -32,7 +33,6 @@ type Rate = {
 type ClosedDateRecord = { date: string };
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
-const DOW_KEYS = ["closedSun", "closedMon", "closedTue", "closedWed", "closedThu", "closedFri", "closedSat"] as const;
 
 function timeToMin(t: string): number {
   const [h, m] = t.split(":").map(Number);
@@ -110,10 +110,7 @@ export default function EmployeeDakoku() {
       const me = emps.find((e) => e.id === user.employeeId);
       if (me) setShift({ shiftStart: me.shiftStart, shiftEnd: me.shiftEnd });
 
-      const dow = new Date(today).getDay();
-      const weekdayClosed = rates[DOW_KEYS[dow]];
-      const dateClosed = closedDates.some((cd) => cd.date.startsWith(today));
-      setDayIsClosed(weekdayClosed || dateClosed);
+      setDayIsClosed(isClosedDay(today, rates, closedDates));
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.employeeId]);

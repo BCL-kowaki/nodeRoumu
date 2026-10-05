@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { toCsv } from "@/lib/csv";
+// 状態判定・実働時間は出勤簿画面と共通
+import {
+  DOW_KEYS,
+  STATUS_LABELS,
+  autoStatus,
+  dayOfWeek,
+  isWorkingStatus,
+  workHoursLabel,
+} from "@/lib/attendance-status";
 
 export const dynamic = "force-dynamic";
 
@@ -13,61 +22,9 @@ export const dynamic = "force-dynamic";
 // - BOM付きUTF-8でExcelの日本語化けを防止
 
 const DOW_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
-const DOW_KEYS = [
-  "closedSun",
-  "closedMon",
-  "closedTue",
-  "closedWed",
-  "closedThu",
-  "closedFri",
-  "closedSat",
-] as const;
-
-const STATUS_JP: Record<string, string> = {
-  normal: "出勤",
-  late: "遅刻",
-  early_leave: "早退",
-  absent: "欠勤",
-  scheduled: "出勤予定",
-  public_holiday: "公休",
-  closed: "定休",
-};
-
 // YYYY-MM-DD 文字列を返す（ローカルではなくUTC基準、DBの @db.Date と整合）
 function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
-}
-
-// 実働時間（時）を小数1桁で返す
-function calcWorkHours(
-  startTime: string | null,
-  endTime: string | null,
-  breakMinutes: number | null
-): string {
-  if (!startTime || !endTime) return "";
-  const [sh, sm] = startTime.split(":").map(Number);
-  const [eh, em] = endTime.split(":").map(Number);
-  const t = eh * 60 + em - (sh * 60 + sm) - (breakMinutes || 0);
-  if (t <= 0) return "0";
-  return (t / 60).toFixed(1);
-}
-
-// 画面のautoStatusと同じロジックをサーバー側に実装
-function autoStatus(
-  rec: { status: string | null; startTime: string | null } | undefined,
-  closed: boolean,
-  isPast: boolean
-): string {
-  if (rec?.status) return rec.status;
-  if (closed) return "closed";
-  if (rec?.startTime) return "normal";
-  if (isPast) return "absent";
-  return "scheduled";
-}
-
-// 実働時間を計上すべきステータスか
-function isWorkingStatus(status: string): boolean {
-  return status === "normal" || status === "late" || status === "early_leave";
 }
 
 export async function GET(req: NextRequest) {
@@ -167,7 +124,7 @@ export async function GET(req: NextRequest) {
       );
 
       // 休日判定
-      const dow = new Date(date).getDay();
+      const dow = dayOfWeek(date);
       const weekdayClosed = rate ? (rate[DOW_KEYS[dow]] as boolean) : false;
       const closedDate = closedDates.find((cd) => toDateStr(cd.date) === date);
       const closed = weekdayClosed || !!closedDate;
@@ -191,16 +148,12 @@ export async function GET(req: NextRequest) {
         date,
         DOW_LABELS[dow],
         status,
-        STATUS_JP[status] || status,
+        STATUS_LABELS[status] || status,
         working ? rec?.startTime || "" : "",
         working ? rec?.endTime || "" : "",
         working ? rec?.breakMinutes ?? "" : "",
         working
-          ? calcWorkHours(
-              rec?.startTime || null,
-              rec?.endTime || null,
-              rec?.breakMinutes || null
-            )
+          ? workHoursLabel(rec)
           : "",
         holidayName,
         rec?.memo || "",
