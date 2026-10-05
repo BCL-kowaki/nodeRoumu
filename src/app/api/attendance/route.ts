@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { canWriteAttendanceTime } from "@/lib/permissions";
+import { canAccessAdminArea, canWriteAttendanceTime } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
 // 出勤簿取得（クエリ: employeeId, month）
+// 代表者・社労士は全員分、従業員は自分の分のみ
 export async function GET(req: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
-  const employeeId = searchParams.get("employeeId");
+  const employeeId = canAccessAdminArea(session.role)
+    ? searchParams.get("employeeId")
+    : session.employeeId;
   const month = searchParams.get("month"); // YYYY-MM
 
   const where: Record<string, unknown> = {};

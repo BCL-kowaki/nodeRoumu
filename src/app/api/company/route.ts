@@ -6,7 +6,13 @@ import { canWriteCompany } from "@/lib/permissions";
 export const dynamic = "force-dynamic";
 
 // 企業情報取得（単一レコード）
+// 給与明細の表示に従業員画面でも使うため、ログインしていれば閲覧可
 export async function GET() {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   let company = await prisma.company.findFirst();
   if (!company) {
     company = await prisma.company.create({

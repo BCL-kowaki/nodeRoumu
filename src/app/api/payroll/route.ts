@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { canWritePayroll } from "@/lib/permissions";
+import { canAccessAdminArea, canWritePayroll } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
 // 賃金台帳取得（クエリ: month, employeeId）
+// 代表者・社労士は全員分、従業員は自分の分のみ
 export async function GET(req: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const month = searchParams.get("month"); // YYYY-MM
-  const employeeId = searchParams.get("employeeId");
+  const employeeId = canAccessAdminArea(session.role)
+    ? searchParams.get("employeeId")
+    : session.employeeId;
 
   const where: Record<string, unknown> = {};
   if (month) where.month = month;
@@ -17,7 +25,8 @@ export async function GET(req: NextRequest) {
 
   const records = await prisma.payroll.findMany({
     where,
-    include: { employee: true },
+    // パスワードのハッシュ値などを返さないよう、従業員情報は必要な項目だけに絞る
+    include: { employee: { select: { id: true, name: true, employmentType: true } } },
     orderBy: { createdAt: "asc" },
   });
   return NextResponse.json(records);

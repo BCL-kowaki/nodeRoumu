@@ -6,7 +6,13 @@ import { canWriteHolidays } from "@/lib/permissions";
 export const dynamic = "force-dynamic";
 
 // 特定休日一覧取得（クエリ: year）
+// 休日の表示に従業員画面でも使うため、ログインしていれば閲覧可
 export async function GET(req: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const year = searchParams.get("year") || new Date().getFullYear().toString();
 

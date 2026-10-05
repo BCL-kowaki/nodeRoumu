@@ -2,18 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { canWriteEmployees } from "@/lib/permissions";
+import { canAccessAdminArea, canWriteEmployees } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
 // 従業員一覧取得（passwordHashは除外）
 // ?scope=workers を付けると role="employee" のみ返す（労働者名簿用）
 // 省略時は従来どおり全員返す（打刻・出勤簿等の既存画面の互換性のため）
+// 代表者・社労士は全員分、従業員は自分の分のみ（住所・生年月日・給与を含むため）
 export async function GET(req: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const scope = searchParams.get("scope");
 
-  const where = scope === "workers" ? { role: "employee" } : {};
+  const where = !canAccessAdminArea(session.role)
+    ? { id: session.employeeId }
+    : scope === "workers"
+    ? { role: "employee" }
+    : {};
 
   const employees = await prisma.employee.findMany({
     where,
