@@ -37,7 +37,10 @@ export async function GET(req: NextRequest) {
   const tasks = await prisma.workTask.findMany({
     where,
     orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { priority: "asc" }, { createdAt: "asc" }],
-    include: { project: { select: { id: true, name: true, color: true } } },
+    include: {
+      project: { select: { id: true, name: true, color: true } },
+      githubRepo: { select: { fullName: true } },
+    },
   });
   return NextResponse.json(tasks);
 }

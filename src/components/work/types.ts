@@ -12,6 +12,9 @@ export type Task = {
   completedAt: string | null;
   projectId: string | null;
   project: ProjectRef | null;
+  githubIssueNumber?: number | null;
+  githubHtmlUrl?: string | null;
+  githubRepo?: { fullName: string } | null;
 };
 
 export type Project = {
@@ -107,3 +110,17 @@ export type TimerLinks = { taskId?: string; projectId?: string; routineId?: stri
 export function entryTitle(e: TimeEntry): string {
   return e.task?.title || e.plan?.title || e.routine?.title || e.note || "（作業内容なし）";
 }
+
+export type GithubRepo = {
+  id: string;
+  fullName: string;
+  description: string | null;
+  isPrivate: boolean;
+  isArchived: boolean;
+  htmlUrl: string;
+  openIssuesCount: number;
+  openPrCount: number;
+  pushedAt: string | null;
+  syncIssues: boolean;
+  lastSyncedAt: string | null;
+};

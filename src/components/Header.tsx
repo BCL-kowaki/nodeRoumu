@@ -105,6 +105,14 @@ export default function Header() {
                   >
                     {inWork ? "📋 労務管理へ戻る" : "✅ 業務管理"}
                   </button>
+                  {inWork && (
+                    <button
+                      onClick={() => { router.push("/admin/work/github"); setMenuOpen(false); }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
+                    >
+                      🐙 GitHub 連携
+                    </button>
+                  )}
                   <button
                     onClick={() => { router.push("/admin/users"); setMenuOpen(false); }}
                     className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"

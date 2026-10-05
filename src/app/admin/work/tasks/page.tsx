@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import Card from "@/components/Card";
 import TaskRow from "@/components/work/TaskRow";
 import TaskEditor from "@/components/work/TaskEditor";
@@ -26,6 +27,7 @@ export default function WorkTasksPage() {
     <div className="flex flex-col gap-3">
       <div className="flex justify-between items-center">
         <div className="text-lg font-bold">タスク</div>
+        <Link href="/admin/work/github" className="ml-auto mr-2 text-xs text-primary">GitHub 連携</Link>
         <button
           onClick={() => setEditing("new")}
           className="px-4 py-2 rounded bg-primary text-white text-sm font-bold border-none cursor-pointer"

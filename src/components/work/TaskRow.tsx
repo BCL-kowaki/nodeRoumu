@@ -65,6 +65,17 @@ export default function TaskRow({
           )}
         </div>
       </button>
+      {task.githubHtmlUrl && task.githubIssueNumber && (
+        <a
+          href={task.githubHtmlUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={task.githubRepo ? `${task.githubRepo.fullName} の Issue を開く` : "GitHub の Issue を開く"}
+          className="text-[11px] text-app-sub no-underline border border-app-border rounded px-1.5 py-0.5 mt-0.5 shrink-0"
+        >
+          #{task.githubIssueNumber}
+        </a>
+      )}
       {onStart && !done && !canceled && (
         <button
           type="button"

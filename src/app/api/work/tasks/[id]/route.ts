@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { badRequest, notFound, requireWorkspace } from "@/lib/work/auth";
 import { completedAtFor, parseTaskInput, toDbDate } from "@/lib/work/validate";
+import { githubErrorMessage, updateIssueState } from "@/lib/github";
+import { issueStateFor, needsIssueUpdate } from "@/lib/work/github-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +30,28 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (!project) return badRequest("プロジェクトが見つかりません");
   }
 
+  // GitHub の Issue と紐づいたタスクを完了・中止・再開したら、先に GitHub 側を更新する。
+  // 失敗したらアプリ側も変更しない（両者がずれないように）
+  let github: { githubState: string; githubUpdatedAt: Date } | undefined;
+  if (current.githubRepoId && current.githubIssueNumber && needsIssueUpdate(current.status, d.status)) {
+    const repo = await prisma.githubRepo.findFirst({
+      where: { id: current.githubRepoId, ownerId: auth.ctx.ownerId },
+      select: { fullName: true },
+    });
+    if (repo) {
+      try {
+        const issue = await updateIssueState(repo.fullName, current.githubIssueNumber, issueStateFor(d.status!));
+        github = { githubState: issue.state, githubUpdatedAt: new Date(issue.updated_at) };
+      } catch (e) {
+        return NextResponse.json({ error: `GitHub の Issue を更新できませんでした：${githubErrorMessage(e)}` }, { status: 502 });
+      }
+    }
+  }
+
   const updated = await prisma.workTask.update({
     where: { id: current.id },
     data: {
+      ...github,
       title: d.title,
       description: d.description,
       status: d.status,
