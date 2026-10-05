@@ -44,3 +44,9 @@ export function canWriteAttendanceTime(role: Role | string | undefined): boolean
 export function canWriteFaqDocuments(role: Role | string | undefined): boolean {
   return role === "admin";
 }
+
+// 業務管理（プロジェクト・タスク等）の利用（代表者のみ）
+// 社労士・従業員には画面もAPIも見せない
+export function canUseWorkspace(role: Role | string | undefined): boolean {
+  return role === "admin";
+}
