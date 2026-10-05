@@ -11,18 +11,26 @@ export {
   type SessionPayload,
 } from "@/lib/session-token";
 
-// セッションCookieをセット（remember: trueなら30日保持）
-export async function setSessionCookie(token: string, remember = false) {
+// セッションCookieの名前と属性（remember: trueなら30日保持）
+// 転送レスポンス（redirect）に直接付ける場合も同じ属性を使う
+export function sessionCookie(token: string, remember = false) {
   const maxAge = remember
     ? 60 * 60 * 24 * 30  // 30日
     : 60 * 60 * 24 * 7;  // 7日
-  (await cookies()).set(COOKIE_NAME, token, {
+  return {
+    name: COOKIE_NAME,
+    value: token,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "lax" as const,
     path: "/",
     maxAge,
-  });
+  };
+}
+
+// セッションCookieをセット（remember: trueなら30日保持）
+export async function setSessionCookie(token: string, remember = false) {
+  (await cookies()).set(sessionCookie(token, remember));
 }
 
 // セッションCookieを削除

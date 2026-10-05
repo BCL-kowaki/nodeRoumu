@@ -1,9 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Card from "@/components/Card";
 import PasswordInput from "@/components/PasswordInput";
+
+// Google ログイン（代表者用）から戻ってきたときのエラー表示
+const GOOGLE_ERRORS: Record<string, string> = {
+  google_not_configured: "Googleログインは現在利用できません。ログインIDとパスワードでログインしてください。",
+  google_canceled: "Googleログインがキャンセルされました。",
+  google_not_allowed: "このGoogleアカウントではログインできません（代表者のアカウントのみ利用できます）。",
+  google_failed: "Googleログインに失敗しました。もう一度お試しください。",
+};
 
 export default function LoginPage() {
   const [loginId, setLoginId] = useState("");
@@ -12,6 +20,11 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("error");
+    if (code && GOOGLE_ERRORS[code]) setError(GOOGLE_ERRORS[code]);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,6 +111,15 @@ export default function LoginPage() {
               <span className="text-xs text-app-sub">30日間ログイン状態を保持する</span>
             </label>
           </form>
+          {/* 代表者専用。社労士・従業員は上のID・パスワードでログインする */}
+          <div className="mt-5 pt-4 border-t border-app-border">
+            <a
+              href="/api/auth/google/start"
+              className="block w-full py-3 rounded border border-app-border text-sm font-semibold text-app-text bg-white text-center no-underline"
+            >
+              Googleでログイン（代表者）
+            </a>
+          </div>
         </Card>
       </div>
     </div>
