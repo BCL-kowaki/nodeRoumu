@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionFromRequest } from "@/lib/auth";
+import { getSessionFromRequest } from "@/lib/session-token";
 
 const PUBLIC_PATHS = ["/login", "/api/auth/login"];
 const STATIC_PREFIXES = ["/_next", "/favicon.ico", "/fav.png", "/logo.png", "/manifest.json"];

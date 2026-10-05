@@ -111,7 +111,7 @@ export default function AdminUsersPage() {
       }
       setRoleMsg({
         type: "ok",
-        text: `${target.name} の権限を「${roleLabel(nextRole)}」に変更しました。対象者が再ログインすると反映されます。`,
+        text: `${target.name} の権限を「${roleLabel(nextRole)}」に変更しました。すぐに反映されます（対象者が開いている画面は再読み込みで切り替わります）。`,
       });
       fetchUsers();
     } catch {

@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import { canWriteHolidays, canWritePayroll } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
 // 料率取得（1レコードのみ）
+// 定休曜日の表示に従業員画面でも使うため、ログインしていれば閲覧可
 export async function GET() {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   let rate = await prisma.rate.findFirst();
   if (!rate) {
     // デフォルト値で作成
@@ -22,7 +30,16 @@ export async function GET() {
 }
 
 // 料率更新
+// 社会保険料率（給与）と定休曜日（休日設定）の両方を更新するため、両方の権限を要求する
 export async function PUT(req: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  if (!canWritePayroll(session.role) || !canWriteHolidays(session.role)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   const body = await req.json();
 
   let rate = await prisma.rate.findFirst();
