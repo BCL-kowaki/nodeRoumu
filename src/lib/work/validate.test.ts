@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   completedAtFor,
   parseProjectInput,
+  parseRoutineCheckInput,
+  parseRoutineInput,
   parseTaskInput,
 } from "./validate";
 
@@ -147,5 +149,56 @@ describe("parseProjectInput（プロジェクト）", () => {
 
   it("更新で変更する項目が無いとき、エラーを返す", () => {
     expect(parseProjectInput({}, "update")).toEqual({ ok: false, error: "変更する内容がありません" });
+  });
+});
+
+describe("parseRoutineInput（ルーティン）", () => {
+  it("毎週のとき、曜日と開始日を受け付ける（既定: 有効・休日を除かない）", () => {
+    expect(
+      parseRoutineInput(
+        { title: " 週次レポート ", frequency: "weekly", weekdays: 2, startDate: "2026-10-05" },
+        "create"
+      )
+    ).toEqual({
+      ok: true,
+      data: { title: "週次レポート", frequency: "weekly", weekdays: 2, startDate: "2026-10-05", active: true, skipClosedDays: false },
+    });
+  });
+
+  it("開始日を省略したとき、エラーにせず呼び出し側で今日を入れられるよう未設定のまま返す", () => {
+    const r = parseRoutineInput({ title: "日報", frequency: "daily" }, "create");
+    expect(r).toEqual({ ok: true, data: { title: "日報", frequency: "daily", active: true, skipClosedDays: false } });
+  });
+
+  it.each([
+    ["名前が無い", { frequency: "daily" }, "ルーティン名を入力してください"],
+    ["頻度が不正", { title: "a", frequency: "yearly" }, "繰り返しの値が正しくありません"],
+    ["毎週なのに曜日が無い", { title: "a", frequency: "weekly", weekdays: 0 }, "曜日を1つ以上選んでください"],
+    ["曜日の値が範囲外", { title: "a", frequency: "weekly", weekdays: 128 }, "曜日を1つ以上選んでください"],
+    ["毎月なのに日付が無い", { title: "a", frequency: "monthly" }, "毎月の日付は1〜31日か月末を選んでください"],
+    ["毎月の日付が範囲外", { title: "a", frequency: "monthly", monthDay: 32 }, "毎月の日付は1〜31日か月末を選んでください"],
+    ["終了日が開始日より前", { title: "a", frequency: "daily", startDate: "2026-10-10", endDate: "2026-10-01" }, "終了日は開始日以降にしてください"],
+  ])("%s のとき、エラーを返す", (_name, body, message) => {
+    expect(parseRoutineInput(body, "create")).toEqual({ ok: false, error: message });
+  });
+
+  it("更新で停止だけ送ったとき、その項目だけを返す", () => {
+    expect(parseRoutineInput({ active: false }, "update")).toEqual({ ok: true, data: { active: false } });
+  });
+});
+
+describe("parseRoutineCheckInput（実施チェック）", () => {
+  it("実施・スキップと日付を受け付ける", () => {
+    expect(parseRoutineCheckInput({ routineId: "r1", date: "2026-10-05", status: "done" })).toEqual({
+      ok: true,
+      data: { routineId: "r1", date: "2026-10-05", status: "done" },
+    });
+  });
+  it.each([
+    ["ルーティンの指定が無い", { date: "2026-10-05", status: "done" }, "ルーティンの指定が正しくありません"],
+    ["日付が不正", { routineId: "r1", date: "10/5", status: "done" }, "日付の形式が正しくありません"],
+    ["状態が不正", { routineId: "r1", date: "2026-10-05", status: "ok" }, "状態の値が正しくありません"],
+  ])("%s のとき、エラーを返す", (_name, body, message) => {
+    expect(parseRoutineCheckInput(body)).toEqual({ ok: false, error: message });
   });
 });

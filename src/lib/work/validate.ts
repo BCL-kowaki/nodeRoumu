@@ -181,3 +181,116 @@ export function toDbDate(v: string | null | undefined): Date | null | undefined 
   if (v === null) return null;
   return jstDateToDb(v);
 }
+
+// ===== ルーティン =====
+export const ROUTINE_FREQUENCIES = ["daily", "weekly", "monthly"] as const;
+export const ROUTINE_CHECK_STATUSES = ["done", "skipped"] as const;
+
+export type RoutineInput = {
+  title?: string;
+  description?: string | null;
+  frequency?: (typeof ROUTINE_FREQUENCIES)[number];
+  weekdays?: number;
+  monthDay?: number | null;
+  skipClosedDays?: boolean;
+  plannedMinutes?: number | null;
+  active?: boolean;
+  startDate?: string;
+  endDate?: string | null;
+  projectId?: string | null;
+};
+
+const MAX_ROUTINE_TITLE = 100;
+
+// ルーティンの入力チェック。頻度ごとに必要な項目（曜日・日付）の組み合わせも確認する。
+// update で頻度だけ・曜日だけが送られた場合の組み合わせ確認は、保存済みの値と合わせて API 側で行う
+export function parseRoutineInput(body: unknown, mode: Mode): ParseResult<RoutineInput> {
+  return run(body, mode, (b) => {
+    const out: RoutineInput = {};
+    if (mode === "create" || has(b, "title")) {
+      out.title = requiredText(
+        b.title,
+        MAX_ROUTINE_TITLE,
+        "ルーティン名を入力してください",
+        `ルーティン名は${MAX_ROUTINE_TITLE}文字以内で入力してください`
+      );
+    }
+    if (has(b, "description")) out.description = optionalText(b.description, MAX_DESCRIPTION, "メモ");
+    if (mode === "create" || has(b, "frequency")) {
+      if (typeof b.frequency !== "string" || !(ROUTINE_FREQUENCIES as readonly string[]).includes(b.frequency)) {
+        throw new InputError("繰り返しの値が正しくありません");
+      }
+      out.frequency = b.frequency as RoutineInput["frequency"];
+    }
+    if (has(b, "weekdays")) {
+      const w = b.weekdays;
+      if (typeof w !== "number" || !Number.isInteger(w) || w < 0 || w > 127) {
+        throw new InputError("曜日を1つ以上選んでください");
+      }
+      out.weekdays = w;
+    }
+    if (has(b, "monthDay")) {
+      const m = b.monthDay;
+      if (m === null) out.monthDay = null;
+      else if (typeof m === "number" && Number.isInteger(m) && (m === -1 || (m >= 1 && m <= 31))) out.monthDay = m;
+      else throw new InputError("毎月の日付は1〜31日か月末を選んでください");
+    }
+    // 頻度と、その頻度に必要な項目の組み合わせ
+    if (out.frequency === "weekly" && mode === "create" && !out.weekdays) {
+      throw new InputError("曜日を1つ以上選んでください");
+    }
+    if (out.frequency === "weekly" && out.weekdays === 0) throw new InputError("曜日を1つ以上選んでください");
+    if (out.frequency === "monthly" && mode === "create" && (out.monthDay === undefined || out.monthDay === null)) {
+      throw new InputError("毎月の日付は1〜31日か月末を選んでください");
+    }
+    if (has(b, "skipClosedDays")) {
+      if (typeof b.skipClosedDays !== "boolean") throw new InputError("休日の扱いの値が正しくありません");
+      out.skipClosedDays = b.skipClosedDays;
+    } else if (mode === "create") out.skipClosedDays = false;
+    if (has(b, "active")) {
+      if (typeof b.active !== "boolean") throw new InputError("有効・停止の値が正しくありません");
+      out.active = b.active;
+    } else if (mode === "create") out.active = true;
+    if (has(b, "plannedMinutes")) {
+      const m = b.plannedMinutes;
+      if (m === null || m === "") out.plannedMinutes = null;
+      else if (typeof m === "number" && Number.isInteger(m) && m >= 0 && m <= MAX_PLANNED_MINUTES) out.plannedMinutes = m;
+      else throw new InputError("予定時間の値が正しくありません");
+    }
+    if (has(b, "startDate")) {
+      const s = optionalDate(b.startDate, "開始日");
+      if (s === null) throw new InputError("開始日の形式が正しくありません");
+      out.startDate = s;
+    }
+    if (has(b, "endDate")) out.endDate = optionalDate(b.endDate, "終了日");
+    if (out.startDate && out.endDate && out.endDate < out.startDate) {
+      throw new InputError("終了日は開始日以降にしてください");
+    }
+    if (has(b, "projectId")) {
+      const p = b.projectId;
+      if (p === null || p === "") out.projectId = null;
+      else if (typeof p === "string") out.projectId = p;
+      else throw new InputError("プロジェクトの指定が正しくありません");
+    }
+    return out;
+  });
+}
+
+export type RoutineCheckInput = {
+  routineId: string;
+  date: string;
+  status: (typeof ROUTINE_CHECK_STATUSES)[number];
+};
+
+// 実施チェックの入力チェック
+export function parseRoutineCheckInput(body: unknown): ParseResult<RoutineCheckInput> {
+  return run(body, "create", (b) => {
+    if (typeof b.routineId !== "string" || !b.routineId) throw new InputError("ルーティンの指定が正しくありません");
+    const date = optionalDate(b.date, "日付");
+    if (!date) throw new InputError("日付の形式が正しくありません");
+    if (typeof b.status !== "string" || !(ROUTINE_CHECK_STATUSES as readonly string[]).includes(b.status)) {
+      throw new InputError("状態の値が正しくありません");
+    }
+    return { routineId: b.routineId, date, status: b.status as RoutineCheckInput["status"] };
+  });
+}
