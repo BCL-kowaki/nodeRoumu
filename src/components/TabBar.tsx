@@ -17,10 +17,11 @@ const ADMIN_TABS: Tab[] = [
 const WORK_TABS: Tab[] = [
   { href: "/admin/work", label: "今日", icon: "✅" },
   { href: "/admin/work/tasks", label: "タスク", icon: "📝" },
+  { href: "/admin/work/plan", label: "計画", icon: "⏱️" },
   { href: "/admin/work/routines", label: "ルーティン", icon: "🔁" },
   { href: "/admin/work/projects", label: "プロジェクト", icon: "🗂️" },
-  { href: "/admin", label: "労務へ", icon: "↩️" },
 ];
+// ※ 労務管理へは ⚙️ メニューの「労務管理へ戻る」から戻る
 
 // 下の各タブを「完全一致」で選択中にするパス（それ以外は前方一致）
 const EXACT_MATCH = ["/admin", "/admin/work"];

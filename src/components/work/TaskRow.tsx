@@ -10,11 +10,15 @@ export default function TaskRow({
   task,
   onToggle,
   onOpen,
+  onStart,
+  running = false,
   showProject = true,
 }: {
   task: Task;
   onToggle: (task: Task) => void;
   onOpen: (task: Task) => void;
+  onStart?: (task: Task) => void; // 渡すとタイマー開始ボタン（▶）を表示
+  running?: boolean; // このタスクのタイマーが計測中
   showProject?: boolean;
 }) {
   const done = task.status === "done";
@@ -61,6 +65,17 @@ export default function TaskRow({
           )}
         </div>
       </button>
+      {onStart && !done && !canceled && (
+        <button
+          type="button"
+          onClick={() => onStart(task)}
+          disabled={running}
+          aria-label={running ? `「${task.title}」は計測中` : `「${task.title}」のタイマーを開始`}
+          className="w-8 h-8 rounded-full bg-primary-light text-primary text-xs border-none cursor-pointer disabled:opacity-40 shrink-0"
+        >
+          {running ? "●" : "▶"}
+        </button>
+      )}
     </div>
   );
 }

@@ -62,3 +62,48 @@ export type RoutineDay = {
   closed: boolean;
   items: { routineId: string; status: CheckStatus }[];
 };
+
+export type Plan = {
+  id: string;
+  date: string;
+  startTime: string | null;
+  plannedMinutes: number;
+  title: string;
+  taskId: string | null;
+  projectId: string | null;
+  task: { id: string; title: string; status: string } | null;
+  project: ProjectRef | null;
+};
+
+export type TimeEntry = {
+  id: string;
+  date: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  minutes: number | null;
+  source: "timer" | "manual";
+  note: string | null;
+  taskId: string | null;
+  projectId: string | null;
+  routineId: string | null;
+  planId: string | null;
+  task: { id: string; title: string; status: string } | null;
+  project: ProjectRef | null;
+  routine: { id: string; title: string } | null;
+  plan: { id: string; title: string } | null;
+};
+
+export type DaySummary = {
+  date: string;
+  plannedMin: number;
+  actualMin: number;
+  attendanceMin: number | null;
+  unrecordedMin: number | null;
+};
+
+export type TimerLinks = { taskId?: string; projectId?: string; routineId?: string; planId?: string; note?: string };
+
+// 実績の表示名（タスク → 計画 → ルーティン → メモ の順で使う）
+export function entryTitle(e: TimeEntry): string {
+  return e.task?.title || e.plan?.title || e.routine?.title || e.note || "（作業内容なし）";
+}

@@ -7,6 +7,8 @@ import TaskRow from "@/components/work/TaskRow";
 import TaskEditor from "@/components/work/TaskEditor";
 import { useTasks } from "@/components/work/useTasks";
 import { useRoutineChecks } from "@/components/work/useRoutineChecks";
+import { useTimer } from "@/components/work/useTimer";
+import TimerBar from "@/components/work/TimerBar";
 import { formatMinutes } from "@/lib/work/labels";
 import type { Task } from "@/components/work/types";
 import { addDays, todayJst } from "@/lib/date-jst";
@@ -18,6 +20,12 @@ export default function WorkTodayPage() {
 
   const today = todayJst();
   const routineChecks = useRoutineChecks(today, today);
+  const timer = useTimer();
+  const rowProps = {
+    onToggle: toggle,
+    onOpen: setEditing,
+    onStart: (t: Task) => timer.start({ taskId: t.id }),
+  };
   const todayRoutines = (routineChecks.days[0]?.items ?? [])
     .map((i) => ({ ...i, routine: routineChecks.routines.find((r) => r.id === i.routineId) }))
     .filter((i) => i.routine);
@@ -46,8 +54,10 @@ export default function WorkTodayPage() {
         </button>
       </div>
 
-      {(error || routineChecks.error) && (
-        <div className="text-sm text-danger bg-danger-light rounded p-3">{error || routineChecks.error}</div>
+      <TimerBar running={timer.running} busy={timer.busy} onStop={timer.stop} />
+
+      {(error || routineChecks.error || timer.error) && (
+        <div className="text-sm text-danger bg-danger-light rounded p-3">{error || routineChecks.error || timer.error}</div>
       )}
 
       {/* 今日のルーティン（実施日のものだけ） */}
@@ -93,7 +103,7 @@ export default function WorkTodayPage() {
                 {g.title}（{g.items.length}）
               </div>
               {g.items.map((t) => (
-                <TaskRow key={t.id} task={t} onToggle={toggle} onOpen={setEditing} />
+                <TaskRow key={t.id} task={t} {...rowProps} running={timer.running?.taskId === t.id} />
               ))}
             </Card>
           ))
