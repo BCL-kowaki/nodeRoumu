@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   completedAtFor,
+  parsePlanInput,
   parseProjectInput,
   parseRoutineCheckInput,
   parseRoutineInput,
   parseTaskInput,
+  parseTimeEntryInput,
 } from "./validate";
 
 describe("parseTaskInput（タスクの作成）", () => {
@@ -200,5 +202,44 @@ describe("parseRoutineCheckInput（実施チェック）", () => {
     ["状態が不正", { routineId: "r1", date: "2026-10-05", status: "ok" }, "状態の値が正しくありません"],
   ])("%s のとき、エラーを返す", (_name, body, message) => {
     expect(parseRoutineCheckInput(body)).toEqual({ ok: false, error: message });
+  });
+});
+
+describe("parsePlanInput（業務計画）", () => {
+  it("日付・開始時刻・予定分数・タイトルを受け付ける", () => {
+    expect(
+      parsePlanInput({ date: "2026-10-06", startTime: "09:30", plannedMinutes: 90, title: " 見積作成 ", taskId: "t1" }, "create")
+    ).toEqual({
+      ok: true,
+      data: { date: "2026-10-06", startTime: "09:30", plannedMinutes: 90, title: "見積作成", taskId: "t1" },
+    });
+  });
+  it.each([
+    ["タイトルが無い", { date: "2026-10-06", plannedMinutes: 30 }, "タイトルを入力してください"],
+    ["日付が無い", { title: "a", plannedMinutes: 30 }, "日付の形式が正しくありません"],
+    ["予定時間が無い", { title: "a", date: "2026-10-06" }, "予定時間は1〜1440分で入力してください"],
+    ["予定時間が0分", { title: "a", date: "2026-10-06", plannedMinutes: 0 }, "予定時間は1〜1440分で入力してください"],
+    ["開始時刻の形式が不正", { title: "a", date: "2026-10-06", plannedMinutes: 30, startTime: "25:00" }, "開始時刻は HH:MM の形式で入力してください"],
+  ])("%s のとき、エラーを返す", (_name, body, message) => {
+    expect(parsePlanInput(body, "create")).toEqual({ ok: false, error: message });
+  });
+});
+
+describe("parseTimeEntryInput（実績の手入力）", () => {
+  it("日付と分数を受け付ける", () => {
+    expect(parseTimeEntryInput({ date: "2026-10-06", minutes: 45, note: "電話対応", projectId: "p1" }, "create")).toEqual({
+      ok: true,
+      data: { date: "2026-10-06", minutes: 45, note: "電話対応", projectId: "p1" },
+    });
+  });
+  it.each([
+    ["分数が無い", { date: "2026-10-06" }, "時間は1〜1440分で入力してください"],
+    ["分数が多すぎる", { date: "2026-10-06", minutes: 1441 }, "時間は1〜1440分で入力してください"],
+    ["日付が不正", { date: "2026-13-01", minutes: 10 }, "日付の形式が正しくありません"],
+  ])("%s のとき、エラーを返す", (_name, body, message) => {
+    expect(parseTimeEntryInput(body, "create")).toEqual({ ok: false, error: message });
+  });
+  it("更新でメモだけ送ったとき、その項目だけを返す", () => {
+    expect(parseTimeEntryInput({ note: "" }, "update")).toEqual({ ok: true, data: { note: null } });
   });
 });

@@ -294,3 +294,85 @@ export function parseRoutineCheckInput(body: unknown): ParseResult<RoutineCheckI
     return { routineId: b.routineId, date, status: b.status as RoutineCheckInput["status"] };
   });
 }
+
+// ===== 業務計画・実績 =====
+export type LinkInput = {
+  taskId?: string | null;
+  projectId?: string | null;
+  routineId?: string | null;
+};
+
+function optionalId(v: unknown, label: string): string | null {
+  if (v === null || v === "") return null;
+  if (typeof v === "string") return v;
+  throw new InputError(`${label}の指定が正しくありません`);
+}
+
+function readLinks(b: Record<string, unknown>, out: LinkInput, keys: (keyof LinkInput)[]) {
+  const labels: Record<keyof LinkInput, string> = { taskId: "タスク", projectId: "プロジェクト", routineId: "ルーティン" };
+  for (const k of keys) if (has(b, k)) out[k] = optionalId(b[k], labels[k]);
+}
+
+function minutesInRange(v: unknown, message: string): number {
+  if (typeof v !== "number" || !Number.isInteger(v) || v < 1 || v > MAX_PLANNED_MINUTES) throw new InputError(message);
+  return v;
+}
+
+export type PlanInput = LinkInput & {
+  date?: string;
+  startTime?: string | null;
+  plannedMinutes?: number;
+  title?: string;
+};
+
+// 業務計画（ある日の予定ブロック）の入力チェック
+export function parsePlanInput(body: unknown, mode: Mode): ParseResult<PlanInput> {
+  return run(body, mode, (b) => {
+    const out: PlanInput = {};
+    if (mode === "create" || has(b, "date")) {
+      const d = optionalDate(b.date ?? "", "日付");
+      if (!d) throw new InputError("日付の形式が正しくありません");
+      out.date = d;
+    }
+    if (has(b, "startTime")) {
+      const t = b.startTime;
+      if (t === null || t === "") out.startTime = null;
+      else if (typeof t === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(t)) out.startTime = t;
+      else throw new InputError("開始時刻は HH:MM の形式で入力してください");
+    }
+    if (mode === "create" || has(b, "plannedMinutes")) {
+      out.plannedMinutes = minutesInRange(b.plannedMinutes, "予定時間は1〜1440分で入力してください");
+    }
+    if (mode === "create" || has(b, "title")) {
+      out.title = requiredText(b.title, MAX_TITLE, "タイトルを入力してください", `タイトルは${MAX_TITLE}文字以内で入力してください`);
+    }
+    readLinks(b, out, ["taskId", "projectId"]);
+    return out;
+  });
+}
+
+export type TimeEntryInput = LinkInput & {
+  date?: string;
+  minutes?: number;
+  note?: string | null;
+  planId?: string | null;
+};
+
+// 実績の手入力・編集の入力チェック（タイマーの開始・停止は別API）
+export function parseTimeEntryInput(body: unknown, mode: Mode): ParseResult<TimeEntryInput> {
+  return run(body, mode, (b) => {
+    const out: TimeEntryInput = {};
+    if (mode === "create" || has(b, "date")) {
+      const d = optionalDate(b.date ?? "", "日付");
+      if (!d) throw new InputError("日付の形式が正しくありません");
+      out.date = d;
+    }
+    if (mode === "create" || has(b, "minutes")) {
+      out.minutes = minutesInRange(b.minutes, "時間は1〜1440分で入力してください");
+    }
+    if (has(b, "note")) out.note = optionalText(b.note, MAX_TITLE, "メモ");
+    readLinks(b, out, ["taskId", "projectId", "routineId"]);
+    if (has(b, "planId")) out.planId = optionalId(b.planId, "計画");
+    return out;
+  });
+}
