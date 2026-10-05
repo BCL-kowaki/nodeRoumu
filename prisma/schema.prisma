@@ -43,6 +43,8 @@ model Employee {
   workProjects WorkProject[]
   workTasks    WorkTask[]
   routines     Routine[]
+  workPlans    WorkPlan[]
+  timeEntries  TimeEntry[]
 }
 
 model Attendance {
@@ -182,9 +184,11 @@ model WorkProject {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  owner    Employee   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  owner    Employee    @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   tasks    WorkTask[]
   routines Routine[]
+  plans    WorkPlan[]
+  entries  TimeEntry[]
 
   @@index([ownerId, status])
 }
@@ -207,6 +211,8 @@ model WorkTask {
   owner   Employee     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   // プロジェクトを削除してもタスクは残し、プロジェクト未設定に戻す
   project WorkProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  plans   WorkPlan[]
+  entries TimeEntry[]
 
   @@index([ownerId, status, dueDate])
   @@index([projectId])
@@ -234,6 +240,7 @@ model Routine {
   owner   Employee       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   project WorkProject?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
   checks  RoutineCheck[]
+  entries TimeEntry[]
 
   @@index([ownerId, active])
   @@index([projectId])
@@ -252,4 +259,53 @@ model RoutineCheck {
 
   @@unique([routineId, date])
   @@index([date])
+}
+
+// 業務計画（ある日の予定ブロック）
+model WorkPlan {
+  id             String   @id @default(cuid())
+  ownerId        String
+  date           DateTime @db.Date // 日本時間の日付
+  startTime      String? // "HH:MM"（任意）
+  plannedMinutes Int
+  title          String
+  taskId         String?
+  projectId      String?
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  owner   Employee     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  task    WorkTask?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  project WorkProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  entries TimeEntry[]
+
+  @@index([ownerId, date])
+}
+
+// 実績（タイマーまたは手入力）。計測中のタイマーは endedAt が null で、常に1件まで
+model TimeEntry {
+  id        String    @id @default(cuid())
+  ownerId   String
+  date      DateTime  @db.Date // 日本時間での開始日（出勤簿の date と同じ基準）
+  startedAt DateTime? // タイマーのとき必須
+  endedAt   DateTime? // タイマー計測中は null
+  minutes   Int? // 停止時に計算、または手入力
+  source    String    @default("manual") // "timer" | "manual"
+  note      String?
+  taskId    String?
+  projectId String?
+  routineId String?
+  planId    String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  owner   Employee     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  task    WorkTask?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  project WorkProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  routine Routine?     @relation(fields: [routineId], references: [id], onDelete: SetNull)
+  plan    WorkPlan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId, date])
+  @@index([ownerId, endedAt])
 }
