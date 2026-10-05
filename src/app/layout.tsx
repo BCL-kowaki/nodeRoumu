@@ -3,13 +3,13 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 
 export const metadata: Metadata = {
-  title: "node 労務管理",
-  description: "合同会社node 労務管理システム",
+  title: "node-portal",
+  description: "合同会社node 社内ポータル（労務・業務管理）",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "node労務",
+    title: "node-portal",
   },
   icons: {
     icon: "/fav.png",

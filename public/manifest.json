@@ -1,7 +1,7 @@
 {
-  "name": "node 労務管理",
-  "short_name": "node労務",
-  "description": "合同会社node 労務管理システム",
+  "name": "node-portal",
+  "short_name": "node-portal",
+  "description": "合同会社node 社内ポータル（労務・業務管理）",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F5F6F8",

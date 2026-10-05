@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Card from "@/components/Card";
 import PasswordInput from "@/components/PasswordInput";
+import BrandLogo from "@/components/BrandLogo";
 
 // Google ログイン（代表者用）から戻ってきたときのエラー表示
 const GOOGLE_ERRORS: Record<string, string> = {
@@ -56,12 +57,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-app-bg flex items-center justify-center px-4">
       <div className="w-full max-w-[400px]">
         <div className="text-center mb-8">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo.png"
-            alt="node"
-            className="mx-auto h-14 w-auto object-contain"
-          />
+          <BrandLogo size="lg" />
         </div>
         <Card>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">

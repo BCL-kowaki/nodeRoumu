@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -28,12 +29,7 @@ export default function Header() {
   return (
     <header className="bg-white border-b border-app-border px-4 flex items-center h-14 sticky top-0 z-[100] shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
       <div className="flex-1 flex items-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/logo.png"
-          alt="node 労務管理"
-          className="h-10 w-auto object-contain"
-        />
+        <BrandLogo />
       </div>
       <div className="flex items-center gap-3">
         {user && (
