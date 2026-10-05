@@ -6,6 +6,8 @@ import Card from "@/components/Card";
 import TaskRow from "@/components/work/TaskRow";
 import TaskEditor from "@/components/work/TaskEditor";
 import { useTasks } from "@/components/work/useTasks";
+import { useRoutineChecks } from "@/components/work/useRoutineChecks";
+import { formatMinutes } from "@/lib/work/labels";
 import type { Task } from "@/components/work/types";
 import { addDays, todayJst } from "@/lib/date-jst";
 
@@ -15,6 +17,11 @@ export default function WorkTodayPage() {
   const [editing, setEditing] = useState<Task | null | "new">(null);
 
   const today = todayJst();
+  const routineChecks = useRoutineChecks(today, today);
+  const todayRoutines = (routineChecks.days[0]?.items ?? [])
+    .map((i) => ({ ...i, routine: routineChecks.routines.find((r) => r.id === i.routineId) }))
+    .filter((i) => i.routine);
+  const routinesDone = todayRoutines.filter((i) => i.status !== null).length;
   const weekEnd = addDays(today, 7);
   const due = (t: Task) => t.dueDate?.slice(0, 10) ?? null;
   const groups: { title: string; items: Task[]; tone?: string }[] = [
@@ -39,7 +46,41 @@ export default function WorkTodayPage() {
         </button>
       </div>
 
-      {error && <div className="text-sm text-danger bg-danger-light rounded p-3">{error}</div>}
+      {(error || routineChecks.error) && (
+        <div className="text-sm text-danger bg-danger-light rounded p-3">{error || routineChecks.error}</div>
+      )}
+
+      {/* 今日のルーティン（実施日のものだけ） */}
+      {todayRoutines.length > 0 && (
+        <Card className="!p-4">
+          <div className="flex justify-between items-center mb-1">
+            <div className="text-xs font-bold text-app-sub">
+              今日のルーティン（{routinesDone}/{todayRoutines.length}）
+            </div>
+            <Link href="/admin/work/routines" className="text-[11px] text-primary">一覧へ</Link>
+          </div>
+          {todayRoutines.map(({ routineId, status, routine }) => (
+            <label
+              key={routineId}
+              className="flex items-center gap-3 py-2 border-b border-app-border last:border-b-0 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={status === "done"}
+                onChange={(e) => routineChecks.setStatus(routineId, today, e.target.checked ? "done" : null)}
+                className="w-4 h-4 accent-primary"
+              />
+              <span className={`flex-1 text-sm ${status ? "line-through text-app-sub" : "text-app-text"}`}>
+                {routine!.title}
+              </span>
+              {status === "skipped" && <span className="text-[11px] text-app-sub">スキップ</span>}
+              {routine!.plannedMinutes !== null && !status && (
+                <span className="text-[11px] text-app-sub">{formatMinutes(routine!.plannedMinutes)}</span>
+              )}
+            </label>
+          ))}
+        </Card>
+      )}
 
       {tasks.length === 0 ? (
         <Card className="text-center !py-10 text-app-sub text-sm">未完了のタスクはありません</Card>

@@ -39,3 +39,26 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   if (!res.ok) throw new Error(data.error || `通信に失敗しました（${res.status}）`);
   return data as T;
 }
+
+export type Routine = {
+  id: string;
+  title: string;
+  description: string | null;
+  frequency: "daily" | "weekly" | "monthly";
+  weekdays: number;
+  monthDay: number | null;
+  skipClosedDays: boolean;
+  plannedMinutes: number | null;
+  active: boolean;
+  startDate: string;
+  endDate: string | null;
+  projectId: string | null;
+  project: ProjectRef | null;
+};
+
+export type CheckStatus = "done" | "skipped" | null;
+export type RoutineDay = {
+  date: string;
+  closed: boolean;
+  items: { routineId: string; status: CheckStatus }[];
+};

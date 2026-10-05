@@ -17,6 +17,7 @@ const ADMIN_TABS: Tab[] = [
 const WORK_TABS: Tab[] = [
   { href: "/admin/work", label: "今日", icon: "✅" },
   { href: "/admin/work/tasks", label: "タスク", icon: "📝" },
+  { href: "/admin/work/routines", label: "ルーティン", icon: "🔁" },
   { href: "/admin/work/projects", label: "プロジェクト", icon: "🗂️" },
   { href: "/admin", label: "労務へ", icon: "↩️" },
 ];
