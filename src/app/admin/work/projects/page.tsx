@@ -11,6 +11,7 @@ import ClientTimeCard from "@/components/work/ClientTimeCard";
 import ProjectEditor from "@/components/work/ProjectEditor";
 import ProjectNote from "@/components/work/ProjectNote";
 import SortableClientList from "@/components/work/SortableClientList";
+import { useCollapsedClients } from "@/components/work/useCollapsedClients";
 import TaskEditor from "@/components/work/TaskEditor";
 import TaskRow from "@/components/work/TaskRow";
 import { api, type Client, type Project, type Task } from "@/components/work/types";
@@ -22,7 +23,6 @@ import LinkifiedText from "@/components/LinkifiedText";
 // 選択中の項目。"all"=すべて、"none"=未分類（プロジェクトなし）、"client:<ID>"=クライアント、それ以外はプロジェクトID
 type Selection = "all" | "none" | string;
 const CLIENT_PREFIX = "client:";
-const COLLAPSED_KEY = "node-portal:collapsed-clients";
 
 const TASK_FILTERS = [
   { key: "open", label: "未完了", statuses: ["todo", "doing"] },
@@ -44,28 +44,7 @@ function ProjectsAndTasks() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<(typeof TASK_FILTERS)[number]["key"]>("open");
   const [showClosedProjects, setShowClosedProjects] = useState(false);
-  // たたんでいるクライアント（この端末のブラウザに覚えておく）
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "[]");
-      if (Array.isArray(saved)) setCollapsed(new Set(saved.filter((x): x is string => typeof x === "string")));
-    } catch {
-      // 保存できない環境（プライベートモードなど）では、毎回すべて開いた状態で始める
-    }
-  }, []);
-  const toggleClient = (clientId: string) =>
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(clientId)) next.delete(clientId);
-      else next.add(clientId);
-      try {
-        localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]));
-      } catch {
-        // 保存できなくても、画面上の開閉はそのまま使える
-      }
-      return next;
-    });
+  const { collapsed, toggle: toggleClient } = useCollapsedClients();
   const [editingTask, setEditingTask] = useState<Task | null | "new">(null);
   const [editingProject, setEditingProject] = useState<Project | null | "new">(null);
   const [editingClient, setEditingClient] = useState<Client | null | "new">(null);

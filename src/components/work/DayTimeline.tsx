@@ -25,9 +25,10 @@ import {
   yToStart,
 } from "@/lib/work/timeline";
 import Link from "next/link";
-import { Building2, CalendarPlus, Check, Repeat } from "lucide-react";
+import { Building2, CalendarPlus, Check, ChevronDown, Repeat } from "lucide-react";
 import { formatMinutes } from "@/lib/work/labels";
-import { eventToPlan, groupTasksByProject, importableEvents } from "@/lib/work/plan-sources";
+import { eventToPlan, groupByClient, groupTasksByProject, importableEvents } from "@/lib/work/plan-sources";
+import { useCollapsedClients } from "./useCollapsedClients";
 import { entryTitle, type CheckStatus, type Client, type Plan, type Project, type Routine, type Task, type TimeEntry } from "./types";
 
 export type DayGoogleEvent = { id: string; title: string; allDay: boolean; startTime: string | null; endTime: string | null };
@@ -266,6 +267,7 @@ export default function DayTimeline({
   const [active, setActive] = useState<DragData | null>(null);
   const [preview, setPreview] = useState<{ id: string; start: number; duration: number } | null>(null);
   const [now, setNow] = useState(() => new Date());
+  const { collapsed, toggle: toggleClient } = useCollapsedClients();
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60_000);
@@ -406,31 +408,47 @@ export default function DayTimeline({
             <section className="flex flex-col gap-1.5">
               <div className="text-[11px] font-bold tracking-[0.08em] text-app-sub">未完了のタスク</div>
               {tasks.length === 0 && <div className="text-xs text-app-sub py-1">未完了のタスクはありません</div>}
-              {taskGroups.map((g) => {
-                const project = g.projectId ? projectById.get(g.projectId) : undefined;
+              {groupByClient(taskGroups, projects, clients).map((cg) => {
+                const key = cg.clientId ?? "__none__";
+                const isCollapsed = collapsed.has(key);
+                const count = cg.groups.reduce((n, g) => n + g.tasks.length, 0);
                 return (
-                  <div key={g.projectId ?? "none"} className="flex flex-col gap-1.5">
-                    {g.projectId ? (
-                      <Link
-                        href={`/admin/work/projects?project=${g.projectId}`}
-                        className="flex items-center gap-1.5 mt-1 text-xs font-semibold text-app-text no-underline hover:underline min-w-0"
-                        title="プロジェクト・タスクの画面で開く"
-                      >
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: project?.color || "#9AA6A2" }} aria-hidden />
-                        <span className="truncate">{project?.name ?? "（プロジェクト）"}</span>
-                        {clientName(project?.clientId) && (
-                          <span className="flex items-center gap-0.5 text-[10px] font-normal text-app-sub shrink-0">
-                            <Building2 size={10} aria-hidden />
-                            {clientName(project?.clientId)}
-                          </span>
-                        )}
-                      </Link>
-                    ) : (
-                      <div className="mt-1 text-xs font-semibold text-app-sub">プロジェクトなし</div>
-                    )}
-                    {g.tasks.map((t) => (
-                      <DraggableTask key={t.id} task={t} projects={projects} onOpen={onOpenTask} />
-                    ))}
+                  <div key={key} className="flex flex-col gap-1.5">
+                    {/* クライアントの見出し（押すと開閉） */}
+                    <button
+                      type="button"
+                      onClick={() => toggleClient(key)}
+                      aria-expanded={!isCollapsed}
+                      className="flex items-center gap-1.5 mt-1 px-1 py-1 rounded-lg text-left text-xs font-bold text-app-text bg-transparent border-none cursor-pointer hover:bg-app-bg"
+                    >
+                      <ChevronDown size={13} className={`shrink-0 text-app-sub transition-transform ${isCollapsed ? "-rotate-90" : ""}`} aria-hidden />
+                      {cg.clientId ? <Building2 size={12} className="shrink-0 text-app-sub" aria-hidden /> : null}
+                      <span className="flex-1 min-w-0 truncate">{cg.clientId ? clientName(cg.clientId) : "クライアントなし・その他"}</span>
+                      <span className="text-[11px] font-normal text-app-sub tabular-nums">{count}</span>
+                    </button>
+                    {!isCollapsed &&
+                      cg.groups.map((g) => {
+                        const project = g.projectId ? projectById.get(g.projectId) : undefined;
+                        return (
+                          <div key={g.projectId ?? "none"} className="flex flex-col gap-1.5 pl-2">
+                            {g.projectId ? (
+                              <Link
+                                href={`/admin/work/projects?project=${g.projectId}`}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-app-text no-underline hover:underline min-w-0"
+                                title="プロジェクト・タスクの画面で開く"
+                              >
+                                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: project?.color || "#9AA6A2" }} aria-hidden />
+                                <span className="truncate">{project?.name ?? "（プロジェクト）"}</span>
+                              </Link>
+                            ) : (
+                              <div className="text-xs font-semibold text-app-sub">プロジェクトなし</div>
+                            )}
+                            {g.tasks.map((t) => (
+                              <DraggableTask key={t.id} task={t} projects={projects} onOpen={onOpenTask} />
+                            ))}
+                          </div>
+                        );
+                      })}
                   </div>
                 );
               })}

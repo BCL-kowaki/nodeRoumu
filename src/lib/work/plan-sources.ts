@@ -42,3 +42,22 @@ export function importableEvents<E extends GoogleEventLike>(events: E[], plans: 
   const imported = new Set(plans.map((p) => p.sourceEventId).filter(Boolean));
   return events.filter((e) => eventToPlan(e) !== null && !imported.has(e.id));
 }
+
+// プロジェクトごとのまとまりを、さらにクライアントごとに分ける（開閉の単位）。
+// クライアントの並び順。プロジェクトなし・一覧に無いプロジェクトは最後にまとめる（clientId: null）
+export function groupByClient<G extends { projectId: string | null }>(
+  groups: G[],
+  projects: { id: string; clientId: string }[],
+  clients: { id: string }[]
+): { clientId: string | null; groups: G[] }[] {
+  const clientOf = new Map(projects.map((p) => [p.id, p.clientId]));
+  const out: { clientId: string | null; groups: G[] }[] = [];
+  for (const c of clients) {
+    const gs = groups.filter((g) => g.projectId && clientOf.get(g.projectId) === c.id);
+    if (gs.length) out.push({ clientId: c.id, groups: gs });
+  }
+  const known = new Set(clients.map((c) => c.id));
+  const rest = groups.filter((g) => !g.projectId || !known.has(clientOf.get(g.projectId) ?? ""));
+  if (rest.length) out.push({ clientId: null, groups: rest });
+  return out;
+}

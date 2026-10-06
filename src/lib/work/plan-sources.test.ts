@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eventToPlan, groupTasksByProject, importableEvents } from "./plan-sources";
+import { eventToPlan, groupByClient, groupTasksByProject, importableEvents } from "./plan-sources";
 
 describe("groupTasksByProject（左の一覧をプロジェクトごとに分ける）", () => {
   const clients = [{ id: "c2" }, { id: "c1" }];
@@ -61,5 +61,26 @@ describe("importableEvents（まだ取り込んでいない時刻つきの予定
       { id: "g3", title: "C", allDay: true, startTime: null, endTime: null },
     ];
     expect(importableEvents(events, [{ sourceEventId: "g1" }, { sourceEventId: null }]).map((e) => e.id)).toEqual(["g2"]);
+  });
+});
+
+describe("groupByClient（プロジェクトごとのまとまりを、さらにクライアントごとに分ける）", () => {
+  const clients = [{ id: "c2" }, { id: "c1" }];
+  const projects = [
+    { id: "p1", clientId: "c1" },
+    { id: "p2", clientId: "c2" },
+  ];
+  it("クライアントの並び順でまとめ、プロジェクトなし・一覧に無いプロジェクトは最後（clientId: null）", () => {
+    const groups = [
+      { projectId: "p2", tasks: [] },
+      { projectId: "p1", tasks: [] },
+      { projectId: "gone", tasks: [] },
+      { projectId: null, tasks: [] },
+    ];
+    expect(groupByClient(groups, projects, clients).map((c) => [c.clientId, c.groups.map((g) => g.projectId)])).toEqual([
+      ["c2", ["p2"]],
+      ["c1", ["p1"]],
+      [null, ["gone", null]],
+    ]);
   });
 });
