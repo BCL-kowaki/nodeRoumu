@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PRIORITY_LABELS, TASK_STATUS_LABELS } from "@/lib/work/labels";
 import { TASK_STATUSES } from "@/lib/work/validate";
+import ProjectOptions from "./ProjectOptions";
 import TaskAttachments from "./TaskAttachments";
 import { api, inputClass, labelClass, type Project, type Task } from "./types";
 
@@ -160,9 +161,7 @@ export default function TaskEditor({
             <label className={labelClass} htmlFor="task-project">プロジェクト</label>
             <select id="task-project" className={inputClass} value={form.projectId} onChange={(e) => set("projectId", e.target.value)}>
               <option value="">（なし）</option>
-              {selectable.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
+              <ProjectOptions projects={selectable} />
             </select>
           </div>
           <div>

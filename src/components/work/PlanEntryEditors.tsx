@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ProjectOptions from "./ProjectOptions";
 import { api, entryTitle, inputClass, labelClass, type Plan, type Project, type Task, type TimeEntry } from "./types";
 
 function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
@@ -156,9 +157,7 @@ export function PlanEditor({
           <label className={labelClass} htmlFor="plan-project">プロジェクト（任意）</label>
           <select id="plan-project" className={inputClass} value={form.projectId} onChange={(e) => set("projectId", e.target.value)}>
             <option value="">（なし）</option>
-            {projects.filter((p) => p.status === "active" || p.status === "on_hold" || p.id === form.projectId).map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            <ProjectOptions projects={projects.filter((p) => p.status === "active" || p.status === "on_hold" || p.id === form.projectId)} />
           </select>
         </div>
         {error && <div className="text-sm text-danger bg-danger-light rounded p-3 text-center">{error}</div>}
@@ -260,9 +259,7 @@ export function EntryEditor({
           <label className={labelClass} htmlFor="entry-project">プロジェクト（任意）</label>
           <select id="entry-project" className={inputClass} value={form.projectId} onChange={(e) => set("projectId", e.target.value)}>
             <option value="">（なし）</option>
-            {projects.filter((p) => p.status === "active" || p.status === "on_hold" || p.id === form.projectId).map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            <ProjectOptions projects={projects.filter((p) => p.status === "active" || p.status === "on_hold" || p.id === form.projectId)} />
           </select>
         </div>
         <div>
