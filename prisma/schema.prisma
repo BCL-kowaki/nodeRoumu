@@ -173,17 +173,20 @@ model FaqDocument {
 // 持ち主の従業員レコードを誤って削除して業務データが消えないよう onDelete: Restrict にしている。
 
 model WorkProject {
-  id          String    @id @default(cuid())
-  ownerId     String
-  name        String
-  description String?   @db.Text
-  status      String    @default("active") // "active" | "on_hold" | "done" | "archived"
-  color       String? // "#rrggbb"
-  startDate   DateTime? @db.Date
-  dueDate     DateTime? @db.Date
-  sortOrder   Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  ownerId          String
+  name             String
+  description      String?   @db.Text
+  status           String    @default("active") // "active" | "on_hold" | "done" | "archived"
+  color            String? // "#rrggbb"
+  startDate        DateTime? @db.Date
+  dueDate          DateTime? @db.Date
+  sortOrder        Int       @default(0)
+  // Obsidian ノート連携（ノート用リポジトリ内の相対パス。未紐づけは NULL）
+  obsidianPath     String?
+  obsidianSyncedAt DateTime? // 最後にアプリからノートを読み書きした日時
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   owner    Employee    @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   tasks    WorkTask[]
