@@ -40,12 +40,13 @@ model Employee {
   dakoku     Dakoku[]
 
   // 業務管理（代表者のみ利用）
-  workProjects WorkProject[]
-  workTasks    WorkTask[]
-  routines     Routine[]
-  workPlans    WorkPlan[]
-  timeEntries  TimeEntry[]
-  githubRepos  GithubRepo[]
+  workProjects        WorkProject[]
+  workTasks           WorkTask[]
+  routines            Routine[]
+  workPlans           WorkPlan[]
+  timeEntries         TimeEntry[]
+  githubRepos         GithubRepo[]
+  integrationAccounts IntegrationAccount[]
 }
 
 model Attendance {
@@ -276,17 +277,20 @@ model RoutineCheck {
 
 // 業務計画（ある日の予定ブロック）
 model WorkPlan {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   ownerId        String
-  date           DateTime @db.Date // 日本時間の日付
+  date           DateTime  @db.Date // 日本時間の日付
   startTime      String? // "HH:MM"（任意）
   plannedMinutes Int
   title          String
   taskId         String?
   projectId      String?
-  sortOrder      Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  sortOrder      Int       @default(0)
+  // Google カレンダーへの書き出し（未書き出しは NULL）
+  googleEventId  String?
+  googleSyncedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   owner   Employee     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   task    WorkTask?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
@@ -346,4 +350,24 @@ model GithubRepo {
   tasks WorkTask[]
 
   @@unique([ownerId, githubId])
+}
+
+// 外部サービス（Google カレンダー）との接続情報。トークンは必ず暗号化して保存する（src/lib/crypto.ts）
+model IntegrationAccount {
+  id                    String    @id @default(cuid())
+  ownerId               String
+  provider              String // "google"
+  accountEmail          String? // 接続した Google アカウント（表示用）
+  encryptedRefreshToken String    @db.Text // "v1:iv:tag:暗号文"
+  accessTokenExpiresAt  DateTime?
+  scopes                String?
+  calendarId            String? // 書き出し先の専用カレンダー「業務計画」（未作成は NULL）
+  status                String    @default("active") // "active" | "needs_reconnect"
+  lastSyncedAt          DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  owner Employee @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+
+  @@unique([ownerId, provider])
 }
