@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     include: {
       _count: { select: { tasks: { where: { status: { in: ["todo", "doing"] } } } } },
+      githubRepos: { select: { id: true, fullName: true, htmlUrl: true }, orderBy: { fullName: "asc" } },
     },
   });
   return NextResponse.json(

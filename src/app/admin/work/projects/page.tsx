@@ -2,7 +2,8 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Building2 } from "lucide-react";
+import Link from "next/link";
+import { Building2, GitBranch } from "lucide-react";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import ClientEditor from "@/components/work/ClientEditor";
@@ -301,6 +302,26 @@ function ProjectsAndTasks() {
                 </>
               )}
             </div>
+            {project && (
+              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                {(project.githubRepos ?? []).map((r) => (
+                  <a
+                    key={r.id}
+                    href={r.htmlUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-app-border text-[11px] text-app-text no-underline hover:bg-app-bg"
+                    title="GitHub でリポジトリを開く"
+                  >
+                    <GitBranch size={11} aria-hidden />
+                    {r.fullName}
+                  </a>
+                ))}
+                <Link href="/admin/work/github" className="text-[11px] text-app-sub hover:text-app-text">
+                  {(project.githubRepos ?? []).length > 0 ? "リポジトリの紐づけを変更" : "+ リポジトリを紐づける"}
+                </Link>
+              </div>
+            )}
             {project && (project.startDate || project.dueDate || project.description) && (
               <div className="mt-2 flex flex-col gap-1">
                 {(project.startDate || project.dueDate) && (

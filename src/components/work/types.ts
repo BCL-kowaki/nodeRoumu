@@ -34,6 +34,7 @@ export type Project = {
   startDate: string | null;
   dueDate: string | null;
   openTaskCount?: number;
+  githubRepos?: { id: string; fullName: string; htmlUrl: string }[];
 };
 
 export const inputClass =
@@ -134,6 +135,7 @@ export type GithubRepo = {
   openPrCount: number;
   pushedAt: string | null;
   syncIssues: boolean;
+  projectId: string | null;
   lastSyncedAt: string | null;
 };
 

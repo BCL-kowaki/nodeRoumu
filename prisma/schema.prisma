@@ -208,13 +208,14 @@ model WorkProject {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  owner    Employee    @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  owner       Employee     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   // プロジェクトが残っているクライアントは削除できない
-  client   WorkClient  @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  tasks    WorkTask[]
-  routines Routine[]
-  plans    WorkPlan[]
-  entries  TimeEntry[]
+  client      WorkClient   @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  tasks       WorkTask[]
+  routines    Routine[]
+  plans       WorkPlan[]
+  entries     TimeEntry[]
+  githubRepos GithubRepo[]
 
   @@index([ownerId, status])
   @@index([clientId])
@@ -397,14 +398,18 @@ model GithubRepo {
   openPrCount     Int       @default(0)
   pushedAt        DateTime?
   syncIssues      Boolean   @default(false)
+  // 紐づけたプロジェクト。取り込んだ Issue のタスクは、このプロジェクトに入る
+  projectId       String?
   lastSyncedAt    DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  owner Employee   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  tasks WorkTask[]
+  owner   Employee     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  project WorkProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  tasks   WorkTask[]
 
   @@unique([ownerId, githubId])
+  @@index([projectId])
 }
 
 // 外部サービス（Google カレンダー）との接続情報。トークンは必ず暗号化して保存する（src/lib/crypto.ts）

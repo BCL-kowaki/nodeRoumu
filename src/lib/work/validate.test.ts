@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   completedAtFor,
   parsePlanInput,
+  parseRepoPatch,
   parseClientInput,
   parseIdOrder,
   parseProjectInput,
@@ -321,5 +322,21 @@ describe("parsePlanInput のルーティン・Google の予定", () => {
       ok: false,
       error: "取り込む予定の指定が正しくありません",
     });
+  });
+});
+
+describe("parseRepoPatch（リポジトリの設定変更）", () => {
+  it("同期の ON/OFF とプロジェクトを受け付ける。空・null はプロジェクトなし", () => {
+    expect(parseRepoPatch({ syncIssues: true })).toEqual({ ok: true, data: { syncIssues: true } });
+    expect(parseRepoPatch({ projectId: "p1" })).toEqual({ ok: true, data: { projectId: "p1" } });
+    expect(parseRepoPatch({ projectId: "" })).toEqual({ ok: true, data: { projectId: null } });
+    expect(parseRepoPatch({ projectId: null, syncIssues: false })).toEqual({ ok: true, data: { projectId: null, syncIssues: false } });
+  });
+  it.each([
+    ["何も無い", {}, "変更する内容がありません"],
+    ["同期の値が真偽でない", { syncIssues: "yes" }, "同期の ON/OFF の指定が正しくありません"],
+    ["プロジェクトの値が文字列でない", { projectId: 3 }, "プロジェクトの指定が正しくありません"],
+  ])("%s のとき、エラーを返す", (_name, body, message) => {
+    expect(parseRepoPatch(body)).toEqual({ ok: false, error: message });
   });
 });

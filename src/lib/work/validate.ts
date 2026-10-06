@@ -429,3 +429,24 @@ export function parseTimeEntryInput(body: unknown, mode: Mode): ParseResult<Time
     return out;
   });
 }
+
+// ===== GitHub のリポジトリ =====
+export type RepoPatch = { syncIssues?: boolean; projectId?: string | null };
+
+// リポジトリの設定変更（Issue 同期の ON/OFF・紐づけるプロジェクト）
+export function parseRepoPatch(body: unknown): ParseResult<RepoPatch> {
+  return run(body, "update", (b) => {
+    const out: RepoPatch = {};
+    if (Object.prototype.hasOwnProperty.call(b, "projectId")) {
+      const p = b.projectId;
+      if (p === null || p === "") out.projectId = null;
+      else if (typeof p === "string") out.projectId = p;
+      else throw new InputError("プロジェクトの指定が正しくありません");
+    }
+    if (has(b, "syncIssues")) {
+      if (typeof b.syncIssues !== "boolean") throw new InputError("同期の ON/OFF の指定が正しくありません");
+      out.syncIssues = b.syncIssues;
+    }
+    return out;
+  });
+}

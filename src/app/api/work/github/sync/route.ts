@@ -44,7 +44,8 @@ export async function POST() {
 
       await prisma.$transaction([
         ...plan.creates.map((c) =>
-          prisma.workTask.create({ data: { ownerId, githubRepoId: repo.id, ...c } })
+          // 新しく取り込む Issue は、リポジトリに紐づけたプロジェクトに入れる
+          prisma.workTask.create({ data: { ownerId, githubRepoId: repo.id, projectId: repo.projectId, ...c } })
         ),
         ...plan.updates.map((u) =>
           prisma.workTask.updateMany({ where: { id: u.id, ownerId }, data: u.data })
