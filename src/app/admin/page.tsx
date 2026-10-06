@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import { AlertTriangle, Banknote, CalendarDays, ClipboardList, ReceiptText, UserCheck, Users } from "lucide-react";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import { LABOR_ROADMAP, categoryColor } from "@/lib/labor-roadmap";
@@ -116,7 +117,7 @@ export default function AdminDashboard() {
       {/* 料率未設定の警告 */}
       {rates && !rates.updatedAt && (
         <Card className="!bg-[#FFF8E1] !border-[#FFE082]">
-          <div className="text-sm font-semibold text-[#F57F17] mb-2">⚠️ 料率が未設定です</div>
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-[#F57F17] mb-2"><AlertTriangle size={16} aria-hidden />料率が未設定です</div>
           <div className="text-[13px] text-[#795548] mb-3">「料率設定」から健康保険料率等を入力してください</div>
           <Link href="/admin/settings" className="inline-block px-6 py-3 rounded bg-primary text-white text-sm font-bold no-underline">料率設定へ →</Link>
         </Card>
@@ -125,7 +126,7 @@ export default function AdminDashboard() {
       {/* 労務カレンダーのアラート */}
       {hasAlerts && (
         <Card className="!bg-[#FFF8E1] !border-[#FFE082]">
-          <div className="text-sm font-bold text-[#F57F17] mb-2">📋 労務カレンダーのお知らせ</div>
+          <div className="flex items-center gap-1.5 text-sm font-bold text-[#F57F17] mb-2"><ClipboardList size={16} aria-hidden />労務カレンダーのお知らせ</div>
           <div className="flex flex-col gap-1.5">
             {upcomingEvents.map((ev, i) => (
               <div key={`ev-${i}`} className="text-[13px] text-[#795548]">
@@ -133,8 +134,9 @@ export default function AdminDashboard() {
               </div>
             ))}
             {expiringContracts.map((e) => (
-              <div key={`contract-${e.id}`} className="text-[13px] text-[#E53935] font-semibold">
-                ⚠️ {e.name}さんの契約が{e.contractEndDate!.slice(0, 10)}に満了します。更新手続きを確認してください
+              <div key={`contract-${e.id}`} className="flex items-start gap-1 text-[13px] text-[#E53935] font-semibold">
+                <AlertTriangle size={14} className="shrink-0 mt-0.5" aria-hidden />
+                {e.name}さんの契約が{e.contractEndDate!.slice(0, 10)}に満了します。更新手続きを確認してください
               </div>
             ))}
           </div>
@@ -144,14 +146,16 @@ export default function AdminDashboard() {
       {/* サマリーカード 2x2 */}
       <div className="grid grid-cols-2 gap-2.5">
         {[
-          { label: "在籍", value: active.length + "名", icon: "👥", href: "/admin/meibo" },
-          { label: "出勤中", value: working + "名", icon: "🟢", href: "/admin" },
-          { label: "給与処理", value: mPay.length + "件", icon: "📋", href: "/admin/chingin" },
-          { label: "支給合計", value: "¥" + fmt(total), icon: "💴", href: "/admin/chingin" },
+          { label: "在籍", value: active.length + "名", icon: Users, href: "/admin/meibo" },
+          { label: "出勤中", value: working + "名", icon: UserCheck, href: "/admin" },
+          { label: "給与処理", value: mPay.length + "件", icon: ReceiptText, href: "/admin/chingin" },
+          { label: "支給合計", value: "¥" + fmt(total), icon: Banknote, href: "/admin/chingin" },
         ].map((c) => (
           <Link key={c.label} href={c.href} className="no-underline">
             <Card className="!p-4">
-              <div className="text-xl mb-1.5">{c.icon}</div>
+              <div className="w-9 h-9 mb-2 rounded-lg bg-primary-light text-primary-dark flex items-center justify-center">
+                <c.icon size={18} strokeWidth={2} aria-hidden />
+              </div>
               <div className="text-[11px] text-app-sub mb-1">{c.label}</div>
               <div className="text-xl font-extrabold text-primary">{c.value}</div>
             </Card>
@@ -202,7 +206,7 @@ export default function AdminDashboard() {
 
       {/* 年間労務ロードマップ */}
       <Card>
-        <div className="text-sm font-bold text-app-text mb-3">📅 年間労務ロードマップ</div>
+        <div className="flex items-center gap-1.5 text-sm font-bold text-app-text mb-3"><CalendarDays size={16} className="text-primary" aria-hidden />年間労務ロードマップ</div>
         <div className="flex flex-col gap-3">
           {/* 月カード: 1-12 + 通年(0) */}
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0]

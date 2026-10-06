@@ -13,6 +13,8 @@ import {
   workHoursLabel,
 } from "@/lib/attendance-status";
 import PageTitle from "@/components/PageTitle";
+import { MapPin } from "lucide-react";
+import { punchTypeInfo } from "@/components/PunchType";
 
 type Employee = {
   id: string;
@@ -570,13 +572,7 @@ export default function ShukkinPage() {
               ) : (
                 <div className="flex flex-col gap-3">
                   {modalLogs.map((log) => {
-                    const typeLabels: Record<string, { label: string; icon: string; color: string }> = {
-                      in: { label: "出勤", icon: "🟢", color: "text-primary" },
-                      out: { label: "退勤", icon: "🔴", color: "text-danger" },
-                      break_start: { label: "休憩開始", icon: "☕", color: "text-accent" },
-                      break_end: { label: "休憩終了", icon: "🔄", color: "text-primary" },
-                    };
-                    const info = typeLabels[log.type] || { label: log.type, icon: "⏱️", color: "text-app-text" };
+                    const info = punchTypeInfo(log.type);
 
                     return (
                       <div
@@ -584,7 +580,7 @@ export default function ShukkinPage() {
                         className="border border-app-border rounded p-3"
                       >
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-lg">{info.icon}</span>
+                          <info.icon size={18} strokeWidth={2} className={info.color} aria-hidden />
                           <span className={`text-sm font-bold ${info.color}`}>{info.label}</span>
                           <span className="text-lg font-bold text-app-text tabular-nums ml-auto">
                             {log.time}
@@ -595,7 +591,7 @@ export default function ShukkinPage() {
                         </div>
                         {log.latitude && log.longitude ? (
                           <div className="mt-1.5 flex items-center gap-1.5">
-                            <span className="text-xs">📍</span>
+                            <MapPin size={13} className="text-app-sub shrink-0" aria-hidden />
                             <a
                               href={`https://maps.google.com/maps?q=${log.latitude},${log.longitude}`}
                               target="_blank"
@@ -609,8 +605,8 @@ export default function ShukkinPage() {
                             </span>
                           </div>
                         ) : (
-                          <div className="mt-1.5 text-[11px] text-app-sub">
-                            📍 位置情報なし
+                          <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-app-sub">
+                            <MapPin size={13} className="shrink-0" aria-hidden />位置情報なし
                           </div>
                         )}
                       </div>

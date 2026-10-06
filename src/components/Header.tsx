@@ -4,6 +4,20 @@ import { useState, useRef, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import BrandLogo from "@/components/BrandLogo";
+import {
+  ArrowLeftRight,
+  Building2,
+  CalendarCheck2,
+  CalendarRange,
+  CheckCircle2,
+  GitBranch,
+  LogOut,
+  Percent,
+  Settings,
+  ShieldCheck,
+  UserCog,
+  UserRound,
+} from "lucide-react";
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -42,9 +56,11 @@ export default function Header() {
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen((v) => !v)}
-            className="w-8 h-8 flex items-center justify-center rounded bg-transparent border border-app-border cursor-pointer hover:bg-gray-50 text-base"
+            aria-label="メニュー"
+            aria-expanded={menuOpen}
+            className="w-8 h-8 flex items-center justify-center rounded-lg bg-transparent border border-app-border cursor-pointer hover:bg-gray-50 text-app-text"
           >
-            ⚙️
+            <Settings size={17} strokeWidth={1.75} aria-hidden />
           </button>
 
           {menuOpen && (
@@ -55,18 +71,18 @@ export default function Header() {
                   router.push(isAdminOrManager ? "/admin/account" : "/account");
                   setMenuOpen(false);
                 }}
-                className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
+                className="w-full flex items-center gap-2.5 text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
               >
-                👤 アカウント
+                <UserCog size={16} strokeWidth={1.75} className="shrink-0 text-app-sub" aria-hidden />アカウント
               </button>
 
               {/* ステータス（従業員のみ：自分の基本情報） */}
               {!isAdminOrManager && (
                 <button
                   onClick={() => { router.push("/status"); setMenuOpen(false); }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
+                  className="w-full flex items-center gap-2.5 text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
                 >
-                  📋 ステータス
+                  <UserRound size={16} strokeWidth={1.75} className="shrink-0 text-app-sub" aria-hidden />ステータス
                 </button>
               )}
 
@@ -76,21 +92,21 @@ export default function Header() {
                   <div className="border-t border-app-border my-1" />
                   <button
                     onClick={() => { router.push("/admin/company"); setMenuOpen(false); }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
+                    className="w-full flex items-center gap-2.5 text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
                   >
-                    🏢 企業情報
+                    <Building2 size={16} strokeWidth={1.75} className="shrink-0 text-app-sub" aria-hidden />企業情報
                   </button>
                   <button
                     onClick={() => { router.push("/admin/settings"); setMenuOpen(false); }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
+                    className="w-full flex items-center gap-2.5 text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
                   >
-                    📋 料率設定
+                    <Percent size={16} strokeWidth={1.75} className="shrink-0 text-app-sub" aria-hidden />料率設定
                   </button>
                   <button
                     onClick={() => { router.push("/admin/holidays"); setMenuOpen(false); }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
+                    className="w-full flex items-center gap-2.5 text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
                   >
-                    📅 休日設定
+                    <CalendarCheck2 size={16} strokeWidth={1.75} className="shrink-0 text-app-sub" aria-hidden />休日設定
                   </button>
                 </>
               )}
@@ -101,31 +117,31 @@ export default function Header() {
                   <div className="border-t border-app-border my-1" />
                   <button
                     onClick={() => { router.push(inWork ? "/admin" : "/admin/work"); setMenuOpen(false); }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
+                    className="w-full flex items-center gap-2.5 text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
                   >
-                    {inWork ? "📋 労務管理へ戻る" : "✅ 業務管理"}
+                    {inWork ? <><ArrowLeftRight size={16} strokeWidth={1.75} className="shrink-0 text-app-sub" aria-hidden />労務管理へ戻る</> : <><CheckCircle2 size={16} strokeWidth={1.75} className="shrink-0 text-app-sub" aria-hidden />業務管理</>}
                   </button>
                   {inWork && (
                     <button
                       onClick={() => { router.push("/admin/work/schedule"); setMenuOpen(false); }}
-                      className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
+                      className="w-full flex items-center gap-2.5 text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
                     >
-                      📆 スケジュール
+                      <CalendarRange size={16} strokeWidth={1.75} className="shrink-0 text-app-sub" aria-hidden />スケジュール
                     </button>
                   )}
                   {inWork && (
                     <button
                       onClick={() => { router.push("/admin/work/github"); setMenuOpen(false); }}
-                      className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
+                      className="w-full flex items-center gap-2.5 text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
                     >
-                      🐙 GitHub 連携
+                      <GitBranch size={16} strokeWidth={1.75} className="shrink-0 text-app-sub" aria-hidden />GitHub 連携
                     </button>
                   )}
                   <button
                     onClick={() => { router.push("/admin/users"); setMenuOpen(false); }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
+                    className="w-full flex items-center gap-2.5 text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
                   >
-                    🛡️ 管理ユーザー
+                    <ShieldCheck size={16} strokeWidth={1.75} className="shrink-0 text-app-sub" aria-hidden />管理ユーザー
                   </button>
                 </>
               )}
@@ -133,9 +149,9 @@ export default function Header() {
               <div className="border-t border-app-border my-1" />
               <button
                 onClick={() => { setMenuOpen(false); logout(); }}
-                className="w-full text-left px-4 py-2.5 text-sm text-danger hover:bg-gray-50 border-none bg-transparent cursor-pointer"
+                className="w-full flex items-center gap-2.5 text-left px-4 py-2.5 text-sm text-danger hover:bg-gray-50 border-none bg-transparent cursor-pointer"
               >
-                🚪 ログアウト
+                <LogOut size={16} strokeWidth={1.75} className="shrink-0" aria-hidden />ログアウト
               </button>
             </div>
           )}

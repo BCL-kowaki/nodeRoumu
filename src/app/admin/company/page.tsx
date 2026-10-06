@@ -5,6 +5,7 @@ import Card from "@/components/Card";
 import { useAuth } from "@/lib/auth-context";
 import { canWriteCompany } from "@/lib/permissions";
 import PageTitle from "@/components/PageTitle";
+import { CheckCircle2, FileText, Loader2 } from "lucide-react";
 
 type Company = {
   id: string;
@@ -211,14 +212,14 @@ export default function CompanyPage() {
 
       {saved && (
         <Card className="!bg-primary-light text-center !p-3">
-          <div className="text-sm font-bold text-primary-dark">✅ 保存しました</div>
+          <div className="flex items-center justify-center gap-1.5 text-sm font-bold text-primary-dark"><CheckCircle2 size={16} aria-hidden />保存しました</div>
         </Card>
       )}
 
       {/* 謄本PDFアップロード（manager は非表示） */}
       {canWrite && (
       <Card>
-        <div className="text-sm font-bold text-app-text mb-2">📄 謄本PDFから読み取り</div>
+        <div className="flex items-center gap-1.5 text-sm font-bold text-app-text mb-2"><FileText size={16} className="text-primary" aria-hidden />謄本PDFから読み取り</div>
         <div className="text-[11px] text-app-sub mb-3">
           登記簿謄本のPDFをアップロードすると、会社名・所在地・設立日・法人番号・代表者・事業内容を自動入力します。
           スキャンPDFにも対応しています（OCR処理に数十秒かかる場合があります）
@@ -234,14 +235,15 @@ export default function CompanyPage() {
           />
         </div>
         {uploadMsg && (
-          <div className={`text-xs mt-2 p-2.5 rounded ${
+          <div className={`flex items-center gap-1.5 text-xs mt-2 p-2.5 rounded ${
             uploadMsg.includes("失敗") || uploadMsg.includes("エラー") || uploadMsg.includes("読み取れません")
               ? "text-danger bg-danger-light"
               : uploading
               ? "text-app-text bg-[#FFF8E1]"
               : "text-primary-dark bg-primary-light"
           }`}>
-            {uploading && "⏳ "}{uploadMsg}
+            {uploading && <Loader2 size={14} className="shrink-0 animate-spin" aria-hidden />}
+            {uploadMsg}
           </div>
         )}
         {rawText && !uploading && (

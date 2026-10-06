@@ -6,6 +6,8 @@ import { useAuth } from "@/lib/auth-context";
 import { EMPLOYEE_SCHEDULE } from "@/lib/employee-schedule";
 // 出勤日数・実働時間は出勤簿と同じ判定を使う
 import { isClosedDay, isCountableDay, workMinutes } from "@/lib/attendance-status";
+import { CalendarDays, ClipboardList } from "lucide-react";
+import { PunchTypeLabel } from "@/components/PunchType";
 
 type AttRecord = {
   date: string;
@@ -196,25 +198,19 @@ export default function EmployeeDashboard() {
       {todayLogs.length > 0 && (
         <Card>
           <div className="text-sm font-bold text-app-text mb-3">本日の打刻</div>
-          {todayLogs.map((l, i) => {
-            const labels: Record<string, string> = {
-              in: "🟢 出勤", out: "🔴 退勤",
-              break_start: "☕ 休憩開始", break_end: "🔄 休憩終了",
-            };
-            return (
-              <div key={i} className="flex justify-between py-2 border-b border-app-border last:border-0">
-                <span className="font-bold text-lg text-primary tabular-nums">{l.time}</span>
-                <span className="text-sm text-app-text">{labels[l.type] || l.type}</span>
-              </div>
-            );
-          })}
+          {todayLogs.map((l, i) => (
+            <div key={i} className="flex justify-between items-center py-2 border-b border-app-border last:border-0">
+              <span className="font-bold text-lg text-primary tabular-nums">{l.time}</span>
+              <PunchTypeLabel type={l.type} className="text-sm text-app-text" />
+            </div>
+          ))}
         </Card>
       )}
 
       {/* お知らせ（今月・来月のイベント） */}
       {upcomingEvents.length > 0 && (
         <Card className="!bg-[#FFF8E1] !border-[#FFE082]">
-          <div className="text-sm font-bold text-[#F57F17] mb-2">📋 お知らせ</div>
+          <div className="flex items-center gap-1.5 text-sm font-bold text-[#F57F17] mb-2"><ClipboardList size={16} aria-hidden />お知らせ</div>
           {upcomingEvents.map((ev, i) => (
             <div key={i} className="mb-2 last:mb-0">
               <div className="text-[13px] font-semibold text-[#795548]">
@@ -228,7 +224,7 @@ export default function EmployeeDashboard() {
 
       {/* 年間スケジュール */}
       <Card>
-        <div className="text-sm font-bold text-app-text mb-3">📅 年間スケジュール</div>
+        <div className="flex items-center gap-1.5 text-sm font-bold text-app-text mb-3"><CalendarDays size={16} className="text-primary" aria-hidden />年間スケジュール</div>
         <div className="flex flex-col gap-2">
           {EMPLOYEE_SCHEDULE.filter((e) => e.month > 0)
             .sort((a, b) => a.month - b.month)

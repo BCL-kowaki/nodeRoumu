@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
 // パスワード入力欄（目アイコンで表示/非表示切替）
 // 既存の <input type="password"> の代替として使う
@@ -42,7 +43,7 @@ export default function PasswordInput({
         aria-label={visible ? "パスワードを隠す" : "パスワードを表示"}
         className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-app-sub hover:text-app-text cursor-pointer bg-transparent border-none p-0"
       >
-        {visible ? "🙈" : "👁️"}
+        {visible ? <EyeOff size={17} aria-hidden /> : <Eye size={17} aria-hidden />}
       </button>
     </div>
   );

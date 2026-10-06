@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import Card from "@/components/Card";
 import { useAuth } from "@/lib/auth-context";
 import { isClosedDay } from "@/lib/attendance-status";
+import { CheckCircle2, MapPin } from "lucide-react";
+import { PUNCH_TYPES, PunchTypeLabel, punchTypeInfo } from "@/components/PunchType";
 
 type DakokuLog = {
   id: string;
@@ -165,18 +167,15 @@ export default function EmployeeDakoku() {
       }),
     });
     fetchLogs();
-    const labels: Record<string, string> = {
-      in: "出勤", out: "退勤", break_start: "休憩開始", break_end: "休憩終了",
-    };
-    setFlash(labels[type] + " " + time + (loc ? " 📍" : ""));
+    setFlash(punchTypeInfo(type).label + " " + time + (loc ? "（位置情報あり）" : ""));
     setTimeout(() => setFlash(null), 3000);
   };
 
   const btns = [
-    { type: "in", label: "出勤", icon: "🟢", disabled: punchStatus === "勤務中" || punchStatus === "退勤済" || punchStatus === "休憩中" || dayIsClosed },
-    { type: "break_start", label: "休憩", icon: "☕", disabled: punchStatus !== "勤務中" },
-    { type: "break_end", label: "戻り", icon: "🔄", disabled: punchStatus !== "休憩中" },
-    { type: "out", label: "退勤", icon: "🔴", disabled: punchStatus === "未出勤" || punchStatus === "退勤済" },
+    { type: "in", label: "出勤", icon: PUNCH_TYPES.in.icon, disabled: punchStatus === "勤務中" || punchStatus === "退勤済" || punchStatus === "休憩中" || dayIsClosed },
+    { type: "break_start", label: "休憩", icon: PUNCH_TYPES.break_start.icon, disabled: punchStatus !== "勤務中" },
+    { type: "break_end", label: "戻り", icon: PUNCH_TYPES.break_end.icon, disabled: punchStatus !== "休憩中" },
+    { type: "out", label: "退勤", icon: PUNCH_TYPES.out.icon, disabled: punchStatus === "未出勤" || punchStatus === "退勤済" },
   ];
 
   if (authLoading)
@@ -210,7 +209,7 @@ export default function EmployeeDakoku() {
 
       {flash && (
         <Card className="!bg-primary-light text-center !p-3.5">
-          <div className="text-[15px] font-bold text-primary-dark">✅ {flash}</div>
+          <div className="flex items-center justify-center gap-1.5 text-[15px] font-bold text-primary-dark"><CheckCircle2 size={18} aria-hidden />{flash}</div>
         </Card>
       )}
 
@@ -227,7 +226,7 @@ export default function EmployeeDakoku() {
                 : "border-primary bg-white cursor-pointer shadow-[0_2px_8px_rgba(33,151,127,0.12)] hover:shadow-[0_4px_16px_rgba(33,151,127,0.2)]"
             }`}
           >
-            <span className="text-4xl">{b.icon}</span>
+            <b.icon size={36} strokeWidth={1.75} className={b.disabled ? "text-app-sub" : punchTypeInfo(b.type).color} aria-hidden />
             <span className={`text-base font-bold tracking-widest ${b.disabled ? "text-app-sub" : "text-app-text"}`}>
               {b.label}
             </span>
@@ -240,9 +239,6 @@ export default function EmployeeDakoku() {
         <Card>
           <div className="text-sm font-bold text-app-text mb-3">本日の打刻履歴</div>
           {logs.map((l) => {
-            const labels: Record<string, string> = {
-              in: "🟢 出勤", out: "🔴 退勤", break_start: "☕ 休憩開始", break_end: "🔄 休憩終了",
-            };
             return (
               <div key={l.id} className="flex items-center py-2 border-b border-app-border last:border-0 gap-2">
                 <span className="font-bold text-lg text-primary tabular-nums">{l.time}</span>
@@ -251,12 +247,13 @@ export default function EmployeeDakoku() {
                     href={`https://maps.google.com/maps?q=${l.latitude},${l.longitude}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-app-sub no-underline"
+                    className="text-app-sub no-underline"
+                    aria-label="打刻した場所を地図で見る"
                   >
-                    📍
+                    <MapPin size={14} aria-hidden />
                   </a>
                 )}
-                <span className="text-sm text-app-text ml-auto">{labels[l.type] || l.type}</span>
+                <PunchTypeLabel type={l.type} className="text-sm text-app-text ml-auto" />
               </div>
             );
           })}
