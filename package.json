@@ -15,6 +15,7 @@
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^3.0.3",
     "jose": "^6.2.2",
+    "lucide-react": "^1.52.0",
     "next": "15.5.26",
     "pdfjs-dist": "^3.11.174",
     "prisma": "^5.22.0",

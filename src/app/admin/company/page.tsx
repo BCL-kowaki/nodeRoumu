@@ -196,7 +196,7 @@ export default function CompanyPage() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-lg font-bold">企業情報</div>
+      <div className="text-lg lg:text-2xl font-bold tracking-tight">企業情報</div>
 
       {!canWrite && (
         <div className="text-xs text-app-sub bg-app-bg rounded px-3 py-2">

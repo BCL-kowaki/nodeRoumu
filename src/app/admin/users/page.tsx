@@ -136,7 +136,7 @@ export default function AdminUsersPage() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-between items-center">
-        <div className="text-lg font-bold">管理ユーザー</div>
+        <div className="text-lg lg:text-2xl font-bold tracking-tight">管理ユーザー</div>
         <button
           onClick={() => setShowAdd((v) => !v)}
           className="px-5 py-2.5 rounded bg-primary text-white text-sm font-bold border-none cursor-pointer"

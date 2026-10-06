@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 body {
-  color: #333333;
-  background: #F5F6F8;
+  color: #1F2A27;
+  background: #F4F6F5;
   font-family: 'Hiragino Sans', 'Noto Sans JP', -apple-system, sans-serif;
 }
 
@@ -40,6 +40,10 @@ input, select, textarea {
   nav,
   [data-no-print] {
     display: none !important;
+  }
+  /* PC のサイドバー分の左余白を、印刷では取らない */
+  .lg\:pl-60 {
+    padding-left: 0 !important;
   }
   /* 白背景で印刷（カード影・背景色を抑える） */
   body {

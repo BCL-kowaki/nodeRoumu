@@ -154,7 +154,7 @@ export default function HolidaysPage() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-lg font-bold">休日設定</div>
+      <div className="text-lg lg:text-2xl font-bold tracking-tight">休日設定</div>
 
       {!canWrite && (
         <div className="text-xs text-app-sub bg-app-bg rounded px-3 py-2">

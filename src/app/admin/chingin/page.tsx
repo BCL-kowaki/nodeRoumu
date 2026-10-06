@@ -401,7 +401,7 @@ export default function ChinginPage() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-between items-center">
-        <div className="text-lg font-bold">賃金台帳</div>
+        <div className="text-lg lg:text-2xl font-bold tracking-tight">賃金台帳</div>
         <input
           type="month"
           value={selMonth}

@@ -2,68 +2,40 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+import { bottomTabs, isActive } from "./nav";
 
-type Tab = { href: string; label: string; icon: string };
-
-const ADMIN_TABS: Tab[] = [
-  { href: "/admin", label: "ホーム", icon: "📊" },
-  { href: "/admin/meibo", label: "名簿", icon: "👥" },
-  { href: "/admin/shukkin", label: "出勤簿", icon: "📅" },
-  { href: "/admin/chingin", label: "賃金台帳", icon: "💰" },
-  { href: "/admin/faq", label: "FAQ", icon: "💬" },
-];
-
-// 業務管理（/admin/work 配下・代表者のみ）表示中のタブ
-const WORK_TABS: Tab[] = [
-  { href: "/admin/work", label: "今日", icon: "✅" },
-  { href: "/admin/work/tasks", label: "タスク", icon: "📝" },
-  { href: "/admin/work/plan", label: "計画", icon: "⏱️" },
-  { href: "/admin/work/routines", label: "ルーティン", icon: "🔁" },
-  { href: "/admin/work/projects", label: "プロジェクト", icon: "🗂️" },
-];
-// ※ 労務管理へは ⚙️ メニューの「労務管理へ戻る」から戻る
-
-// 下の各タブを「完全一致」で選択中にするパス（それ以外は前方一致）
-const EXACT_MATCH = ["/admin", "/admin/work"];
-
-const EMPLOYEE_TABS: Tab[] = [
-  { href: "/", label: "ホーム", icon: "📊" },
-  { href: "/dakoku", label: "打刻", icon: "⏱️" },
-  { href: "/shukkin", label: "出勤簿", icon: "📅" },
-  { href: "/kyuyo", label: "給与明細", icon: "💰" },
-  { href: "/faq", label: "FAQ", icon: "💬" },
-];
-
+// スマホ・タブレット用の下部タブ（PC ではサイドバーを使うので表示しない）
 export default function TabBar({ variant }: { variant: "admin" | "employee" }) {
   const pathname = usePathname();
-  const inWork = variant === "admin" && (pathname === "/admin/work" || pathname.startsWith("/admin/work/"));
-  const tabs = inWork ? WORK_TABS : variant === "admin" ? ADMIN_TABS : EMPLOYEE_TABS;
+  const { user } = useAuth();
+  // 表示中のエリアに合わせる（役割が読み込まれる前も、エリアに合ったタブを出す）
+  const role = user?.role ?? (variant === "admin" ? "manager" : "employee");
+  const tabs = bottomTabs(role, pathname);
 
   return (
-    <div
+    <nav
       data-no-print
-      className="fixed bottom-0 left-0 right-0 bg-white border-t border-app-border flex z-[100] shadow-[0_-2px_8px_rgba(0,0,0,0.04)]"
+      aria-label="メインメニュー"
+      className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-app-border flex z-[100] pb-[env(safe-area-inset-bottom)]"
     >
       {tabs.map((t) => {
-        const active =
-          variant === "admin"
-            ? EXACT_MATCH.includes(t.href)
-              ? pathname === t.href
-              : pathname.startsWith(t.href)
-            : pathname === t.href;
+        const active = isActive(t, pathname);
+        const Icon = t.icon;
         return (
           <Link
             key={t.href}
             href={t.href}
-            className={`flex-1 py-2 pb-1.5 flex flex-col items-center gap-0.5 no-underline text-[10px] transition-colors ${
+            aria-current={active ? "page" : undefined}
+            className={`flex-1 pt-2 pb-1.5 flex flex-col items-center gap-0.5 no-underline text-[10px] transition-colors ${
               active ? "text-primary font-bold" : "text-app-sub"
             }`}
           >
-            <span className="text-lg">{t.icon}</span>
+            <Icon size={20} strokeWidth={active ? 2.25 : 1.75} aria-hidden />
             {t.label}
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 }

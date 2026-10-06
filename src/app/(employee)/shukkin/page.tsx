@@ -115,7 +115,7 @@ export default function EmployeeShukkin() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-lg font-bold">出勤簿</div>
+      <div className="text-lg lg:text-2xl font-bold tracking-tight">出勤簿</div>
 
       <Card className="!p-4">
         <label className="block text-xs font-semibold text-app-sub mb-1">月</label>

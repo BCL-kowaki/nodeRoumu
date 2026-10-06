@@ -44,7 +44,7 @@ export default function WorkRoutinesPage() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-between items-center">
-        <div className="text-lg font-bold">ルーティン</div>
+        <div className="text-lg lg:text-2xl font-bold tracking-tight">ルーティン</div>
         <button
           onClick={() => setEditing("new")}
           className="px-4 py-2 rounded bg-primary text-white text-sm font-bold border-none cursor-pointer"

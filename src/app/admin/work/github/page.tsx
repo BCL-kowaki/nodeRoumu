@@ -92,7 +92,7 @@ export default function WorkGithubPage() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-lg font-bold">GitHub 連携</div>
+      <div className="text-lg lg:text-2xl font-bold tracking-tight">GitHub 連携</div>
 
       {/* 接続状態 */}
       <Card className="!p-4">

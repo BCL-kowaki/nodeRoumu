@@ -270,7 +270,7 @@ export default function AdminMeiboPage() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-between items-center">
-        <div className="text-lg font-bold">労働者名簿（管理）</div>
+        <div className="text-lg lg:text-2xl font-bold tracking-tight">労働者名簿（管理）</div>
         {canWrite && (
           <button
             onClick={startNew}

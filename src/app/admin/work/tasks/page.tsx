@@ -26,7 +26,7 @@ export default function WorkTasksPage() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-between items-center">
-        <div className="text-lg font-bold">タスク</div>
+        <div className="text-lg lg:text-2xl font-bold tracking-tight">タスク</div>
         <Link href="/admin/work/github" className="ml-auto mr-2 text-xs text-primary">GitHub 連携</Link>
         <button
           onClick={() => setEditing("new")}

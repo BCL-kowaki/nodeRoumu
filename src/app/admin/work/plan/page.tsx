@@ -82,7 +82,7 @@ export default function WorkPlanPage() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <div className="text-lg font-bold">計画・実績</div>
+        <div className="text-lg lg:text-2xl font-bold tracking-tight">計画・実績</div>
         <Link href="/admin/work/schedule" className="ml-auto mr-2 text-xs text-primary">スケジュール</Link>
         <div className="flex items-center gap-1">
           <button onClick={() => setDate(addDays(date, -1))} aria-label="前の日" className="px-2 py-1 text-sm text-primary bg-transparent border-none cursor-pointer">←</button>

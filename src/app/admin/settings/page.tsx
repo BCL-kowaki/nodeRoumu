@@ -56,7 +56,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-lg font-bold">料率設定</div>
+      <div className="text-lg lg:text-2xl font-bold tracking-tight">料率設定</div>
 
       {saved && (
         <Card className="!bg-primary-light text-center !p-3">

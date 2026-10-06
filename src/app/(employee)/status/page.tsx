@@ -74,7 +74,7 @@ export default function EmployeeStatus() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-lg font-bold">ステータス</div>
+      <div className="text-lg lg:text-2xl font-bold tracking-tight">ステータス</div>
 
       <Card>
         <div className="flex items-center gap-3 mb-4">
