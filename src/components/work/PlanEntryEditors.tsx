@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import ProjectOptions from "./ProjectOptions";
+import ProjectOptions, { TaskOptions } from "./ProjectOptions";
 import { api, entryTitle, inputClass, labelClass, type Plan, type Project, type Task, type TimeEntry } from "./types";
 
 function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
@@ -134,9 +134,7 @@ export function PlanEditor({
           <label className={labelClass} htmlFor="plan-task">タスク（任意）</label>
           <select id="plan-task" className={inputClass} value={form.taskId} onChange={(e) => pickTask(e.target.value)}>
             <option value="">（なし）</option>
-            {tasks.map((t) => (
-              <option key={t.id} value={t.id}>{t.title}</option>
-            ))}
+            <TaskOptions tasks={tasks} projects={projects} />
           </select>
         </div>
         <div>
@@ -247,9 +245,7 @@ export function EntryEditor({
           <label className={labelClass} htmlFor="entry-task">タスク（任意）</label>
           <select id="entry-task" className={inputClass} value={form.taskId} onChange={(e) => set("taskId", e.target.value)}>
             <option value="">（なし）</option>
-            {tasks.map((t) => (
-              <option key={t.id} value={t.id}>{t.title}</option>
-            ))}
+            <TaskOptions tasks={tasks} projects={projects} />
             {entry?.task && !tasks.some((t) => t.id === entry.task!.id) && (
               <option value={entry.task.id}>{entry.task.title}</option>
             )}
