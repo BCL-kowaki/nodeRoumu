@@ -6,6 +6,7 @@ import Link from "next/link";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import ProjectEditor from "@/components/work/ProjectEditor";
+import ProjectNote from "@/components/work/ProjectNote";
 import TaskEditor from "@/components/work/TaskEditor";
 import TaskRow from "@/components/work/TaskRow";
 import { api, type Project, type Task } from "@/components/work/types";
@@ -98,6 +99,8 @@ export default function WorkProjectDetailPage() {
       </Card>
 
       {error && <div className="text-sm text-danger bg-danger-light rounded p-3">{error}</div>}
+
+      <ProjectNote projectId={project.id} />
 
       <Card className="!p-4">
         <div className="flex justify-between items-center mb-1">

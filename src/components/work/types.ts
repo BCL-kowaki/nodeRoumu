@@ -124,3 +124,6 @@ export type GithubRepo = {
   syncIssues: boolean;
   lastSyncedAt: string | null;
 };
+
+export type NoteInfo = { path: string | null; content?: string; missing?: boolean };
+export type ObsidianStatus = { configured: boolean; noteCount?: number; error?: string };
