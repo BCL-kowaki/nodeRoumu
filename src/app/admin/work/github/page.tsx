@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
-import { api, type GithubRepo, type Project } from "@/components/work/types";
+import ProjectOptions from "@/components/work/ProjectOptions";
+import { api, type Client, type GithubRepo, type Project } from "@/components/work/types";
 import PageTitle from "@/components/PageTitle";
 
 type Status = { configured: boolean; login?: string; error?: string };
@@ -20,6 +21,7 @@ export default function WorkGithubPage() {
   const [status, setStatus] = useState<Status | null>(null);
   const [repos, setRepos] = useState<GithubRepo[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<"repos" | "sync" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -28,12 +30,14 @@ export default function WorkGithubPage() {
 
   const load = useCallback(async () => {
     try {
-      const [s, r, p] = await Promise.all([
+      const [s, r, p, c] = await Promise.all([
         api<Status>("/api/work/github/status"),
         api<GithubRepo[]>("/api/work/github/repos"),
         api<Project[]>("/api/work/projects"),
+        api<Client[]>("/api/work/clients"),
       ]);
       setProjects(p);
+      setClients(c);
       setStatus(s);
       setRepos(r);
     } catch (e) {
@@ -192,13 +196,10 @@ export default function WorkGithubPage() {
                   className="shrink-0 max-w-[40%] p-1.5 rounded-lg border border-app-border text-xs bg-white"
                 >
                   <option value="">プロジェクトなし</option>
-                  {projects
-                    .filter((p) => p.status === "active" || p.status === "on_hold" || p.id === r.projectId)
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
+                  <ProjectOptions
+                    projects={projects.filter((p) => p.status === "active" || p.status === "on_hold" || p.id === r.projectId)}
+                    clients={clients}
+                  />
                 </select>
                 <label className="flex items-center gap-1.5 text-xs text-app-text cursor-pointer shrink-0">
                   <input type="checkbox" checked={r.syncIssues} onChange={() => toggleSync(r)} className="w-4 h-4 accent-primary" />

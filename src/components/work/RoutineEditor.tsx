@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { todayJst } from "@/lib/date-jst";
 import { WEEKDAY_BITS, WEEKDAY_NAMES, WEEKDAY_ORDER } from "@/lib/work/recurrence";
+import ProjectOptions from "./ProjectOptions";
 import { api, inputClass, labelClass, type Client, type Project, type Routine } from "./types";
 
 const FREQUENCIES = [
@@ -224,9 +225,7 @@ export default function RoutineEditor({
               <label className={labelClass} htmlFor="routine-project">プロジェクト</label>
               <select id="routine-project" className={inputClass} value={form.projectId} onChange={(e) => changeProject(e.target.value)}>
                 <option value="">（なし）</option>
-                {selectable.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
+                <ProjectOptions projects={selectable} clients={clients} />
               </select>
             </div>
           </div>

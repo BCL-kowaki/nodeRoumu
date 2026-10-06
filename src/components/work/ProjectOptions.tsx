@@ -4,10 +4,15 @@ import { useEffect, useState } from "react";
 import { groupProjectsByClient, groupTasksForSelect } from "@/lib/work/client-groups";
 import { api, type Client, type Project, type Task } from "./types";
 
-// 編集画面を開くたびにクライアント一覧を読み込む（追加したばかりのクライアントも見出しに出るように）
-function useClients(): Client[] | null {
-  const [clients, setClients] = useState<Client[] | null>(null);
+// 編集画面を開くたびにクライアント一覧を読み込む（追加したばかりのクライアントも見出しに出るように）。
+// 呼び出し側で読み込み済みなら given を渡すと、読み込みを省く
+function useClients(given?: Client[]): Client[] | null {
+  const [clients, setClients] = useState<Client[] | null>(given ?? null);
   useEffect(() => {
+    if (given) {
+      setClients(given);
+      return;
+    }
     let alive = true;
     api<Client[]>("/api/work/clients")
       .then((c) => alive && setClients(c))
@@ -15,7 +20,7 @@ function useClients(): Client[] | null {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [given]);
   return clients;
 }
 
@@ -49,8 +54,8 @@ export function TaskOptions({ tasks, projects }: { tasks: Task[]; projects: Proj
 }
 
 // プロジェクトの選択肢を、クライアントごとの見出し（optgroup）に分けて出す。<select> の中に置いて使う
-export default function ProjectOptions({ projects }: { projects: Project[] }) {
-  const clients = useClients();
+export default function ProjectOptions({ projects, clients: given }: { projects: Project[]; clients?: Client[] }) {
+  const clients = useClients(given);
 
   // 読み込むまでは見出しなしで並べる
   if (!clients) {
