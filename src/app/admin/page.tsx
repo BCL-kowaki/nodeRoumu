@@ -153,7 +153,7 @@ export default function AdminDashboard() {
         ].map((c) => (
           <Link key={c.label} href={c.href} className="no-underline">
             <Card className="!p-4">
-              <div className="w-9 h-9 mb-2 rounded-lg bg-primary-light text-primary-dark flex items-center justify-center">
+              <div className="w-9 h-9 mb-2 rounded-lg bg-accent-light text-accent-dark flex items-center justify-center">
                 <c.icon size={18} strokeWidth={2} aria-hidden />
               </div>
               <div className="text-[11px] text-app-sub mb-1">{c.label}</div>

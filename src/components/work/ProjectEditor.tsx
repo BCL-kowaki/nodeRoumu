@@ -5,7 +5,7 @@ import { PROJECT_STATUS_LABELS } from "@/lib/work/labels";
 import { PROJECT_STATUSES } from "@/lib/work/validate";
 import { api, inputClass, labelClass, type Client, type Project } from "./types";
 
-const COLORS = ["#21977f", "#1e88e5", "#8e24aa", "#f4511e", "#fb8c00", "#6d4c41", "#546e7a"];
+const COLORS = ["#ff9800", "#1a1a1a", "#21977f", "#1e88e5", "#8e24aa", "#f4511e", "#fb8c00", "#6d4c41", "#546e7a"];
 
 // プロジェクトの作成・編集ウィンドウ。project が null なら新規作成
 export default function ProjectEditor({

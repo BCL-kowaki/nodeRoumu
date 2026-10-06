@@ -141,7 +141,7 @@ export default function ClientTimeCard({
                 {/* 上：計画、下：実績 の横棒（一番長い行を全幅とする） */}
                 <div className="mt-1 flex flex-col gap-0.5" aria-hidden>
                   <div className="h-1 rounded-full bg-work-light" style={{ width: `${(r.plannedMin / max) * 100}%` }} />
-                  <div className="h-1 rounded-full bg-work" style={{ width: `${(r.actualMin / max) * 100}%` }} />
+                  <div className="h-1 rounded-full bg-accent" style={{ width: `${(r.actualMin / max) * 100}%` }} />
                 </div>
               </div>
             );

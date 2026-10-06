@@ -9,19 +9,23 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        primary: "#21977f",
-        "primary-light": "#e6f5f2",
-        "primary-dark": "#1a7a66",
-        // 業務管理の帳簿の色（労務＝primary の緑と見分ける）
-        work: "#3b5b8c",
-        "work-light": "#eaf0f8",
-        "work-dark": "#2c4670",
+        // 配色は「黒・白・オレンジ・薄いグレー」。主役は黒、オレンジは差し色に限って使う
+        primary: "#1A1A1A",
+        "primary-light": "#F0F0F0",
+        "primary-dark": "#0D0D0D",
+        // 業務管理も同じ黒系（以前は青で労務と分けていた）
+        work: "#1A1A1A",
+        "work-light": "#EDEDED",
+        "work-dark": "#0D0D0D",
         accent: "#FF9800",
-        // 背景はわずかに緑みのあるグレー。補助の文字色は白地で読みやすいコントラスト（4.5:1 以上）にする
-        "app-bg": "#F4F6F5",
-        "app-text": "#1F2A27",
-        "app-sub": "#66726E",
-        "app-border": "#E2E8E5",
+        "accent-light": "#FFF3E0",
+        // 白地の小さな文字に使うときの濃いオレンジ（コントラスト 4.5:1 以上）
+        "accent-dark": "#B35C00",
+        // 背景は薄いグレー。補助の文字色は白地で読みやすいコントラスト（4.5:1 以上）にする
+        "app-bg": "#F4F4F4",
+        "app-text": "#1A1A1A",
+        "app-sub": "#666666",
+        "app-border": "#E5E5E5",
         danger: "#E53935",
         "danger-light": "#FFF0F0",
       },

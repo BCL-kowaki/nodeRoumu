@@ -159,7 +159,7 @@ function ProjectsAndTasks() {
         ) : (
           <span
             className="w-2 h-2 rounded-full shrink-0"
-            style={color ? { background: color } : { border: "1px solid #66726E" }}
+            style={color ? { background: color } : { border: "1px solid #666666" }}
             aria-hidden
           />
         )}

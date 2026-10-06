@@ -11,7 +11,7 @@ import { isActive, sidebarGroups, type Domain } from "./nav";
 // 緑で塗ったサイドバーの上で、帳簿ごとの区別をつける色（見出しの点と、選択中の文字色）
 const DOMAIN_STYLE: Record<Domain, { dot: string; activeText: string }> = {
   labor: { dot: "bg-white", activeText: "text-primary-dark" },
-  work: { dot: "bg-[#b9cbe6]", activeText: "text-work-dark" },
+  work: { dot: "bg-accent", activeText: "text-work-dark" },
   settings: { dot: "bg-white/50", activeText: "text-app-text" },
 };
 

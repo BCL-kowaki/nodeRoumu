@@ -223,7 +223,7 @@ export default function EmployeeDakoku() {
             className={`py-7 px-3 rounded border-2 flex flex-col items-center gap-2 transition-all ${
               b.disabled
                 ? "border-app-border bg-gray-50 cursor-not-allowed opacity-40"
-                : "border-primary bg-white cursor-pointer shadow-[0_2px_8px_rgba(33,151,127,0.12)] hover:shadow-[0_4px_16px_rgba(33,151,127,0.2)]"
+                : "border-primary bg-white cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.2)]"
             }`}
           >
             <b.icon size={36} strokeWidth={1.75} className={b.disabled ? "text-app-sub" : punchTypeInfo(b.type).color} aria-hidden />
