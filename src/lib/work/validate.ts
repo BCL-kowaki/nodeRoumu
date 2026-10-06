@@ -200,6 +200,19 @@ export function parseClientInput(body: unknown, mode: Mode): ParseResult<ClientI
   });
 }
 
+// 並び順の保存（ドラッグで入れ替えた結果）。{ ids: [先頭から順の ID] }
+const MAX_ORDER_ITEMS = 500;
+
+export function parseIdOrder(body: unknown): ParseResult<string[]> {
+  const error = { ok: false as const, error: "並び順の指定が正しくありません" };
+  if (!isRecord(body) || !Array.isArray(body.ids)) return error;
+  const ids = body.ids;
+  if (ids.length === 0 || ids.length > MAX_ORDER_ITEMS) return error;
+  if (!ids.every((id): id is string => typeof id === "string" && id.length > 0)) return error;
+  if (new Set(ids).size !== ids.length) return error;
+  return { ok: true, data: ids };
+}
+
 // "YYYY-MM-DD" / null / undefined を Prisma に渡す値に変換（undefined は「変更しない」）
 export function toDbDate(v: string | null | undefined): Date | null | undefined {
   if (v === undefined) return undefined;

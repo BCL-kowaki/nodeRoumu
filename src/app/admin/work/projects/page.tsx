@@ -9,6 +9,7 @@ import ClientEditor from "@/components/work/ClientEditor";
 import ClientTimeCard from "@/components/work/ClientTimeCard";
 import ProjectEditor from "@/components/work/ProjectEditor";
 import ProjectNote from "@/components/work/ProjectNote";
+import SortableClientList from "@/components/work/SortableClientList";
 import TaskEditor from "@/components/work/TaskEditor";
 import TaskRow from "@/components/work/TaskRow";
 import { api, type Client, type Project, type Task } from "@/components/work/types";
@@ -101,6 +102,17 @@ function ProjectsAndTasks() {
     [tasks, statuses, selected, clientOfProject]
   );
 
+  // クライアントの並びを入れ替える（画面は先に変え、保存に失敗したら読み直す）
+  const reorderClients = async (next: Client[]) => {
+    setClients(next);
+    try {
+      await api("/api/work/clients/order", { method: "PUT", body: JSON.stringify({ ids: next.map((c) => c.id) }) });
+    } catch (e) {
+      setError((e as Error).message);
+      load();
+    }
+  };
+
   const toggle = async (task: Task) => {
     const next = task.status === "done" ? "todo" : "done";
     setTasks((ts) => ts.map((t) => (t.id === task.id ? { ...t, status: next } : t)));
@@ -136,7 +148,7 @@ function ProjectsAndTasks() {
         type="button"
         onClick={() => select(s)}
         aria-current={active ? "true" : undefined}
-        className={`w-full flex items-center gap-2 h-9 ${kind === "project" ? "pl-7 pr-3" : "px-3"} rounded-lg text-sm text-left border-none cursor-pointer ${
+        className={`w-full flex items-center gap-2 h-9 ${kind === "project" ? "pl-7 pr-3" : "px-3"} rounded-lg text-sm text-left border-none cursor-pointer outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${
           active
             ? "bg-work-light text-work-dark font-bold"
             : `bg-transparent hover:bg-app-bg ${kind === "client" ? "text-app-text font-semibold" : "text-app-text"}`
@@ -208,12 +220,16 @@ function ProjectsAndTasks() {
           <div className="text-[11px] font-bold tracking-[0.12em] text-app-sub px-2 mb-1">クライアント・プロジェクト</div>
           <div className="flex flex-col gap-0.5">
             {navItem("all", "すべて")}
-            {clients.map((c) => (
-              <div key={c.id} className="flex flex-col gap-0.5 mt-1">
-                {navItem(CLIENT_PREFIX + c.id, c.name, null, "client")}
-                {projectsOf(c.id).map((p) => navItem(p.id, p.name, p.color || "#888888", "project"))}
-              </div>
-            ))}
+            <SortableClientList
+              clients={clients}
+              onReorder={reorderClients}
+              renderClient={(c) => (
+                <>
+                  {navItem(CLIENT_PREFIX + c.id, c.name, null, "client")}
+                  {projectsOf(c.id).map((p) => navItem(p.id, p.name, p.color || "#888888", "project"))}
+                </>
+              )}
+            />
             <div className="mt-1">{navItem("none", "未分類のタスク")}</div>
           </div>
           <div className="border-t border-app-border mt-2 pt-2 flex flex-col gap-1">

@@ -3,6 +3,7 @@ import {
   completedAtFor,
   parsePlanInput,
   parseClientInput,
+  parseIdOrder,
   parseProjectInput,
   parseRoutineCheckInput,
   parseRoutineInput,
@@ -273,5 +274,23 @@ describe("parseTimeEntryInput（実績の手入力）", () => {
   });
   it("更新でメモだけ送ったとき、その項目だけを返す", () => {
     expect(parseTimeEntryInput({ note: "" }, "update")).toEqual({ ok: true, data: { note: null } });
+  });
+});
+
+describe("parseIdOrder（並び順の保存）", () => {
+  it("ID の配列のとき、その順のまま返す", () => {
+    expect(parseIdOrder({ ids: ["c2", "c1", "c3"] })).toEqual({ ok: true, data: ["c2", "c1", "c3"] });
+  });
+
+  it.each([
+    ["ids が無い", {}],
+    ["配列でない", { ids: "c1" }],
+    ["空の配列", { ids: [] }],
+    ["文字列でない要素がある", { ids: ["c1", 2] }],
+    ["空文字がある", { ids: ["c1", ""] }],
+    ["同じ ID が重なっている", { ids: ["c1", "c1"] }],
+    ["多すぎる", { ids: Array.from({ length: 501 }, (_, i) => `c${i}`) }],
+  ])("%s のとき、エラーを返す", (_name, body) => {
+    expect(parseIdOrder(body)).toEqual({ ok: false, error: "並び順の指定が正しくありません" });
   });
 });
