@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { gcalConfig, getConnection } from "@/lib/google-calendar";
+import { hasDriveScope } from "@/lib/work/attachments";
 import { requireWorkspace } from "@/lib/work/auth";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ export async function GET() {
     status: acc?.status ?? null, // "active" | "needs_reconnect"
     email: acc?.accountEmail ?? null,
     calendarCreated: !!acc?.calendarId,
+    driveGranted: hasDriveScope(acc?.scopes), // 添付資料用のドライブの権限があるか（無ければ接続し直しが必要）
     lastSyncedAt: acc?.lastSyncedAt ?? null,
   });
 }

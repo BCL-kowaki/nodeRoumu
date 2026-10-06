@@ -19,6 +19,7 @@ type GStatus = {
   status: "active" | "needs_reconnect" | null;
   email: string | null;
   calendarCreated: boolean;
+  driveGranted: boolean;
   lastSyncedAt: string | null;
 };
 type DayEvent = { id: string; title: string; date: string; allDay: boolean; startTime: string | null; endTime: string | null; htmlLink?: string };
@@ -126,7 +127,8 @@ function SchedulePage() {
           <div className="flex flex-col gap-2">
             <div className="text-sm text-app-text">Google カレンダーに接続すると、予定の表示と、計画の書き出しができます。</div>
             <div className="text-[11px] text-app-sub leading-relaxed">
-              求める権限は「アプリが作る専用カレンダーの管理」と「既存の予定の読み取り（書き換えは不可）」だけです。
+              求める権限は「アプリが作る専用カレンダーの管理」「既存の予定の読み取り（書き換えは不可）」と、
+              タスクの添付資料用の「アプリが作ったドライブのファイルの管理（ほかのファイルは見えません）」だけです。
             </div>
             {!gs.encryptionConfigured && (
               <div className="text-xs text-danger">暗号化の鍵（WORKSPACE_ENCRYPTION_KEY）が未設定のため、まだ接続できません。</div>
@@ -148,6 +150,12 @@ function SchedulePage() {
             <button onClick={disconnect} disabled={busy} className="ml-auto text-[11px] text-app-sub bg-transparent border-none cursor-pointer p-0">
               接続を解除
             </button>
+            {gs.status === "active" && !gs.driveGranted && (
+              <div className="w-full mt-1 text-xs text-app-text bg-accent-light rounded p-2.5 leading-relaxed">
+                タスクに資料を添付するには、Google ドライブの権限を追加するため一度接続し直してください（カレンダーの設定はそのまま残ります）。
+                <a href="/api/work/google/auth" className="ml-1 font-bold text-accent-dark">接続し直す</a>
+              </div>
+            )}
           </div>
         )}
       </Card>

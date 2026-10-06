@@ -15,6 +15,7 @@ export type Task = {
   githubIssueNumber?: number | null;
   githubHtmlUrl?: string | null;
   githubRepo?: { fullName: string } | null;
+  attachmentCount?: number;
 };
 
 export type Client = {

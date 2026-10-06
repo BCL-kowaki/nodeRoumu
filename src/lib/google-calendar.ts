@@ -1,10 +1,12 @@
 // Google カレンダー API の呼び出し（サーバー専用）
 // - 求める権限は最小限: calendar.app.created（アプリが作る専用カレンダーの作成・管理）と
 //   calendar.events.readonly（既存の予定の読み取りだけ）。既存の予定は書き換えられない。
+//   タスクの添付資料用に drive.file（アプリが作ったファイルだけ扱える）も一緒にもらう。
 // - 更新用トークンは暗号化してDBに保存し、アクセストークン（約1時間）は保存せず都度取得する。
 import { prisma } from "@/lib/prisma";
 import { decrypt, encrypt } from "@/lib/crypto";
 import { getGoogleLoginConfig, pkceChallenge } from "@/lib/google-login";
+import { DRIVE_FILE_SCOPE } from "@/lib/work/attachments";
 import {
   PLAN_CALENDAR_NAME,
   calendarRange,
@@ -29,6 +31,7 @@ export const GCAL_SCOPES = [
   "email",
   "https://www.googleapis.com/auth/calendar.app.created",
   "https://www.googleapis.com/auth/calendar.events.readonly",
+  DRIVE_FILE_SCOPE,
 ];
 
 export class GcalError extends Error {

@@ -40,9 +40,10 @@ export async function GET(req: NextRequest) {
     include: {
       project: { select: { id: true, name: true, color: true } },
       githubRepo: { select: { fullName: true } },
+      _count: { select: { attachments: true } },
     },
   });
-  return NextResponse.json(tasks);
+  return NextResponse.json(tasks.map(({ _count, ...t }) => ({ ...t, attachmentCount: _count.attachments })));
 }
 
 // タスク作成

@@ -1,5 +1,6 @@
 "use client";
 
+import { Paperclip } from "lucide-react";
 import Badge from "@/components/Badge";
 import { todayJst } from "@/lib/date-jst";
 import { PRIORITY_LABELS, TASK_STATUS_LABELS, dueLabel, formatMinutes } from "@/lib/work/labels";
@@ -53,6 +54,12 @@ export default function TaskRow({
           {due && <Badge type={due.tone}>{due.text}</Badge>}
           {task.plannedMinutes !== null && (
             <span className="text-[11px] text-app-sub">予定 {formatMinutes(task.plannedMinutes)}</span>
+          )}
+          {!!task.attachmentCount && (
+            <span className="inline-flex items-center gap-0.5 text-[11px] text-app-sub" title={`添付資料 ${task.attachmentCount}件`}>
+              <Paperclip size={11} aria-hidden />
+              {task.attachmentCount}
+            </span>
           )}
           {showProject && task.project && (
             <span className="inline-flex items-center gap-1 text-[11px] text-app-sub">

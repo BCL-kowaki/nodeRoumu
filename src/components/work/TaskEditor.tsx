@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PRIORITY_LABELS, TASK_STATUS_LABELS } from "@/lib/work/labels";
 import { TASK_STATUSES } from "@/lib/work/validate";
+import TaskAttachments from "./TaskAttachments";
 import { api, inputClass, labelClass, type Project, type Task } from "./types";
 
 type Form = {
@@ -173,6 +174,13 @@ export default function TaskEditor({
               onChange={(e) => set("description", e.target.value)}
             />
           </div>
+
+          {/* 添付資料は、保存済みのタスクにだけ付けられる（新規作成では先に保存する） */}
+          {task ? (
+            <TaskAttachments taskId={task.id} />
+          ) : (
+            <div className="text-[11px] text-app-sub">添付資料は、タスクを保存したあとに付けられます</div>
+          )}
 
           {error && <div className="text-sm text-danger bg-danger-light rounded p-3 text-center">{error}</div>}
 

@@ -42,6 +42,7 @@ model Employee {
   // 業務管理（代表者のみ利用）
   workProjects        WorkProject[]
   workClients         WorkClient[]
+  taskAttachments     TaskAttachment[]
   workTasks           WorkTask[]
   routines            Routine[]
   workPlans           WorkPlan[]
@@ -219,6 +220,26 @@ model WorkProject {
   @@index([clientId])
 }
 
+// タスクの添付資料。ファイル本体は代表者の Google ドライブにあり、ここには一覧表示用の情報だけを持つ
+model TaskAttachment {
+  id          String   @id @default(cuid())
+  ownerId     String
+  taskId      String
+  driveFileId String
+  name        String
+  mimeType    String
+  size        Int
+  webViewLink String   @db.Text
+  createdAt   DateTime @default(now())
+
+  owner Employee @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  // タスクを削除したら一覧からも消す（ドライブのファイルは残る）
+  task  WorkTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, driveFileId])
+  @@index([taskId])
+}
+
 model WorkTask {
   id                String    @id @default(cuid())
   ownerId           String
@@ -240,12 +261,13 @@ model WorkTask {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  owner      Employee     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  owner       Employee         @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   // プロジェクトを削除してもタスクは残し、プロジェクト未設定に戻す
-  project    WorkProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  githubRepo GithubRepo?  @relation(fields: [githubRepoId], references: [id], onDelete: SetNull)
-  plans      WorkPlan[]
-  entries    TimeEntry[]
+  project     WorkProject?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  githubRepo  GithubRepo?      @relation(fields: [githubRepoId], references: [id], onDelete: SetNull)
+  plans       WorkPlan[]
+  entries     TimeEntry[]
+  attachments TaskAttachment[]
 
   // 同じ Issue を二重に取り込まない（手入力のタスクは列が NULL なので重複扱いにならない）
   @@unique([ownerId, githubRepoId, githubIssueNumber])
@@ -387,6 +409,7 @@ model IntegrationAccount {
   accessTokenExpiresAt  DateTime?
   scopes                String?
   calendarId            String? // 書き出し先の専用カレンダー「業務計画」（未作成は NULL）
+  driveFolderId         String? // 添付資料を入れる Google ドライブのフォルダ（未作成は NULL）
   status                String    @default("active") // "active" | "needs_reconnect"
   lastSyncedAt          DateTime?
   createdAt             DateTime  @default(now())
