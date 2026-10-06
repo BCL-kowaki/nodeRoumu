@@ -1,0 +1,470 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { entryMinutes } from "@/lib/work/time";
+import {
+  DAY_END,
+  entryInterval,
+  layoutColumns,
+  minutesToTime,
+  moveStart,
+  resizeDuration,
+  timeToMinutes,
+  yToStart,
+} from "@/lib/work/timeline";
+import { formatMinutes } from "@/lib/work/labels";
+import { entryTitle, type Plan, type Project, type Task, type TimeEntry } from "./types";
+
+export type DayGoogleEvent = { id: string; title: string; allDay: boolean; startTime: string | null; endTime: string | null };
+
+const HOUR_PX = 56;
+const PX_PER_MIN = HOUR_PX / 60;
+const DEFAULT_TASK_MINUTES = 60;
+
+type DragData =
+  | { kind: "task"; task: Task; duration: number }
+  | { kind: "unscheduled"; plan: Plan; duration: number }
+  | { kind: "plan"; plan: Plan; start: number; duration: number }
+  | { kind: "resize"; plan: Plan; start: number; duration: number };
+
+// ===== 左側：置けるタスク（ドラッグ元） =====
+function DraggableTask({ task, projects }: { task: Task; projects: Project[] }) {
+  const duration = task.plannedMinutes ?? DEFAULT_TASK_MINUTES;
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `task:${task.id}`,
+    data: { kind: "task", task, duration } satisfies DragData,
+  });
+  const color = projects.find((p) => p.id === task.projectId)?.color ?? "#9AA6A2";
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      aria-label={`「${task.title}」をタイムラインにドラッグして置く`}
+      className={`shrink-0 w-56 lg:w-auto flex items-stretch rounded-lg border border-app-border bg-white cursor-grab active:cursor-grabbing select-none touch-manipulation ${
+        isDragging ? "opacity-40" : ""
+      }`}
+    >
+      <span className="w-1 rounded-l-lg shrink-0" style={{ background: color }} aria-hidden />
+      <div className="flex-1 min-w-0 px-3 py-2">
+        <div className="text-sm font-semibold text-app-text truncate">{task.title}</div>
+        <div className="text-[11px] text-app-sub">{formatMinutes(duration)}{task.plannedMinutes == null ? "（仮）" : ""}</div>
+      </div>
+    </div>
+  );
+}
+
+function DraggableUnscheduled({ plan }: { plan: Plan }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `unscheduled:${plan.id}`,
+    data: { kind: "unscheduled", plan, duration: plan.plannedMinutes } satisfies DragData,
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      aria-label={`「${plan.title}」をタイムラインにドラッグして時刻を決める`}
+      className={`shrink-0 w-56 lg:w-auto rounded-lg border border-dashed border-work bg-work-light px-3 py-2 cursor-grab active:cursor-grabbing select-none touch-manipulation ${
+        isDragging ? "opacity-40" : ""
+      }`}
+    >
+      <div className="text-sm font-semibold text-work-dark truncate">{plan.title}</div>
+      <div className="text-[11px] text-app-sub">時刻未定・{formatMinutes(plan.plannedMinutes)}</div>
+    </div>
+  );
+}
+
+// ===== 計画のブロック（動かす・下端で伸ばす・押して編集） =====
+function PlanBlock({
+  plan,
+  start,
+  duration,
+  col,
+  cols,
+  color,
+  onOpen,
+  preview,
+}: {
+  plan: Plan;
+  start: number;
+  duration: number;
+  col: number;
+  cols: number;
+  color: string;
+  onOpen: (p: Plan) => void;
+  preview: { start: number; duration: number } | null;
+}) {
+  const move = useDraggable({ id: `plan:${plan.id}`, data: { kind: "plan", plan, start, duration } satisfies DragData });
+  const resize = useDraggable({ id: `resize:${plan.id}`, data: { kind: "resize", plan, start, duration } satisfies DragData });
+  // ドラッグ中は、15分単位に寄せた位置・長さで表示する
+  const s = preview?.start ?? start;
+  const d = preview?.duration ?? duration;
+  const top = s * PX_PER_MIN;
+  const height = Math.max(d * PX_PER_MIN, 18);
+  return (
+    <div
+      ref={move.setNodeRef}
+      className={`absolute rounded-lg border bg-work-light border-work/30 overflow-hidden select-none touch-manipulation ${
+        preview ? "shadow-lg z-20 ring-2 ring-work" : "z-10"
+      }`}
+      style={{ top, height, left: `calc(${(col / cols) * 100}% + 2px)`, width: `calc(${100 / cols}% - 4px)` }}
+    >
+      <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: color }} aria-hidden />
+      <button
+        type="button"
+        {...move.listeners}
+        {...move.attributes}
+        onClick={() => onOpen(plan)}
+        aria-label={`計画「${plan.title}」${minutesToTime(s)}〜${minutesToTime(s + d)}。ドラッグで時刻を変更、押すと編集`}
+        className="block w-full h-full text-left pl-2.5 pr-1.5 pt-1 bg-transparent border-none cursor-grab active:cursor-grabbing"
+      >
+        <div className="text-[12px] font-bold text-work-dark leading-tight truncate">{plan.title}</div>
+        {height >= 34 && (
+          <div className="text-[10px] text-app-sub tabular-nums">
+            {minutesToTime(s)}〜{minutesToTime(s + d)}
+          </div>
+        )}
+      </button>
+      <div
+        ref={resize.setNodeRef}
+        {...resize.listeners}
+        {...resize.attributes}
+        aria-label={`計画「${plan.title}」の長さを変える`}
+        className="absolute left-0 right-0 bottom-0 h-2 cursor-ns-resize flex justify-center items-end pb-0.5"
+      >
+        <span className="w-6 h-[3px] rounded-full bg-work/40" aria-hidden />
+      </div>
+    </div>
+  );
+}
+
+// ===== 計画の列（ドロップ先） =====
+function PlanLane({ children, laneRef }: { children: React.ReactNode; laneRef: React.MutableRefObject<HTMLDivElement | null> }) {
+  const { setNodeRef, isOver } = useDroppable({ id: "plan-lane" });
+  return (
+    <div
+      ref={(el) => {
+        setNodeRef(el);
+        laneRef.current = el;
+      }}
+      className={`relative border-x border-app-border ${isOver ? "bg-work-light/40" : ""}`}
+      style={{ height: DAY_END * PX_PER_MIN }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ===== 本体 =====
+export default function DayTimeline({
+  date,
+  isToday,
+  tasks,
+  projects,
+  plans,
+  entries,
+  googleEvents,
+  onCreatePlan,
+  onUpdatePlan,
+  onOpenPlan,
+  onOpenEntry,
+}: {
+  date: string;
+  isToday: boolean;
+  tasks: Task[];
+  projects: Project[];
+  plans: Plan[];
+  entries: TimeEntry[];
+  googleEvents: DayGoogleEvent[];
+  onCreatePlan: (task: Task, startTime: string, minutes: number) => void;
+  onUpdatePlan: (plan: Plan, patch: { startTime?: string; plannedMinutes?: number }) => void;
+  onOpenPlan: (plan: Plan) => void;
+  onOpenEntry: (entry: TimeEntry) => void;
+}) {
+  const sensors = useSensors(
+    // マウス：4px 動かしたらドラッグ開始（それ未満はクリック＝編集）
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    // スマホ：長押し（0.25秒）でドラッグ開始。画面のスクロールとぶつからないようにする
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } })
+  );
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const laneRef = useRef<HTMLDivElement | null>(null);
+  const [active, setActive] = useState<DragData | null>(null);
+  const [preview, setPreview] = useState<{ id: string; start: number; duration: number } | null>(null);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  // 最初の表示位置：今日は現在時刻の1時間前、それ以外は 8:00
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const jst = new Date(now.getTime() + 9 * 3600_000);
+    const nowMin = jst.getUTCHours() * 60 + jst.getUTCMinutes();
+    el.scrollTop = Math.max(0, ((isToday ? nowMin - 60 : 8 * 60) * PX_PER_MIN));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date]);
+
+  const timed = plans.filter((p) => p.startTime);
+  const unscheduled = plans.filter((p) => !p.startTime);
+  const projectColor = (id: string | null) => projects.find((p) => p.id === id)?.color ?? "#9AA6A2";
+
+  const planLayout = useMemo(
+    () =>
+      layoutColumns(
+        timed.map((p) => {
+          const s = timeToMinutes(p.startTime!);
+          return { id: p.id, start: s, end: Math.min(DAY_END, s + p.plannedMinutes) };
+        })
+      ),
+    [timed]
+  );
+  const googleTimed = googleEvents.filter((e) => !e.allDay && e.startTime && e.endTime);
+  const googleLayout = useMemo(
+    () =>
+      layoutColumns(
+        googleTimed.map((e) => {
+          const s = timeToMinutes(e.startTime!);
+          const end = timeToMinutes(e.endTime!) || DAY_END; // 24:00 終わりは 00:00 で返る
+          return { id: e.id, start: s, end: Math.max(end, s + 15) };
+        })
+      ),
+    [googleTimed]
+  );
+  const actuals = entries
+    .map((e) => ({ e, iv: entryInterval(date, e.startedAt, e.endedAt, now) }))
+    .filter((x): x is { e: TimeEntry; iv: { start: number; end: number } } => x.iv !== null);
+  const untimedEntries = entries.filter((e) => !e.startedAt);
+
+  // ドロップ位置（ドラッグ中のカードの上端）→ 計画の列の上端からの距離（px）
+  const dropY = (ev: { active: DragEndEvent["active"] }) => {
+    const rect = ev.active.rect.current.translated;
+    const lane = laneRef.current?.getBoundingClientRect();
+    if (!rect || !lane) return null;
+    return rect.top - lane.top;
+  };
+
+  const onDragStart = (ev: DragStartEvent) => setActive(ev.active.data.current as DragData);
+
+  const onDragMove = (ev: { active: DragEndEvent["active"]; delta: { y: number } }) => {
+    const d = ev.active.data.current as DragData;
+    if (d.kind === "plan") setPreview({ id: d.plan.id, start: moveStart(d.start, ev.delta.y, PX_PER_MIN, d.duration), duration: d.duration });
+    else if (d.kind === "resize") setPreview({ id: d.plan.id, start: d.start, duration: resizeDuration(d.start, d.duration, ev.delta.y, PX_PER_MIN) });
+  };
+
+  const onDragEnd = (ev: DragEndEvent) => {
+    const d = ev.active.data.current as DragData;
+    setActive(null);
+    setPreview(null);
+    if (d.kind === "plan") {
+      const start = moveStart(d.start, ev.delta.y, PX_PER_MIN, d.duration);
+      if (start !== d.start) onUpdatePlan(d.plan, { startTime: minutesToTime(start) });
+      return;
+    }
+    if (d.kind === "resize") {
+      const minutes = resizeDuration(d.start, d.duration, ev.delta.y, PX_PER_MIN);
+      if (minutes !== d.duration) onUpdatePlan(d.plan, { plannedMinutes: minutes });
+      return;
+    }
+    // タスク・時刻未定の計画は、計画の列の上に落としたときだけ置く
+    if (ev.over?.id !== "plan-lane") return;
+    const y = dropY(ev);
+    if (y === null) return;
+    const start = yToStart(y, PX_PER_MIN, d.duration);
+    if (d.kind === "task") onCreatePlan(d.task, minutesToTime(start), d.duration);
+    else onUpdatePlan(d.plan, { startTime: minutesToTime(start) });
+  };
+
+  const jstNow = new Date(now.getTime() + 9 * 3600_000);
+  const nowMin = jstNow.getUTCHours() * 60 + jstNow.getUTCMinutes();
+  const allDay = googleEvents.filter((e) => e.allDay);
+
+  return (
+    <DndContext
+      sensors={sensors}
+      onDragStart={onDragStart}
+      onDragMove={onDragMove}
+      onDragEnd={onDragEnd}
+      onDragCancel={() => {
+        setActive(null);
+        setPreview(null);
+      }}
+    >
+      <div className="lg:grid lg:grid-cols-[260px_1fr] lg:gap-6 lg:items-start">
+        {/* ドラッグ元：未完了のタスク・時刻未定の計画 */}
+        <div className="bg-white rounded-2xl border border-app-border p-3 mb-3 lg:mb-0 lg:sticky lg:top-6">
+          <div className="text-[11px] font-bold tracking-[0.12em] text-app-sub mb-2">
+            未完了のタスク <span className="font-normal tracking-normal">（右の「計画」にドラッグ）</span>
+          </div>
+          <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible lg:max-h-[60vh] lg:overflow-y-auto pb-1">
+            {unscheduled.map((p) => (
+              <DraggableUnscheduled key={p.id} plan={p} />
+            ))}
+            {tasks.length === 0 && unscheduled.length === 0 ? (
+              <div className="text-xs text-app-sub py-2">未完了のタスクはありません</div>
+            ) : (
+              tasks.map((t) => <DraggableTask key={t.id} task={t} projects={projects} />)
+            )}
+          </div>
+          <div className="text-[10px] text-app-sub mt-2 hidden lg:block">予定時間が未設定のタスクは60分で置きます。置いたあと下端を引いて調整できます。</div>
+          <div className="text-[10px] text-app-sub mt-1 lg:hidden">スマホは長押ししてからドラッグします。</div>
+        </div>
+
+        {/* タイムライン */}
+        <div className="bg-white rounded-2xl border border-app-border overflow-hidden min-w-0">
+          {allDay.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 px-3 py-2 border-b border-app-border">
+              <span className="text-[10px] text-app-sub self-center">終日</span>
+              {allDay.map((e, i) => (
+                <span key={`${e.id}-${i}`} className="text-[11px] px-2 py-0.5 rounded bg-app-bg text-app-text">
+                  {e.title}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="grid grid-cols-[44px_minmax(0,22%)_1fr_minmax(0,18%)] text-[10px] font-bold text-app-sub border-b border-app-border">
+            <div />
+            <div className="px-2 py-1.5">予定（Google）</div>
+            <div className="px-2 py-1.5 border-x border-app-border text-work-dark">計画</div>
+            <div className="px-2 py-1.5">実績</div>
+          </div>
+          <div ref={scrollRef} className="relative overflow-y-auto" style={{ height: "min(70vh, 720px)" }}>
+            <div className="grid grid-cols-[44px_minmax(0,22%)_1fr_minmax(0,18%)] relative">
+              {/* 時刻の目盛り */}
+              <div className="relative" style={{ height: DAY_END * PX_PER_MIN }}>
+                {Array.from({ length: 24 }, (_, h) => (
+                  <div key={h} className="absolute right-1.5 text-[10px] text-app-sub tabular-nums -translate-y-1/2" style={{ top: h * HOUR_PX }}>
+                    {h === 0 ? "" : `${h}:00`}
+                  </div>
+                ))}
+              </div>
+
+              {/* Google の予定（読み取り専用） */}
+              <div className="relative" style={{ height: DAY_END * PX_PER_MIN }}>
+                {googleTimed.map((e) => {
+                  const s = timeToMinutes(e.startTime!);
+                  const end = timeToMinutes(e.endTime!) || DAY_END;
+                  const lay = googleLayout[e.id] ?? { col: 0, cols: 1 };
+                  return (
+                    <div
+                      key={e.id}
+                      className="absolute rounded-md bg-app-bg border border-app-border px-1.5 py-0.5 overflow-hidden"
+                      style={{
+                        top: s * PX_PER_MIN,
+                        height: Math.max((Math.max(end, s + 15) - s) * PX_PER_MIN, 16),
+                        left: `calc(${(lay.col / lay.cols) * 100}% + 2px)`,
+                        width: `calc(${100 / lay.cols}% - 4px)`,
+                      }}
+                      title={`${e.title}（${e.startTime}〜${e.endTime}）`}
+                    >
+                      <div className="text-[11px] text-app-text truncate">{e.title}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 計画（ドロップ先） */}
+              <PlanLane laneRef={laneRef}>
+                {timed.map((p) => {
+                  const lay = planLayout[p.id] ?? { col: 0, cols: 1 };
+                  return (
+                    <PlanBlock
+                      key={p.id}
+                      plan={p}
+                      start={timeToMinutes(p.startTime!)}
+                      duration={p.plannedMinutes}
+                      col={lay.col}
+                      cols={lay.cols}
+                      color={projectColor(p.projectId)}
+                      onOpen={onOpenPlan}
+                      preview={preview?.id === p.id ? preview : null}
+                    />
+                  );
+                })}
+              </PlanLane>
+
+              {/* 実績（タイマー） */}
+              <div className="relative" style={{ height: DAY_END * PX_PER_MIN }}>
+                {actuals.map(({ e, iv }) => (
+                  <button
+                    key={e.id}
+                    type="button"
+                    onClick={() => onOpenEntry(e)}
+                    title={`${entryTitle(e)}（${minutesToTime(iv.start)}〜${minutesToTime(iv.end)}）`}
+                    className={`absolute left-1 right-1 rounded-md border-none px-1.5 py-0.5 text-left overflow-hidden cursor-pointer ${
+                      e.endedAt ? "bg-primary/80" : "bg-danger/80"
+                    }`}
+                    style={{ top: iv.start * PX_PER_MIN, height: Math.max((iv.end - iv.start) * PX_PER_MIN, 6) }}
+                  >
+                    <span className="text-[10px] text-white font-semibold truncate block">{entryTitle(e)}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* 時刻の横線 */}
+              <div className="pointer-events-none absolute inset-0">
+                {Array.from({ length: 24 }, (_, h) => (
+                  <div key={h} className="absolute left-[44px] right-0 border-t border-app-border/70" style={{ top: h * HOUR_PX }} />
+                ))}
+                {isToday && (
+                  <div className="absolute left-[44px] right-0 z-30" style={{ top: nowMin * PX_PER_MIN }}>
+                    <div className="relative border-t-2 border-danger">
+                      <span className="absolute -left-1.5 -top-[5px] w-2 h-2 rounded-full bg-danger" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          {untimedEntries.length > 0 && (
+            <div className="border-t border-app-border px-3 py-2">
+              <div className="text-[10px] font-bold text-app-sub mb-1">時刻なしの実績（手入力）</div>
+              {untimedEntries.map((e) => (
+                <button
+                  key={e.id}
+                  type="button"
+                  onClick={() => onOpenEntry(e)}
+                  className="w-full flex justify-between py-1 text-sm text-app-text bg-transparent border-none cursor-pointer text-left"
+                >
+                  <span className="truncate">{entryTitle(e)}</span>
+                  <span className="text-app-sub tabular-nums">{formatMinutes(entryMinutes(e, now))}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ドラッグ中に指の下に表示する見た目 */}
+      <DragOverlay dropAnimation={null}>
+        {active && (active.kind === "task" || active.kind === "unscheduled") ? (
+          <div
+            className="rounded-lg bg-work-light border-2 border-work px-3 py-1.5 shadow-xl w-48"
+            style={{ height: Math.max(active.duration * PX_PER_MIN, 28) }}
+          >
+            <div className="text-[12px] font-bold text-work-dark truncate">
+              {active.kind === "task" ? active.task.title : active.plan.title}
+            </div>
+            <div className="text-[10px] text-app-sub">{formatMinutes(active.duration)}</div>
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
+  );
+}
