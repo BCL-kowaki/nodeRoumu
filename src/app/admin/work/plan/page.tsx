@@ -198,6 +198,7 @@ export default function WorkPlanPage() {
             onCreatePlan={createPlan}
             onImportEvents={importEvents}
             onOpenTask={setEditingTask}
+            timer={{ runningFor: timer.runningFor, start: timer.start, stop: timer.stop, busy: timer.busy }}
             onUpdatePlan={updatePlan}
             onOpenPlan={setEditingPlan}
             onOpenEntry={setEditingEntry}

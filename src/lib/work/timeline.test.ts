@@ -84,6 +84,9 @@ describe("entryInterval（タイマーの実績を、その日の時間帯に直
   it("開始・終了を日本時間の分数にする", () => {
     expect(entryInterval("2026-10-07", "2026-10-07T00:30:00Z", "2026-10-07T01:15:00Z", now)).toEqual({ start: 570, end: 615 });
   });
+  it("計測中で、画面の「今」より後に開始したばかりのときも、最低1分の長さで表示する", () => {
+    expect(entryInterval("2026-10-07", "2026-10-07T05:00:30Z", null, now)).toEqual({ start: 840, end: 841 });
+  });
   it("計測中は現在時刻までにする", () => {
     expect(entryInterval("2026-10-07", "2026-10-07T04:00:00Z", null, now)).toEqual({ start: 780, end: 840 });
   });

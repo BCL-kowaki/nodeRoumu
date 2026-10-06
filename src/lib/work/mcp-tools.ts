@@ -252,7 +252,7 @@ export function buildMcpServer(ctx: McpContext, onWrite?: (tool: string) => void
             "/api/work/routines"
           ),
           call<{ days: { items: { routineId: string; status: string | null }[] }[] }>(checksApi.GET, `/api/work/routines/checks?${q}`),
-          call<EntryRow | null>(timerApi.GET, "/api/work/timer"),
+          call<EntryRow[]>(timerApi.GET, "/api/work/timer"),
           call<{ connected: boolean; status: string | null }>(googleStatusApi.GET, "/api/work/google/status"),
         ]);
         const events =
@@ -265,7 +265,7 @@ export function buildMcpServer(ctx: McpContext, onWrite?: (tool: string) => void
           summary: summary.days[0] ? { plannedMin: summary.days[0].plannedMin, actualMin: summary.days[0].actualMin } : null,
           plans: plans.map(slimPlan),
           entries: entries.map(slimEntry),
-          runningTimer: timer ? slimEntry(timer) : null,
+          runningTimers: timer.map(slimEntry),
           routines: (checks.days[0]?.items ?? []).map((i) => {
             const r = routines.find((x) => x.id === i.routineId);
             return { routineId: i.routineId, title: r?.title, client: r?.client?.name, plannedMinutes: r?.plannedMinutes, status: i.status };
@@ -402,7 +402,8 @@ export function buildMcpServer(ctx: McpContext, onWrite?: (tool: string) => void
     "start_timer",
     {
       title: "タイマーを開始",
-      description: "作業時間の計測を始める。計測中のタイマーは自動で止まる（計測中は常に1件）。",
+      description:
+        "作業時間の計測を始める。複数のタイマーを同時に動かせる（並行作業）。同じタスク・ルーティン・計画がすでに計測中なら、そのタイマーを返す。",
       inputSchema: {
         taskId: z.string().optional(),
         projectId: z.string().optional(),
@@ -414,18 +415,35 @@ export function buildMcpServer(ctx: McpContext, onWrite?: (tool: string) => void
     },
     (args) =>
       run(async () => {
-        const r = await call<EntryRow | { stopped: number } | null>(timerApi.POST, "/api/work/timer", { method: "POST", body: { action: "start", ...args } });
-        return r && "id" in r ? slimEntry(r) : r;
+        return slimEntry(await call<EntryRow>(timerApi.POST, "/api/work/timer", { method: "POST", body: { action: "start", ...args } }));
       })
   );
 
   register(
     "stop_timer",
-    { title: "タイマーを止める", description: "計測中のタイマーを止めて、実績として確定する。", annotations: write },
-    () =>
+    {
+      title: "タイマーを止める",
+      description:
+        "計測中のタイマーを止めて、実績として確定する。entryId（get_day の runningTimers の id）か taskId で1件を指定する。どちらも無ければ計測中をすべて止める。",
+      inputSchema: {
+        entryId: z.string().optional().describe("止めるタイマー（実績）のID"),
+        taskId: z.string().optional().describe("このタスクで計測中のタイマーを止める"),
+      },
+      annotations: write,
+    },
+    ({ entryId, taskId }) =>
       run(async () => {
-        const r = await call<EntryRow | { stopped: number } | null>(timerApi.POST, "/api/work/timer", { method: "POST", body: { action: "stop" } });
-        return r && "id" in r ? slimEntry(r) : r;
+        let target = entryId;
+        if (!target && taskId) {
+          const running = await call<EntryRow[]>(timerApi.GET, "/api/work/timer");
+          target = running.find((r) => r.taskId === taskId)?.id;
+          if (!target) throw new ToolError("そのタスクで計測中のタイマーはありません");
+        }
+        const r = await call<EntryRow>(timerApi.POST, "/api/work/timer", {
+          method: "POST",
+          body: { action: "stop", ...(target ? { entryId: target } : {}) },
+        });
+        return slimEntry(r);
       })
   );
 

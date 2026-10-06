@@ -104,7 +104,7 @@ export default function WorkTodayPage() {
                 {g.title}（{g.items.length}）
               </div>
               {g.items.map((t) => (
-                <TaskRow key={t.id} task={t} {...rowProps} running={timer.running?.taskId === t.id} />
+                <TaskRow key={t.id} task={t} {...rowProps} running={!!timer.runningFor({ taskId: t.id })} />
               ))}
             </Card>
           ))

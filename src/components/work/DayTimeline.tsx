@@ -13,7 +13,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { entryMinutes } from "@/lib/work/time";
+import { entryMinutes, formatElapsed } from "@/lib/work/time";
 import {
   DAY_END,
   entryInterval,
@@ -25,7 +25,7 @@ import {
   yToStart,
 } from "@/lib/work/timeline";
 import Link from "next/link";
-import { Building2, CalendarPlus, Check, ChevronDown, Repeat } from "lucide-react";
+import { Building2, CalendarPlus, Check, ChevronDown, Play, Repeat, Square } from "lucide-react";
 import { formatMinutes } from "@/lib/work/labels";
 import { eventToPlan, groupByClient, groupTasksByProject, importableEvents } from "@/lib/work/plan-sources";
 import { useCollapsedClients } from "./useCollapsedClients";
@@ -58,8 +58,54 @@ type DragData =
   | { kind: "plan"; plan: Plan; start: number; duration: number }
   | { kind: "resize"; plan: Plan; start: number; duration: number };
 
+// ===== タイマー（左の一覧のカードに付ける ▶ / ■） =====
+export type TimerControls = {
+  runningFor: (t: { taskId?: string; routineId?: string; planId?: string }) => TimeEntry | undefined;
+  start: (links: { taskId?: string; routineId?: string; planId?: string }) => void;
+  stop: (entryId: string) => void;
+  busy: boolean;
+};
+
+function Elapsed({ startedAt }: { startedAt: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return <span className="tabular-nums">{formatElapsed((now - Date.parse(startedAt)) / 1000)}</span>;
+}
+
+// カードの右側に置く再生・停止ボタン（ドラッグ・詳細を開く操作とは分けて押せる）
+function TimerButton({
+  title,
+  running,
+  timer,
+  links,
+}: {
+  title: string;
+  running: TimeEntry | undefined;
+  timer: TimerControls;
+  links: { taskId?: string; routineId?: string; planId?: string };
+}) {
+  return (
+    <button
+      type="button"
+      disabled={timer.busy}
+      onClick={() => (running ? timer.stop(running.id) : timer.start(links))}
+      aria-label={running ? `「${title}」のタイマーを停止` : `「${title}」のタイマーを開始`}
+      title={running ? "タイマーを停止" : "タイマーを開始"}
+      className={`absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer disabled:opacity-50 ${
+        running ? "bg-danger text-white border-danger" : "bg-white text-app-text border-app-border hover:bg-app-bg"
+      }`}
+    >
+      {running ? <Square size={12} fill="currentColor" aria-hidden /> : <Play size={13} fill="currentColor" className="ml-0.5" aria-hidden />}
+    </button>
+  );
+}
+
 // ===== 左側：置けるタスク（ドラッグ元） =====
-function DraggableTask({ task, projects, onOpen }: { task: Task; projects: Project[]; onOpen: (t: Task) => void }) {
+function DraggableTask({ task, projects, onOpen, timer }: { task: Task; projects: Project[]; onOpen: (t: Task) => void; timer: TimerControls }) {
+  const running = timer.runningFor({ taskId: task.id });
   const duration = task.plannedMinutes ?? DEFAULT_TASK_MINUTES;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `task:${task.id}`,
@@ -67,76 +113,156 @@ function DraggableTask({ task, projects, onOpen }: { task: Task; projects: Proje
   });
   const color = projects.find((p) => p.id === task.projectId)?.color ?? "#9AA6A2";
   return (
-    <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      onClick={() => onOpen(task)}
-      aria-label={`「${task.title}」。押すと詳細、ドラッグでタイムラインに置く`}
-      className={`flex items-stretch rounded-lg border border-app-border bg-white cursor-grab active:cursor-grabbing select-none touch-manipulation hover:border-app-sub ${
-        isDragging ? "opacity-40" : ""
-      }`}
-    >
-      <span className="w-1 rounded-l-lg shrink-0" style={{ background: color }} aria-hidden />
-      <div className="flex-1 min-w-0 px-3 py-2">
-        <div className="text-sm font-semibold text-app-text truncate">{task.title}</div>
-        <div className="text-[11px] text-app-sub">{formatMinutes(duration)}{task.plannedMinutes == null ? "（仮）" : ""}</div>
+    <div className="relative">
+      <div
+        ref={setNodeRef}
+        {...listeners}
+        {...attributes}
+        onClick={() => onOpen(task)}
+        aria-label={`「${task.title}」。押すと詳細、ドラッグでタイムラインに置く`}
+        className={`flex items-stretch rounded-lg border bg-white cursor-grab active:cursor-grabbing select-none touch-manipulation hover:border-app-sub ${
+          running ? "border-danger" : "border-app-border"
+        } ${isDragging ? "opacity-40" : ""}`}
+      >
+        <span className="w-1 rounded-l-lg shrink-0" style={{ background: color }} aria-hidden />
+        <div className="flex-1 min-w-0 pl-3 pr-11 py-2">
+          <div className="text-sm font-semibold text-app-text truncate">{task.title}</div>
+          <div className="text-[11px] text-app-sub">
+            {running?.startedAt ? (
+              <span className="text-danger font-semibold">
+                ● 計測中 <Elapsed startedAt={running.startedAt} />
+              </span>
+            ) : (
+              <>
+                {formatMinutes(duration)}
+                {task.plannedMinutes == null ? "（仮）" : ""}
+              </>
+            )}
+          </div>
+        </div>
       </div>
+      <TimerButton title={task.title} running={running} timer={timer} links={{ taskId: task.id }} />
     </div>
   );
 }
 
-function DraggableRoutine({ item, planned }: { item: DayRoutine; planned: boolean }) {
+function DraggableRoutine({ item, planned, timer }: { item: DayRoutine; planned: boolean; timer: TimerControls }) {
   const { routine, status } = item;
+  const running = timer.runningFor({ routineId: routine.id });
   const duration = routine.plannedMinutes ?? DEFAULT_TASK_MINUTES;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `routine:${routine.id}`,
     data: { kind: "routine", routine, duration } satisfies DragData,
   });
   return (
+    <div className="relative">
     <div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
       aria-label={`ルーティン「${routine.title}」をタイムラインにドラッグして置く`}
-      className={`flex items-center gap-2 rounded-lg border border-app-border bg-white px-3 py-2 cursor-grab active:cursor-grabbing select-none touch-manipulation hover:border-app-sub ${
-        isDragging ? "opacity-40" : ""
-      }`}
+      className={`flex items-center gap-2 rounded-lg border bg-white pl-3 pr-11 py-2 cursor-grab active:cursor-grabbing select-none touch-manipulation hover:border-app-sub ${
+        running ? "border-danger" : "border-app-border"
+      } ${isDragging ? "opacity-40" : ""}`}
     >
       <Repeat size={14} className="shrink-0 text-accent" aria-hidden />
       <div className="flex-1 min-w-0">
         {routine.client && <div className="text-[10px] text-app-sub truncate">{routine.client.name}</div>}
         <div className="text-sm font-semibold text-app-text truncate">{routine.title}</div>
         <div className="text-[11px] text-app-sub">
-          {formatMinutes(duration)}
-          {routine.plannedMinutes == null ? "（仮）" : ""}
-          {planned && "・計画済み"}
-          {status === "done" && "・実施済み"}
-          {status === "skipped" && "・スキップ"}
+          {running?.startedAt ? (
+            <span className="text-danger font-semibold">
+              ● 計測中 <Elapsed startedAt={running.startedAt} />
+            </span>
+          ) : (
+            <>
+              {formatMinutes(duration)}
+              {routine.plannedMinutes == null ? "（仮）" : ""}
+              {planned && "・計画済み"}
+              {status === "done" && "・実施済み"}
+              {status === "skipped" && "・スキップ"}
+            </>
+          )}
         </div>
       </div>
-      {(planned || status === "done") && <Check size={14} className="shrink-0 text-app-sub" aria-hidden />}
+      {(planned || status === "done") && !running && <Check size={14} className="shrink-0 text-app-sub" aria-hidden />}
+    </div>
+    <TimerButton title={routine.title} running={running} timer={timer} links={{ routineId: routine.id }} />
     </div>
   );
 }
 
-function DraggableUnscheduled({ plan }: { plan: Plan }) {
+// 計画のカードで計測中か：計画そのもの、または同じタスク・ルーティンのタイマー
+function runningForPlan(plan: Plan, timer: TimerControls): TimeEntry | undefined {
+  return (
+    timer.runningFor({ planId: plan.id }) ??
+    (plan.taskId ? timer.runningFor({ taskId: plan.taskId }) : undefined) ??
+    (plan.routineId ? timer.runningFor({ routineId: plan.routineId }) : undefined)
+  );
+}
+
+function PlanCardBody({ plan, running, color }: { plan: Plan; running: TimeEntry | undefined; color: string }) {
+  return (
+    <>
+      <span className="w-1 rounded-l-lg shrink-0" style={{ background: color }} aria-hidden />
+      <div className="flex-1 min-w-0 pl-3 pr-11 py-2">
+        <div className="text-sm font-semibold text-app-text truncate">{plan.title}</div>
+        <div className="text-[11px] text-app-sub tabular-nums">
+          {running?.startedAt ? (
+            <span className="text-danger font-semibold">
+              ● 計測中 <Elapsed startedAt={running.startedAt} />
+            </span>
+          ) : plan.startTime ? (
+            `${plan.startTime}〜${minutesToTime(Math.min(DAY_END, timeToMinutes(plan.startTime) + plan.plannedMinutes))}`
+          ) : (
+            `時刻未定・${formatMinutes(plan.plannedMinutes)}（ドラッグで時刻を決める）`
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// 今日の計画タスク：時刻つきの計画（押すと編集）
+function PlanCard({ plan, color, onOpen, timer, showTimer }: { plan: Plan; color: string; onOpen: (p: Plan) => void; timer: TimerControls; showTimer: boolean }) {
+  const running = runningForPlan(plan, timer);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => onOpen(plan)}
+        aria-label={`計画「${plan.title}」${plan.startTime ?? ""}。押すと編集`}
+        className={`w-full flex items-stretch rounded-lg border bg-white text-left p-0 cursor-pointer hover:border-app-sub ${
+          running ? "border-danger" : "border-app-border"
+        }`}
+      >
+        <PlanCardBody plan={plan} running={running} color={color} />
+      </button>
+      {showTimer && <TimerButton title={plan.title} running={running} timer={timer} links={{ planId: plan.id }} />}
+    </div>
+  );
+}
+
+function DraggableUnscheduled({ plan, color, timer, showTimer }: { plan: Plan; color: string; timer: TimerControls; showTimer: boolean }) {
+  const running = runningForPlan(plan, timer);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `unscheduled:${plan.id}`,
     data: { kind: "unscheduled", plan, duration: plan.plannedMinutes } satisfies DragData,
   });
   return (
-    <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      aria-label={`「${plan.title}」をタイムラインにドラッグして時刻を決める`}
-      className={`rounded-lg border border-dashed border-work bg-work-light px-3 py-2 cursor-grab active:cursor-grabbing select-none touch-manipulation ${
-        isDragging ? "opacity-40" : ""
-      }`}
-    >
-      <div className="text-sm font-semibold text-work-dark truncate">{plan.title}</div>
-      <div className="text-[11px] text-app-sub">時刻未定・{formatMinutes(plan.plannedMinutes)}</div>
+    <div className="relative">
+      <div
+        ref={setNodeRef}
+        {...listeners}
+        {...attributes}
+        aria-label={`「${plan.title}」をタイムラインにドラッグして時刻を決める`}
+        className={`flex items-stretch rounded-lg border border-dashed bg-white cursor-grab active:cursor-grabbing select-none touch-manipulation ${
+          running ? "border-danger" : "border-app-sub"
+        } ${isDragging ? "opacity-40" : ""}`}
+      >
+        <PlanCardBody plan={plan} running={running} color={color} />
+      </div>
+      {showTimer && <TimerButton title={plan.title} running={running} timer={timer} links={{ planId: plan.id }} />}
     </div>
   );
 }
@@ -236,6 +362,7 @@ export default function DayTimeline({
   onCreatePlan,
   onImportEvents,
   onOpenTask,
+  timer,
   onUpdatePlan,
   onOpenPlan,
   onOpenEntry,
@@ -252,6 +379,7 @@ export default function DayTimeline({
   onCreatePlan: (plan: NewPlan) => void;
   onImportEvents: (plans: NewPlan[]) => void;
   onOpenTask: (task: Task) => void;
+  timer: TimerControls;
   onUpdatePlan: (plan: Plan, patch: { startTime?: string; plannedMinutes?: number }) => void;
   onOpenPlan: (plan: Plan) => void;
   onOpenEntry: (entry: TimeEntry) => void;
@@ -314,6 +442,8 @@ export default function DayTimeline({
     .map((e) => ({ e, iv: entryInterval(date, e.startedAt, e.endedAt, now) }))
     .filter((x): x is { e: TimeEntry; iv: { start: number; end: number } } => x.iv !== null);
   const untimedEntries = entries.filter((e) => !e.startedAt);
+  // 並行して計測した実績は、計画と同じく横に並べる
+  const actualLayout = layoutColumns(actuals.map(({ e, iv }) => ({ id: e.id, start: iv.start, end: iv.end })));
 
   // ドロップ位置（ドラッグ中のカードの上端）→ 計画の列の上端からの距離（px）
   const dropY = (ev: { active: DragEndEvent["active"] }) => {
@@ -385,7 +515,7 @@ export default function DayTimeline({
       }}
     >
       <div className="lg:grid lg:grid-cols-[260px_1fr] lg:gap-6 lg:items-start">
-        {/* ドラッグ元：今日のルーティン・時刻未定の計画・未完了のタスク（プロジェクトごと） */}
+        {/* ドラッグ元：今日のルーティン・今日の計画タスク・未完了のタスク（クライアント → プロジェクトごと） */}
         <div className="bg-white rounded-2xl border border-app-border p-3 mb-3 lg:mb-0 lg:sticky lg:top-6">
           <div className="text-[10px] text-app-sub mb-2">右の「計画」にドラッグして置きます</div>
           <div className="flex flex-col gap-3 max-h-[45vh] lg:max-h-[68vh] overflow-y-auto pr-0.5 pb-1">
@@ -393,15 +523,20 @@ export default function DayTimeline({
               <section className="flex flex-col gap-1.5">
                 <div className="text-[11px] font-bold tracking-[0.08em] text-app-sub">今日のルーティン</div>
                 {routines.map((r) => (
-                  <DraggableRoutine key={r.routine.id} item={r} planned={plannedRoutineIds.has(r.routine.id)} />
+                  <DraggableRoutine key={r.routine.id} item={r} planned={plannedRoutineIds.has(r.routine.id)} timer={timer} />
                 ))}
               </section>
             )}
-            {unscheduled.length > 0 && (
+            {plans.length > 0 && (
               <section className="flex flex-col gap-1.5">
-                <div className="text-[11px] font-bold tracking-[0.08em] text-app-sub">時刻未定の計画</div>
+                <div className="text-[11px] font-bold tracking-[0.08em] text-app-sub">{isToday ? "今日の計画タスク" : "この日の計画タスク"}</div>
+                {[...timed]
+                  .sort((a, b) => a.startTime!.localeCompare(b.startTime!))
+                  .map((p) => (
+                    <PlanCard key={p.id} plan={p} color={projectColor(p.projectId)} onOpen={onOpenPlan} timer={timer} showTimer={isToday} />
+                  ))}
                 {unscheduled.map((p) => (
-                  <DraggableUnscheduled key={p.id} plan={p} />
+                  <DraggableUnscheduled key={p.id} plan={p} color={projectColor(p.projectId)} timer={timer} showTimer={isToday} />
                 ))}
               </section>
             )}
@@ -444,7 +579,7 @@ export default function DayTimeline({
                               <div className="text-xs font-semibold text-app-sub">プロジェクトなし</div>
                             )}
                             {g.tasks.map((t) => (
-                              <DraggableTask key={t.id} task={t} projects={projects} onOpen={onOpenTask} />
+                              <DraggableTask key={t.id} task={t} projects={projects} onOpen={onOpenTask} timer={timer} />
                             ))}
                           </div>
                         );
@@ -454,7 +589,7 @@ export default function DayTimeline({
               })}
             </section>
           </div>
-          <div className="text-[10px] text-app-sub mt-2 hidden lg:block">タスクを押すと詳細を開きます。予定時間が未設定のものは60分で置き、下端を引いて調整できます。</div>
+          <div className="text-[10px] text-app-sub mt-2 hidden lg:block">タスクを押すと詳細、▶ でタイマー開始（複数同時に計測できます）。予定時間が未設定のものは60分で置き、下端を引いて調整できます。</div>
           <div className="text-[10px] text-app-sub mt-1 lg:hidden">スマホは長押ししてからドラッグします。</div>
         </div>
 
@@ -559,20 +694,28 @@ export default function DayTimeline({
 
               {/* 実績（タイマー） */}
               <div className="relative" style={{ height: DAY_END * PX_PER_MIN }}>
-                {actuals.map(({ e, iv }) => (
+                {actuals.map(({ e, iv }) => {
+                  const lay = actualLayout[e.id] ?? { col: 0, cols: 1 };
+                  return (
                   <button
                     key={e.id}
                     type="button"
                     onClick={() => onOpenEntry(e)}
                     title={`${entryTitle(e)}（${minutesToTime(iv.start)}〜${minutesToTime(iv.end)}）`}
-                    className={`absolute left-1 right-1 rounded-md border-none px-1.5 py-0.5 text-left overflow-hidden cursor-pointer ${
+                    className={`absolute rounded-md border-none px-1.5 py-0.5 text-left overflow-hidden cursor-pointer ${
                       e.endedAt ? "bg-primary/80" : "bg-danger/80"
                     }`}
-                    style={{ top: iv.start * PX_PER_MIN, height: Math.max((iv.end - iv.start) * PX_PER_MIN, 6) }}
+                    style={{
+                      top: iv.start * PX_PER_MIN,
+                      height: Math.max((iv.end - iv.start) * PX_PER_MIN, 6),
+                      left: `calc(${(lay.col / lay.cols) * 100}% + 2px)`,
+                      width: `calc(${100 / lay.cols}% - 4px)`,
+                    }}
                   >
                     <span className="text-[10px] text-white font-semibold truncate block">{entryTitle(e)}</span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
 
               {/* 時刻の横線 */}

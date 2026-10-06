@@ -66,7 +66,7 @@ export function layoutColumns(items: Interval[]): Record<string, { col: number; 
 }
 
 // タイマーの実績を、指定日（日本時間）の時間帯 [start, end)（分）に直す。
-// 計測中は現在時刻まで。その日にかからない・開始時刻がない（手入力）ものは null
+// 計測中は現在時刻まで（最低1分）。その日にかからない・開始時刻がない（手入力）ものは null
 export function entryInterval(
   date: string,
   startedAt: string | null,
@@ -78,7 +78,8 @@ export function entryInterval(
   const s = (Date.parse(startedAt) - dayStart) / 60000;
   const e = ((endedAt ? Date.parse(endedAt) : now.getTime()) - dayStart) / 60000;
   const start = Math.max(0, Math.floor(s));
-  const end = Math.min(DAY_END, Math.ceil(e));
+  // 計測中は、画面の「今」が開始より古くても（開始した直後など）最低1分の長さで表示する
+  const end = Math.min(DAY_END, endedAt ? Math.ceil(e) : Math.max(Math.ceil(e), start + 1));
   if (end <= 0 || start >= DAY_END || end <= start) return null;
   return { start, end };
 }
