@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import TimerBar from "@/components/work/TimerBar";
@@ -82,6 +83,7 @@ export default function WorkPlanPage() {
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div className="text-lg font-bold">計画・実績</div>
+        <Link href="/admin/work/schedule" className="ml-auto mr-2 text-xs text-primary">スケジュール</Link>
         <div className="flex items-center gap-1">
           <button onClick={() => setDate(addDays(date, -1))} aria-label="前の日" className="px-2 py-1 text-sm text-primary bg-transparent border-none cursor-pointer">←</button>
           <div className="text-sm font-bold min-w-[96px] text-center">{label}</div>

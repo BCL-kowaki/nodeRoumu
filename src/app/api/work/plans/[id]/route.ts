@@ -4,6 +4,7 @@ import { jstDateToDb } from "@/lib/date-jst";
 import { badRequest, notFound, requireWorkspace } from "@/lib/work/auth";
 import { LINK_INCLUDE, checkLinks } from "@/lib/work/links";
 import { parsePlanInput } from "@/lib/work/validate";
+import { removePlanEvent, resyncPlanEvent } from "@/lib/work/plan-calendar";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
     },
     include: LINK_INCLUDE,
   });
+  // Google カレンダーに書き出し済みの計画は、予定も更新する（失敗しても計画の更新は成功）
+  await resyncPlanEvent(auth.ctx.ownerId, updated.id);
   return NextResponse.json(updated);
 }
 
@@ -43,7 +46,10 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const auth = await requireWorkspace();
   if (!auth.ok) return auth.response;
   const { id } = await params;
+  const plan = await prisma.workPlan.findFirst({ where: { id, ownerId: auth.ctx.ownerId }, select: { googleEventId: true } });
   const { count } = await prisma.workPlan.deleteMany({ where: { id, ownerId: auth.ctx.ownerId } });
   if (count === 0) return notFound();
+  // 書き出し済みの予定もカレンダーから消す（失敗しても計画の削除は成功）
+  await removePlanEvent(auth.ctx.ownerId, plan?.googleEventId ?? null);
   return NextResponse.json({ ok: true });
 }

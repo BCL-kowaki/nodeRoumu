@@ -107,6 +107,14 @@ export default function Header() {
                   </button>
                   {inWork && (
                     <button
+                      onClick={() => { router.push("/admin/work/schedule"); setMenuOpen(false); }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
+                    >
+                      📆 スケジュール
+                    </button>
+                  )}
+                  {inWork && (
+                    <button
                       onClick={() => { router.push("/admin/work/github"); setMenuOpen(false); }}
                       className="w-full text-left px-4 py-2.5 text-sm text-app-text hover:bg-gray-50 border-none bg-transparent cursor-pointer"
                     >
