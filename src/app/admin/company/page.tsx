@@ -69,7 +69,7 @@ export default function CompanyPage() {
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     const ctx = canvas.getContext("2d")!;
-    await page.render({ canvasContext: ctx, viewport }).promise;
+    await page.render({ canvas, canvasContext: ctx, viewport }).promise;
     return canvas.toDataURL("image/png");
   };
 
@@ -117,12 +117,16 @@ export default function CompanyPage() {
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+      // 古めのブラウザでも動くよう legacy 版を使う。
+      // 作業用スクリプト（worker）は外部の CDN から読まず、アプリと一緒に配信する（本体と版が必ずそろう）
+      const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+        "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
+        import.meta.url
+      ).toString();
 
-      // isEvalSupported: false … 細工したPDFで任意のJSが実行される脆弱性（CVE-2024-4367）の回避策
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer, isEvalSupported: false }).promise;
+      // 6.x では、細工した PDF で任意の JS が動く脆弱性（CVE-2024-4367）の原因だった eval の使用自体がなくなっている
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
       // Step 1: テキストPDFとして読み取りを試みる
       let fullText = "";
