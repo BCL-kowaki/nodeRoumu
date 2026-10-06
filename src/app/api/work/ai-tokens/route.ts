@@ -6,7 +6,7 @@ import { currentMcpContext } from "@/lib/work/mcp-context";
 
 export const dynamic = "force-dynamic";
 
-const SELECT = { id: true, name: true, hint: true, scope: true, expiresAt: true, lastUsedAt: true, revokedAt: true, createdAt: true } as const;
+const SELECT = { id: true, name: true, hint: true, scope: true, attendance: true, expiresAt: true, lastUsedAt: true, revokedAt: true, createdAt: true } as const;
 
 // 鍵の管理はアプリの画面（ログイン）からだけ。AI 連携の中からは扱えない
 function forbidFromMcp() {
@@ -28,7 +28,7 @@ export async function GET() {
 }
 
 // 鍵の発行。鍵そのものは、この応答で1回だけ返す（保存するのは元に戻せない値だけ）
-// POST /api/work/ai-tokens  body: { name, scope: "read" | "write", expiresInDays: 30 | 90 | 365 }
+// POST /api/work/ai-tokens  body: { name, scope: "read" | "write", expiresInDays: 30 | 90 | 365, attendance?: boolean }
 export async function POST(req: NextRequest) {
   const blocked = forbidFromMcp();
   if (blocked) return blocked;
@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
       tokenHash: hashToken(token),
       hint: tokenHint(token),
       scope: d.scope,
+      attendance: d.attendance,
       expiresAt: new Date(Date.now() + d.expiresInDays * 24 * 60 * 60 * 1000),
     },
     select: SELECT,

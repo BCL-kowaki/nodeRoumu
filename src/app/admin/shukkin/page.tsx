@@ -15,6 +15,7 @@ import {
 import PageTitle from "@/components/PageTitle";
 import { MapPin } from "lucide-react";
 import { punchTypeInfo } from "@/components/PunchType";
+import AttendanceChanges from "@/components/AttendanceChanges";
 
 type Employee = {
   id: string;
@@ -419,6 +420,9 @@ export default function ShukkinPage() {
           </div>
         )}
       </Card>
+
+      {/* AI 連携からの修正の履歴（その月にあるときだけ） */}
+      {selEmp && <AttendanceChanges employeeId={selEmp} month={selMonth} />}
 
       {/* 日別 */}
       {days.map((date) => {

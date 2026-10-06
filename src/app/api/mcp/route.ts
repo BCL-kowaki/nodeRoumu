@@ -37,9 +37,10 @@ async function handle(req: Request): Promise<Response> {
     await prisma.apiToken.update({ where: { id: row.id }, data: { lastUsedAt: new Date() } }).catch(() => undefined);
   }
 
-  return runAsMcp({ ownerId: row.ownerId, scope: row.scope as TokenScope }, async () => {
+  const ctx = { ownerId: row.ownerId, scope: row.scope as TokenScope, attendance: row.attendance, tokenId: row.id, tokenName: row.name };
+  return runAsMcp(ctx, async () => {
     // 追加・変更の操作は、いつ・どの鍵で・どの道具を使ったかを記録する（鍵そのもの・入力内容は出さない）
-    const server = buildMcpServer(row.scope as TokenScope, (tool) =>
+    const server = buildMcpServer(ctx, (tool) =>
       console.log(`[mcp] write tool=${tool} token=${row.id} name=${JSON.stringify(row.name)}`)
     );
     // 1回の呼び出しごとに作り直す（状態を持たない方式。Vercel のように毎回別のサーバーで動いても問題ない）

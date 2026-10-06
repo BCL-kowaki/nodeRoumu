@@ -4,7 +4,8 @@
 import { NextRequest } from "next/server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { TokenScope } from "@/lib/api-token";
+import { registerAttendanceTools } from "./mcp-attendance";
+import type { McpContext } from "./mcp-context";
 import { todayJst } from "@/lib/date-jst";
 import * as clientsApi from "@/app/api/work/clients/route";
 import * as projectsApi from "@/app/api/work/projects/route";
@@ -134,14 +135,19 @@ const slimEntry = (e: EntryRow) => ({
   routine: refName(e.routine),
 });
 
-export function buildMcpServer(scope: TokenScope, onWrite?: (tool: string) => void): McpServer {
+export function buildMcpServer(ctx: McpContext, onWrite?: (tool: string) => void): McpServer {
+  const scope = ctx.scope;
   const server = new McpServer(
     { name: "node-portal", version: "1.0.0" },
     {
       instructions:
         "node-portal（代表者の業務管理）を操作する道具です。クライアント → プロジェクト → タスク の階層で、" +
         "1日の計画（時間ブロック）と実績（タイマー・手入力）を記録します。日付は日本時間の YYYY-MM-DD です。" +
-        "削除はできません。労務（給与・出勤簿・従業員）の情報は扱いません。",
+        "削除はできません。給与・労働者名簿（住所・給与など）は扱いません。" +
+        (ctx.attendance
+          ? "出勤簿（従業員の出勤・退勤時刻など）は get_attendance で読めます" +
+            (scope === "write" ? "。update_attendance で直せ、変更は履歴に残ります。給与のもとになるので、指示された内容だけを直してください。" : "。")
+          : "出勤簿はこの鍵では扱えません。"),
     }
   );
   // 道具ごとに「成功なら結果、失敗ならエラー文」を返す実行役
@@ -290,6 +296,9 @@ export function buildMcpServer(scope: TokenScope, onWrite?: (tool: string) => vo
     },
     ({ from, to }) => run(() => call(googleEventsApi.GET, `/api/work/google/events?from=${from}&to=${to}`))
   );
+
+  // 出勤簿は「出勤簿も扱う」を選んだ鍵でだけ使える（読むだけの鍵なら読むだけ）
+  if (ctx.attendance) registerAttendanceTools(server, ctx, onWrite);
 
   if (scope !== "write") return server;
 

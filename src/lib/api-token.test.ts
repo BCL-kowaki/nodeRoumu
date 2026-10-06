@@ -41,10 +41,16 @@ describe("isTokenUsable（鍵が使える状態か）", () => {
 });
 
 describe("parseTokenCreateInput（鍵の発行の入力）", () => {
-  it("名前・範囲・有効日数を受け付ける", () => {
+  it("名前・範囲・有効日数を受け付ける。出勤簿は指定がなければ扱わない", () => {
     expect(parseTokenCreateInput({ name: " Claude Code（MacBook） ", scope: "write", expiresInDays: 90 })).toEqual({
       ok: true,
-      data: { name: "Claude Code（MacBook）", scope: "write", expiresInDays: 90 },
+      data: { name: "Claude Code（MacBook）", scope: "write", expiresInDays: 90, attendance: false },
+    });
+  });
+  it("出勤簿も扱う指定を受け付ける", () => {
+    expect(parseTokenCreateInput({ name: "a", scope: "read", expiresInDays: 30, attendance: true })).toMatchObject({
+      ok: true,
+      data: { attendance: true },
     });
   });
   it.each([
@@ -52,6 +58,7 @@ describe("parseTokenCreateInput（鍵の発行の入力）", () => {
     ["名前が長すぎる", { name: "a".repeat(51), scope: "read", expiresInDays: 30 }, "鍵の名前は50文字以内で入力してください"],
     ["範囲が不正", { name: "a", scope: "admin", expiresInDays: 30 }, "操作の範囲の指定が正しくありません"],
     ["有効日数が選択肢にない", { name: "a", scope: "read", expiresInDays: 9999 }, "有効期限は30日・90日・365日から選んでください"],
+    ["出勤簿の指定が真偽でない", { name: "a", scope: "read", expiresInDays: 30, attendance: "yes" }, "出勤簿を扱うかの指定が正しくありません"],
   ])("%s のとき、エラーを返す", (_n, body, message) => {
     expect(parseTokenCreateInput(body)).toEqual({ ok: false, error: message });
   });

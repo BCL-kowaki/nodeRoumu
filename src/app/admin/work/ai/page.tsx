@@ -12,6 +12,7 @@ type Token = {
   name: string;
   hint: string;
   scope: "read" | "write";
+  attendance: boolean;
   expiresAt: string;
   lastUsedAt: string | null;
   revokedAt: string | null;
@@ -55,7 +56,7 @@ export default function WorkAiPage() {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", scope: "write" as "read" | "write", expiresInDays: 90 });
+  const [form, setForm] = useState({ name: "", scope: "write" as "read" | "write", expiresInDays: 90, attendance: false });
   const [saving, setSaving] = useState(false);
   const [issued, setIssued] = useState<{ name: string; token: string } | null>(null);
   const [origin, setOrigin] = useState("");
@@ -82,7 +83,7 @@ export default function WorkAiPage() {
     try {
       const res = await api<Token & { token: string }>("/api/work/ai-tokens", { method: "POST", body: JSON.stringify(form) });
       setIssued({ name: res.name, token: res.token });
-      setForm((f) => ({ ...f, name: "" }));
+      setForm((f) => ({ ...f, name: "", attendance: false }));
       load();
     } catch (e) {
       setError((e as Error).message);
@@ -114,7 +115,8 @@ export default function WorkAiPage() {
         </div>
         <ul className="mt-2 mb-0 pl-5 text-xs text-app-sub leading-relaxed">
           <li>できるのは「読む」と「追加・変更」だけです。削除はこの画面（アプリ）からだけ行えます。</li>
-          <li>労務（給与・出勤簿・従業員）の情報は、AI からは扱えません。</li>
+          <li>給与・労働者名簿（住所・給与など）は、AI からは扱えません。</li>
+          <li>出勤簿は「出勤簿も扱う」を選んだ鍵でだけ扱えます。AI が直した内容は、出勤簿の画面に変更履歴として残ります。</li>
           <li>タスクの状態を変えると GitHub の Issue に、計画を変えると書き出し済みの Google カレンダーの予定にも反映されます（画面で操作したときと同じ）。</li>
           <li>鍵はパスワードと同じです。人に渡したり、GitHub などに載せたりしないでください。漏れたら下の一覧から取り消してください。</li>
         </ul>
@@ -191,6 +193,20 @@ export default function WorkAiPage() {
                 </select>
               </div>
             </div>
+            <label className="flex items-start gap-2 text-sm text-app-text cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.attendance}
+                onChange={(e) => setForm((f) => ({ ...f, attendance: e.target.checked }))}
+                className="mt-0.5 w-4 h-4 accent-primary"
+              />
+              <span>
+                出勤簿も扱う
+                <span className="block text-[11px] text-app-sub">
+                  従業員の出勤・退勤時刻などを{form.scope === "write" ? "読み、直せる" : "読める"}ようになります（住所・給与などは渡しません）。給与のもとになる記録なので、必要な鍵だけに付けてください。
+                </span>
+              </span>
+            </label>
             <button
               type="button"
               onClick={issue}
@@ -219,6 +235,7 @@ export default function WorkAiPage() {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className={`text-sm font-semibold ${active ? "text-app-text" : "text-app-sub line-through"}`}>{t.name}</span>
                     <Badge type="default">{t.scope === "write" ? "読む＋追加・変更" : "読むだけ"}</Badge>
+                    {t.attendance && <Badge type="accent">出勤簿</Badge>}
                     {t.revokedAt ? <Badge type="danger">取り消し済み</Badge> : expired ? <Badge type="danger">期限切れ</Badge> : null}
                   </div>
                   <div className="text-[11px] text-app-sub mt-0.5">

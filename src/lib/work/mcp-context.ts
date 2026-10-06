@@ -6,7 +6,13 @@
 import { AsyncLocalStorage } from "async_hooks";
 import type { TokenScope } from "@/lib/api-token";
 
-export type McpContext = { ownerId: string; scope: TokenScope };
+export type McpContext = {
+  ownerId: string;
+  scope: TokenScope;
+  attendance: boolean; // 出勤簿も扱える鍵か
+  tokenId: string;
+  tokenName: string;
+};
 
 const storage = new AsyncLocalStorage<McpContext>();
 

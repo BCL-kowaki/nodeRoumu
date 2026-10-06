@@ -44,6 +44,7 @@ model Employee {
   workClients         WorkClient[]
   taskAttachments     TaskAttachment[]
   apiTokens           ApiToken[]
+  attendanceChanges   AttendanceChange[]
   workTasks           WorkTask[]
   routines            Routine[]
   workPlans           WorkPlan[]
@@ -222,6 +223,23 @@ model WorkProject {
   @@index([clientId])
 }
 
+// 出勤簿の変更履歴（AI 連携からの修正を記録する。誤操作に気づいて戻せるように）
+model AttendanceChange {
+  id          String   @id @default(cuid())
+  employeeId  String // 誰の出勤簿か
+  date        DateTime @db.Date
+  changes     Json // { 項目: [変更前, 変更後] }
+  source      String // "ai"（今後ほかの経路を足すときのため）
+  tokenId     String? // 使われた鍵（取り消し・削除されても履歴は残す）
+  tokenName   String? // 鍵の名前（記録時点）
+  changedById String // 操作した人（鍵の持ち主）
+  createdAt   DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, date])
+}
+
 // AI 連携（MCP）用の鍵。鍵そのものは保存せず、SHA-256 の値だけを持つ
 model ApiToken {
   id         String    @id @default(cuid())
@@ -230,6 +248,7 @@ model ApiToken {
   tokenHash  String    @unique
   hint       String // 一覧で見分けるための先頭数文字（npk_xxxx）
   scope      String // "read" | "write"
+  attendance Boolean   @default(false) // 出勤簿（従業員の出勤・退勤など）も扱えるか
   expiresAt  DateTime
   lastUsedAt DateTime?
   revokedAt  DateTime?
