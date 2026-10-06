@@ -5,6 +5,7 @@ import Link from "next/link";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import { LABOR_ROADMAP, categoryColor } from "@/lib/labor-roadmap";
+import PageTitle from "@/components/PageTitle";
 
 type Employee = {
   id: string;
@@ -106,7 +107,7 @@ export default function AdminDashboard() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-between items-center mb-1">
-        <div className="text-lg font-bold text-app-text">管理者ダッシュボード</div>
+        <PageTitle>管理者ダッシュボード</PageTitle>
         <div className="text-xs text-app-sub">
           {new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric", weekday: "long" })}
         </div>

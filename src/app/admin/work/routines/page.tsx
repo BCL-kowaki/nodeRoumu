@@ -10,6 +10,7 @@ import { dayOfWeek } from "@/lib/attendance-status";
 import { addDays, todayJst } from "@/lib/date-jst";
 import { formatMinutes } from "@/lib/work/labels";
 import { WEEKDAY_NAMES, recurrenceLabel } from "@/lib/work/recurrence";
+import PageTitle from "@/components/PageTitle";
 
 // 未実施 → 実施 → スキップ → 未実施 の順に切り替える
 const NEXT: Record<string, CheckStatus> = { null: "done", done: "skipped", skipped: null };
@@ -44,7 +45,7 @@ export default function WorkRoutinesPage() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-between items-center">
-        <div className="text-lg lg:text-2xl font-bold tracking-tight">ルーティン</div>
+        <PageTitle>ルーティン</PageTitle>
         <button
           onClick={() => setEditing("new")}
           className="px-4 py-2 rounded bg-primary text-white text-sm font-bold border-none cursor-pointer"

@@ -7,6 +7,7 @@ import PasswordInput from "@/components/PasswordInput";
 import { useAuth } from "@/lib/auth-context";
 import { canWriteEmployees } from "@/lib/permissions";
 import { roleLabel } from "@/lib/roles";
+import PageTitle from "@/components/PageTitle";
 
 type Employee = {
   id: string;
@@ -270,7 +271,7 @@ export default function AdminMeiboPage() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-between items-center">
-        <div className="text-lg lg:text-2xl font-bold tracking-tight">労働者名簿（管理）</div>
+        <PageTitle>労働者名簿（管理）</PageTitle>
         {canWrite && (
           <button
             onClick={startNew}

@@ -6,6 +6,7 @@ import Badge from "@/components/Badge";
 import PasswordInput from "@/components/PasswordInput";
 import { useAuth } from "@/lib/auth-context";
 import { roleLabel } from "@/lib/roles";
+import PageTitle from "@/components/PageTitle";
 
 type AdminUser = {
   id: string;
@@ -136,7 +137,7 @@ export default function AdminUsersPage() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-between items-center">
-        <div className="text-lg lg:text-2xl font-bold tracking-tight">管理ユーザー</div>
+        <PageTitle>管理ユーザー</PageTitle>
         <button
           onClick={() => setShowAdd((v) => !v)}
           className="px-5 py-2.5 rounded bg-primary text-white text-sm font-bold border-none cursor-pointer"

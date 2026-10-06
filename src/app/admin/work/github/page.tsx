@@ -5,6 +5,7 @@ import Link from "next/link";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import { api, type GithubRepo } from "@/components/work/types";
+import PageTitle from "@/components/PageTitle";
 
 type Status = { configured: boolean; login?: string; error?: string };
 type SyncResult = { repos: { fullName: string; created: number; updated: number; error?: string }[] };
@@ -92,7 +93,7 @@ export default function WorkGithubPage() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-lg lg:text-2xl font-bold tracking-tight">GitHub 連携</div>
+      <PageTitle>GitHub 連携</PageTitle>
 
       {/* 接続状態 */}
       <Card className="!p-4">

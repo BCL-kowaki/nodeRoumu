@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import { useAuth } from "@/lib/auth-context";
+import PageTitle from "@/components/PageTitle";
 
 type EmployeeData = {
   id: string;
@@ -74,7 +75,7 @@ export default function EmployeeStatus() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-lg lg:text-2xl font-bold tracking-tight">ステータス</div>
+      <PageTitle>ステータス</PageTitle>
 
       <Card>
         <div className="flex items-center gap-3 mb-4">

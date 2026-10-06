@@ -6,6 +6,7 @@ import Badge from "@/components/Badge";
 import { getNationalHolidays } from "@/lib/holidays";
 import { useAuth } from "@/lib/auth-context";
 import { canWriteHolidays } from "@/lib/permissions";
+import PageTitle from "@/components/PageTitle";
 
 type Rate = {
   id: string;
@@ -154,7 +155,7 @@ export default function HolidaysPage() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-lg lg:text-2xl font-bold tracking-tight">休日設定</div>
+      <PageTitle>休日設定</PageTitle>
 
       {!canWrite && (
         <div className="text-xs text-app-sub bg-app-bg rounded px-3 py-2">

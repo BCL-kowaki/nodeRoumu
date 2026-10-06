@@ -12,6 +12,7 @@ import {
   isWorkingStatus,
   workHoursLabel,
 } from "@/lib/attendance-status";
+import PageTitle from "@/components/PageTitle";
 
 type AttRecord = {
   id: string;
@@ -115,7 +116,7 @@ export default function EmployeeShukkin() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-lg lg:text-2xl font-bold tracking-tight">出勤簿</div>
+      <PageTitle>出勤簿</PageTitle>
 
       <Card className="!p-4">
         <label className="block text-xs font-semibold text-app-sub mb-1">月</label>

@@ -12,6 +12,7 @@ import {
   isWorkingStatus,
   workHoursLabel,
 } from "@/lib/attendance-status";
+import PageTitle from "@/components/PageTitle";
 
 type Employee = {
   id: string;
@@ -337,7 +338,7 @@ export default function ShukkinPage() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-lg lg:text-2xl font-bold tracking-tight">出勤簿</div>
+      <PageTitle>出勤簿</PageTitle>
       {!canEditTime && (
         <div className="text-xs text-app-sub bg-app-bg rounded px-3 py-2">
           閲覧のみ可能です（編集は代表者権限が必要）

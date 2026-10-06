@@ -10,6 +10,7 @@ import { addDays, todayJst } from "@/lib/date-jst";
 import { formatMinutes } from "@/lib/work/labels";
 import { WEEKDAY_NAMES } from "@/lib/work/recurrence";
 import { planEventEnd } from "@/lib/work/gcal";
+import PageTitle from "@/components/PageTitle";
 
 type GStatus = {
   configured: boolean;
@@ -115,7 +116,7 @@ function SchedulePage() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-lg lg:text-2xl font-bold tracking-tight">スケジュール</div>
+      <PageTitle>スケジュール</PageTitle>
 
       {/* 接続状態 */}
       <Card className="!p-4">

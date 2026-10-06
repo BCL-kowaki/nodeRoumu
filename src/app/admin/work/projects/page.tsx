@@ -14,6 +14,7 @@ import TaskRow from "@/components/work/TaskRow";
 import { api, type Client, type Project, type Task } from "@/components/work/types";
 import { todayJst } from "@/lib/date-jst";
 import { PROJECT_STATUS_LABELS, dueLabel } from "@/lib/work/labels";
+import PageTitle from "@/components/PageTitle";
 
 // 選択中の項目。"all"=すべて、"none"=未分類（プロジェクトなし）、"client:<ID>"=クライアント、それ以外はプロジェクトID
 type Selection = "all" | "none" | string;
@@ -159,7 +160,7 @@ function ProjectsAndTasks() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <div className="text-lg lg:text-2xl font-bold tracking-tight">プロジェクト・タスク</div>
+        <PageTitle>プロジェクト・タスク</PageTitle>
         <button
           onClick={() => setEditingTask("new")}
           className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold border-none cursor-pointer"

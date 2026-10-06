@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import { canWritePayroll } from "@/lib/permissions";
 // 出勤日の判定は出勤簿と共通（出勤時刻があれば退勤なしでも出勤日として数える）
 import { isClosedDay, isCountableDay, workMinutes } from "@/lib/attendance-status";
+import PageTitle from "@/components/PageTitle";
 
 type Employee = {
   id: string;
@@ -401,7 +402,7 @@ export default function ChinginPage() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-between items-center">
-        <div className="text-lg lg:text-2xl font-bold tracking-tight">賃金台帳</div>
+        <PageTitle>賃金台帳</PageTitle>
         <input
           type="month"
           value={selMonth}

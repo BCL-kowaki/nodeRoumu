@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Card from "@/components/Card";
+import PageTitle from "@/components/PageTitle";
 
 type Rate = {
   id: string;
@@ -56,7 +57,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-lg lg:text-2xl font-bold tracking-tight">料率設定</div>
+      <PageTitle>料率設定</PageTitle>
 
       {saved && (
         <Card className="!bg-primary-light text-center !p-3">

@@ -12,6 +12,7 @@ import { dayOfWeek } from "@/lib/attendance-status";
 import { addDays, todayJst } from "@/lib/date-jst";
 import { formatMinutes } from "@/lib/work/labels";
 import { WEEKDAY_NAMES } from "@/lib/work/recurrence";
+import PageTitle from "@/components/PageTitle";
 
 // 「1時間30分」表示。null は「—」
 const fmt = (m: number | null) => (m === null ? "—" : m === 0 ? "0分" : formatMinutes(m));
@@ -97,7 +98,7 @@ export default function WorkPlanPage() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="text-lg lg:text-2xl font-bold tracking-tight mr-auto">計画・実績</div>
+        <PageTitle className="mr-auto">計画・実績</PageTitle>
         <div className="flex items-center gap-1">
           <button onClick={() => setDate(addDays(date, -1))} aria-label="前の日" className="px-2 py-1 text-sm text-primary bg-transparent border-none cursor-pointer">←</button>
           <div className="text-sm font-bold min-w-[96px] text-center">{label}</div>

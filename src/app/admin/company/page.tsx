@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Card from "@/components/Card";
 import { useAuth } from "@/lib/auth-context";
 import { canWriteCompany } from "@/lib/permissions";
+import PageTitle from "@/components/PageTitle";
 
 type Company = {
   id: string;
@@ -196,7 +197,7 @@ export default function CompanyPage() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-lg lg:text-2xl font-bold tracking-tight">企業情報</div>
+      <PageTitle>企業情報</PageTitle>
 
       {!canWrite && (
         <div className="text-xs text-app-sub bg-app-bg rounded px-3 py-2">

@@ -12,6 +12,7 @@ import TimerBar from "@/components/work/TimerBar";
 import { formatMinutes } from "@/lib/work/labels";
 import type { Task } from "@/components/work/types";
 import { addDays, todayJst } from "@/lib/date-jst";
+import PageTitle from "@/components/PageTitle";
 
 // 業務管理の「今日」画面：未完了タスクを期限で振り分けて表示
 export default function WorkTodayPage() {
@@ -45,7 +46,7 @@ export default function WorkTodayPage() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-between items-center">
-        <div className="text-lg lg:text-2xl font-bold tracking-tight">今日の業務</div>
+        <PageTitle>今日の業務</PageTitle>
         <button
           onClick={() => setEditing("new")}
           className="px-4 py-2 rounded bg-primary text-white text-sm font-bold border-none cursor-pointer"
