@@ -110,7 +110,7 @@ export default function WorkTodayPage() {
       )}
 
       {restCount > 0 && (
-        <Link href="/admin/work/tasks" className="text-xs text-primary text-center">
+        <Link href="/admin/work/projects" className="text-xs text-primary text-center">
           ほかに期限が先・期限なしの未着手タスクが {restCount} 件あります →
         </Link>
       )}

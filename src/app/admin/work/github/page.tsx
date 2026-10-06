@@ -177,7 +177,7 @@ export default function WorkGithubPage() {
         </button>
       )}
 
-      <Link href="/admin/work/tasks" className="text-xs text-primary text-center">取り込んだタスクを見る →</Link>
+      <Link href="/admin/work/projects" className="text-xs text-primary text-center">取り込んだタスクを見る →</Link>
     </div>
   );
 }

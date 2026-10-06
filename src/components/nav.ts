@@ -7,7 +7,6 @@ import {
   CalendarDays,
   CalendarRange,
   CheckCircle2,
-  ClipboardList,
   FolderKanban,
   GitBranch,
   HelpCircle,
@@ -37,10 +36,9 @@ const LABOR_ADMIN: NavItem[] = [
 
 const WORK: NavItem[] = [
   { href: "/admin/work", label: "今日", icon: CheckCircle2, exact: true },
-  { href: "/admin/work/tasks", label: "タスク", icon: ClipboardList },
   { href: "/admin/work/plan", label: "計画・実績", icon: Timer },
   { href: "/admin/work/routines", label: "ルーティン", icon: Repeat },
-  { href: "/admin/work/projects", label: "プロジェクト", icon: FolderKanban },
+  { href: "/admin/work/projects", label: "プロジェクト・タスク", icon: FolderKanban },
   { href: "/admin/work/schedule", label: "スケジュール", icon: CalendarRange },
   { href: "/admin/work/github", label: "GitHub 連携", icon: GitBranch },
 ];
