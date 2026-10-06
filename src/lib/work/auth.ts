@@ -3,13 +3,18 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { canUseWorkspace } from "@/lib/permissions";
+import { currentMcpContext } from "./mcp-context";
 
 export type WorkspaceContext = { ownerId: string };
 
 // 代表者であれば { ownerId } を、そうでなければ返すべきエラー応答を返す
+// AI 連携（MCP）の中で呼ばれたときは、/api/mcp で確かめ済みの鍵の持ち主として動く
 export async function requireWorkspace(): Promise<
   { ok: true; ctx: WorkspaceContext } | { ok: false; response: NextResponse }
 > {
+  const mcp = currentMcpContext();
+  if (mcp) return { ok: true, ctx: { ownerId: mcp.ownerId } };
+
   const session = await getSession();
   if (!session) {
     return { ok: false, response: NextResponse.json({ error: "unauthorized" }, { status: 401 }) };

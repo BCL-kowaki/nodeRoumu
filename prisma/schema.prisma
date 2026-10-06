@@ -43,6 +43,7 @@ model Employee {
   workProjects        WorkProject[]
   workClients         WorkClient[]
   taskAttachments     TaskAttachment[]
+  apiTokens           ApiToken[]
   workTasks           WorkTask[]
   routines            Routine[]
   workPlans           WorkPlan[]
@@ -219,6 +220,24 @@ model WorkProject {
 
   @@index([ownerId, status])
   @@index([clientId])
+}
+
+// AI 連携（MCP）用の鍵。鍵そのものは保存せず、SHA-256 の値だけを持つ
+model ApiToken {
+  id         String    @id @default(cuid())
+  ownerId    String
+  name       String // 用途の名前（例: Claude Code（MacBook））
+  tokenHash  String    @unique
+  hint       String // 一覧で見分けるための先頭数文字（npk_xxxx）
+  scope      String // "read" | "write"
+  expiresAt  DateTime
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  owner Employee @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
 }
 
 // タスクの添付資料。ファイル本体は代表者の Google ドライブにあり、ここには一覧表示用の情報だけを持つ

@@ -8,6 +8,7 @@ import {
   CalendarRange,
   CheckCircle2,
   FolderKanban,
+  Bot,
   GitBranch,
   HelpCircle,
   Home,
@@ -41,6 +42,7 @@ const WORK: NavItem[] = [
   { href: "/admin/work/projects", label: "プロジェクト・タスク", icon: FolderKanban },
   { href: "/admin/work/schedule", label: "スケジュール", icon: CalendarRange },
   { href: "/admin/work/github", label: "GitHub 連携", icon: GitBranch },
+  { href: "/admin/work/ai", label: "AI 連携", icon: Bot },
 ];
 
 const SETTINGS_ADMIN: NavItem[] = [
