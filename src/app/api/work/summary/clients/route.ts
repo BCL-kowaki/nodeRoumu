@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const ownerId = auth.ctx.ownerId;
   const date = { gte: jstDateToDb(range.from), lte: jstDateToDb(range.to) };
 
-  const [plans, entries, projects] = await Promise.all([
+  const [plans, entries, projects, clients] = await Promise.all([
     prisma.workPlan.findMany({
       where: { ownerId, date },
       select: { plannedMinutes: true, projectId: true, task: { select: { projectId: true } } },
@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
         projectId: true,
         task: { select: { projectId: true } },
         plan: { select: { projectId: true } },
+        routine: { select: { projectId: true, clientId: true } },
       },
     }),
     prisma.workProject.findMany({
@@ -38,7 +39,12 @@ export async function GET(req: NextRequest) {
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       select: { id: true, clientId: true },
     }),
+    prisma.workClient.findMany({
+      where: { ownerId },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: { id: true },
+    }),
   ]);
 
-  return NextResponse.json({ from: range.from, to: range.to, ...summarizeByClient({ plans, entries, projects, now: new Date() }) });
+  return NextResponse.json({ from: range.from, to: range.to, ...summarizeByClient({ plans, entries, projects, clients: clients.map((c) => c.id), now: new Date() }) });
 }

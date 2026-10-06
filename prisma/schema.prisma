@@ -185,6 +185,7 @@ model WorkClient {
 
   owner    Employee      @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   projects WorkProject[]
+  routines Routine[]
 
   @@unique([ownerId, name])
 }
@@ -257,6 +258,8 @@ model Routine {
   id             String    @id @default(cuid())
   ownerId        String
   projectId      String?
+  // クライアント（任意）。プロジェクトがあるときは、そのプロジェクトのクライアントにそろえる
+  clientId       String?
   title          String
   description    String?   @db.Text
   frequency      String // "daily" | "weekly" | "monthly"
@@ -273,11 +276,13 @@ model Routine {
 
   owner   Employee       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   project WorkProject?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  client  WorkClient?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
   checks  RoutineCheck[]
   entries TimeEntry[]
 
   @@index([ownerId, active])
   @@index([projectId])
+  @@index([clientId])
 }
 
 // ルーティンの実施記録。チェックした日だけ行を作る（ルーティンを削除すると記録も消える）

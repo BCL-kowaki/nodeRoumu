@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { jstDateToDb } from "@/lib/date-jst";
+import { resolveRoutineLinks } from "@/lib/work/links";
 import { badRequest, notFound, requireWorkspace } from "@/lib/work/auth";
 import { parseRoutineInput, toDbDate } from "@/lib/work/validate";
 
@@ -32,13 +33,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const end = d.endDate !== undefined ? d.endDate : current.endDate ? ymd(current.endDate) : null;
   if (end && end < start) return badRequest("終了日は開始日以降にしてください");
 
-  if (d.projectId) {
-    const project = await prisma.workProject.findFirst({
-      where: { id: d.projectId, ownerId: auth.ctx.ownerId },
-      select: { id: true },
-    });
-    if (!project) return badRequest("プロジェクトが見つかりません");
-  }
+  const links = await resolveRoutineLinks(auth.ctx.ownerId, d, current);
+  if (!links.ok) return badRequest(links.error);
 
   const updated = await prisma.routine.update({
     where: { id: current.id },
@@ -55,8 +51,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
       startDate: d.startDate ? jstDateToDb(d.startDate) : undefined,
       endDate: toDbDate(d.endDate),
       projectId: d.projectId,
+      clientId: links.clientId,
     },
-    include: { project: { select: { id: true, name: true, color: true } } },
+    include: { project: { select: { id: true, name: true, color: true } }, client: { select: { id: true, name: true } } },
   });
   return NextResponse.json(updated);
 }

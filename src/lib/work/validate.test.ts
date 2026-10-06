@@ -294,3 +294,14 @@ describe("parseIdOrder（並び順の保存）", () => {
     expect(parseIdOrder(body)).toEqual({ ok: false, error: "並び順の指定が正しくありません" });
   });
 });
+
+describe("parseRoutineInput のクライアント", () => {
+  it("クライアントを指定したとき、その値を返す。空・null は「なし」", () => {
+    expect(parseRoutineInput({ clientId: "c1" }, "update")).toEqual({ ok: true, data: { clientId: "c1" } });
+    expect(parseRoutineInput({ clientId: "" }, "update")).toEqual({ ok: true, data: { clientId: null } });
+    expect(parseRoutineInput({ clientId: null }, "update")).toEqual({ ok: true, data: { clientId: null } });
+  });
+  it("クライアントの値が文字列でないとき、エラーを返す", () => {
+    expect(parseRoutineInput({ clientId: 3 }, "update")).toEqual({ ok: false, error: "クライアントの指定が正しくありません" });
+  });
+});

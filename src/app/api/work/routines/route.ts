@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { todayJst } from "@/lib/date-jst";
+import { resolveRoutineLinks } from "@/lib/work/links";
 import { badRequest, requireWorkspace } from "@/lib/work/auth";
 import { parseRoutineInput, toDbDate } from "@/lib/work/validate";
 
@@ -14,7 +15,7 @@ export async function GET() {
   const routines = await prisma.routine.findMany({
     where: { ownerId: auth.ctx.ownerId },
     orderBy: [{ active: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
-    include: { project: { select: { id: true, name: true, color: true } } },
+    include: { project: { select: { id: true, name: true, color: true } }, client: { select: { id: true, name: true } } },
   });
   return NextResponse.json(routines);
 }
@@ -30,13 +31,8 @@ export async function POST(req: NextRequest) {
   const startDate = d.startDate ?? todayJst();
   if (d.endDate && d.endDate < startDate) return badRequest("終了日は開始日以降にしてください");
 
-  if (d.projectId) {
-    const project = await prisma.workProject.findFirst({
-      where: { id: d.projectId, ownerId: auth.ctx.ownerId },
-      select: { id: true },
-    });
-    if (!project) return badRequest("プロジェクトが見つかりません");
-  }
+  const links = await resolveRoutineLinks(auth.ctx.ownerId, d, null);
+  if (!links.ok) return badRequest(links.error);
 
   const created = await prisma.routine.create({
     data: {
@@ -53,8 +49,9 @@ export async function POST(req: NextRequest) {
       startDate: toDbDate(startDate)!,
       endDate: toDbDate(d.endDate),
       projectId: d.projectId,
+      clientId: links.clientId,
     },
-    include: { project: { select: { id: true, name: true, color: true } } },
+    include: { project: { select: { id: true, name: true, color: true } }, client: { select: { id: true, name: true } } },
   });
   return NextResponse.json(created, { status: 201 });
 }

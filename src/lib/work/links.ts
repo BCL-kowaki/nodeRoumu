@@ -1,6 +1,7 @@
 // 計画・実績に紐づける タスク / プロジェクト / ルーティン / 計画 が、ログイン中の代表者のものかを確認する
 // （他人のIDを指定して紐づけ・情報を引き出されるのを防ぐ）
 import { prisma } from "@/lib/prisma";
+import { routineClientFor } from "./routine-link";
 
 export type Links = {
   taskId?: string | null;
@@ -40,3 +41,21 @@ export const ENTRY_INCLUDE = {
   routine: { select: { id: true, title: true } },
   plan: { select: { id: true, title: true } },
 } as const;
+
+// ルーティンのプロジェクト・クライアントの確認と、保存するクライアントの決定
+// （プロジェクトがあればそのクライアントにそろえる。どちらも自分のものだけ指定できる）
+export async function resolveRoutineLinks(
+  ownerId: string,
+  sent: { projectId?: string | null; clientId?: string | null },
+  current: { projectId: string | null; clientId: string | null } | null
+): Promise<{ ok: true; clientId: string | null } | { ok: false; error: string }> {
+  const projectId = sent.projectId !== undefined ? sent.projectId : current?.projectId ?? null;
+  let projectClientId: string | null = null;
+  if (projectId) {
+    const project = await prisma.workProject.findFirst({ where: { id: projectId, ownerId }, select: { clientId: true } });
+    if (!project) return { ok: false, error: "プロジェクトが見つかりません" };
+    projectClientId = project.clientId;
+  }
+  if (sent.clientId && !(await ownsClient(ownerId, sent.clientId))) return { ok: false, error: "クライアントが見つかりません" };
+  return routineClientFor({ sentClientId: sent.clientId, projectClientId, currentClientId: current?.clientId ?? null });
+}

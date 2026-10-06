@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { todayJst } from "@/lib/date-jst";
 import { WEEKDAY_BITS, WEEKDAY_NAMES, WEEKDAY_ORDER } from "@/lib/work/recurrence";
-import { api, inputClass, labelClass, type Project, type Routine } from "./types";
+import { api, inputClass, labelClass, type Client, type Project, type Routine } from "./types";
 
 const FREQUENCIES = [
   { value: "daily", label: "毎日" },
@@ -15,11 +15,13 @@ const FREQUENCIES = [
 export default function RoutineEditor({
   routine,
   projects,
+  clients,
   onClose,
   onSaved,
 }: {
   routine: Routine | null;
   projects: Project[];
+  clients: Client[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -36,6 +38,7 @@ export default function RoutineEditor({
     startDate: routine?.startDate?.slice(0, 10) ?? todayJst(),
     endDate: routine?.endDate?.slice(0, 10) ?? "",
     projectId: routine?.projectId ?? "",
+    clientId: routine?.clientId ?? "",
   });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -62,6 +65,7 @@ export default function RoutineEditor({
         startDate: form.startDate,
         endDate: form.endDate || null,
         projectId: form.projectId || null,
+        clientId: form.clientId || null,
       });
       if (routine) await api(`/api/work/routines/${routine.id}`, { method: "PUT", body });
       else await api("/api/work/routines", { method: "POST", body });
@@ -85,7 +89,21 @@ export default function RoutineEditor({
     }
   };
 
-  const selectable = projects.filter((p) => p.status === "active" || p.status === "on_hold" || p.id === form.projectId);
+  // プロジェクトは選んだクライアントのものだけ候補に出す（クライアント未選択なら全部）
+  const selectable = projects.filter(
+    (p) =>
+      (p.status === "active" || p.status === "on_hold" || p.id === form.projectId) &&
+      (!form.clientId || p.clientId === form.clientId)
+  );
+  // クライアントを変えたら、合わなくなったプロジェクトは外す
+  const changeClient = (clientId: string) =>
+    setForm((f) => {
+      const project = projects.find((p) => p.id === f.projectId);
+      return { ...f, clientId, projectId: project && clientId && project.clientId !== clientId ? "" : f.projectId };
+    });
+  // プロジェクトを選んだら、クライアントもそのプロジェクトのものにそろえる
+  const changeProject = (projectId: string) =>
+    setForm((f) => ({ ...f, projectId, clientId: projects.find((p) => p.id === projectId)?.clientId ?? f.clientId }));
 
   return (
     <>
@@ -194,8 +212,17 @@ export default function RoutineEditor({
               />
             </div>
             <div>
+              <label className={labelClass} htmlFor="routine-client">クライアント</label>
+              <select id="routine-client" className={inputClass} value={form.clientId} onChange={(e) => changeClient(e.target.value)}>
+                <option value="">（なし）</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className={labelClass} htmlFor="routine-project">プロジェクト</label>
-              <select id="routine-project" className={inputClass} value={form.projectId} onChange={(e) => set("projectId", e.target.value)}>
+              <select id="routine-project" className={inputClass} value={form.projectId} onChange={(e) => changeProject(e.target.value)}>
                 <option value="">（なし）</option>
                 {selectable.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>

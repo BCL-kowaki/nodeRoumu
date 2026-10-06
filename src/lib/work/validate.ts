@@ -236,6 +236,7 @@ export type RoutineInput = {
   startDate?: string;
   endDate?: string | null;
   projectId?: string | null;
+  clientId?: string | null;
 };
 
 const MAX_ROUTINE_TITLE = 100;
@@ -309,6 +310,13 @@ export function parseRoutineInput(body: unknown, mode: Mode): ParseResult<Routin
       if (p === null || p === "") out.projectId = null;
       else if (typeof p === "string") out.projectId = p;
       else throw new InputError("プロジェクトの指定が正しくありません");
+    }
+    // null はそのまま「なし」にするため、has() ではなくキーの有無で判定する
+    if (Object.prototype.hasOwnProperty.call(b, "clientId")) {
+      const c = b.clientId;
+      if (c === null || c === "") out.clientId = null;
+      else if (typeof c === "string") out.clientId = c;
+      else throw new InputError("クライアントの指定が正しくありません");
     }
     return out;
   });

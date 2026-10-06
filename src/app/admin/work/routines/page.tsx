@@ -5,7 +5,8 @@ import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import RoutineEditor from "@/components/work/RoutineEditor";
 import { useRoutineChecks } from "@/components/work/useRoutineChecks";
-import { api, type CheckStatus, type Project, type Routine } from "@/components/work/types";
+import { Building2 } from "lucide-react";
+import { api, type CheckStatus, type Client, type Project, type Routine } from "@/components/work/types";
 import { dayOfWeek } from "@/lib/attendance-status";
 import { addDays, todayJst } from "@/lib/date-jst";
 import { formatMinutes } from "@/lib/work/labels";
@@ -32,10 +33,12 @@ export default function WorkRoutinesPage() {
   const weekEnd = addDays(weekStart, 6);
   const { routines, days, loading, error, reload, setStatus } = useRoutineChecks(weekStart, weekEnd);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [editing, setEditing] = useState<Routine | null | "new">(null);
 
   useEffect(() => {
     api<Project[]>("/api/work/projects").then(setProjects).catch(() => setProjects([]));
+    api<Client[]>("/api/work/clients").then(setClients).catch(() => setClients([]));
   }, []);
 
   const active = routines.filter((r) => r.active);
@@ -100,7 +103,10 @@ export default function WorkRoutinesPage() {
                 </div>
                 {active.map((r) => (
                   <div key={r.id}>
-                    <div className="text-xs font-semibold text-app-text mb-1 truncate">{r.title}</div>
+                    <div className="text-xs font-semibold text-app-text mb-1 truncate">
+                      {r.client && <span className="text-app-sub font-normal">{r.client.name} › </span>}
+                      {r.title}
+                    </div>
                     <div className="grid grid-cols-7 gap-1">
                       {days.map((d) => {
                         const item = d.items.find((i) => i.routineId === r.id);
@@ -148,6 +154,12 @@ export default function WorkRoutinesPage() {
                     onClick={() => setEditing(r)}
                     className="w-full text-left py-2.5 border-b border-app-border last:border-b-0 bg-transparent border-x-0 border-t-0 cursor-pointer"
                   >
+                    {r.client && (
+                      <div className="flex items-center gap-1 text-[11px] text-app-sub mb-0.5">
+                        <Building2 size={11} aria-hidden />
+                        {r.client.name}
+                      </div>
+                    )}
                     <div className={`text-sm font-semibold ${r.active ? "text-app-text" : "text-app-sub"}`}>{r.title}</div>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] text-app-sub">
                       <Badge type={r.active ? "success" : "default"}>
@@ -168,6 +180,7 @@ export default function WorkRoutinesPage() {
         <RoutineEditor
           routine={editing === "new" ? null : editing}
           projects={projects}
+          clients={clients}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);

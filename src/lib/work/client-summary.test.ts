@@ -26,7 +26,7 @@ describe("summarizeByClient（クライアント別の計画・実績）", () =>
     ];
     const entries = [entry(50, { projectId: "p1" }), entry(20, { projectId: "p3" })];
     // Act
-    const r = summarizeByClient({ plans, entries, projects, now });
+    const r = summarizeByClient({ plans, entries, projects, clients: ["c1", "c2"], now });
     // Assert
     expect(r.clients).toEqual([
       {
@@ -46,7 +46,7 @@ describe("summarizeByClient（クライアント別の計画・実績）", () =>
   it("プロジェクトが直接ついていないとき、タスク → 計画 の順でプロジェクトをたどる", () => {
     const plans = [{ plannedMinutes: 30, projectId: null, task: { projectId: "p3" } }];
     const entries = [entry(10, { taskProjectId: "p3" }), entry(15, { taskProjectId: null, planProjectId: "p3" })];
-    const r = summarizeByClient({ plans, entries, projects, now });
+    const r = summarizeByClient({ plans, entries, projects, clients: ["c1", "c2"], now });
     expect(r.clients).toEqual([
       { clientId: "c2", plannedMin: 30, actualMin: 25, projects: [{ projectId: "p3", plannedMin: 30, actualMin: 25 }] },
     ]);
@@ -55,16 +55,30 @@ describe("summarizeByClient（クライアント別の計画・実績）", () =>
   it("プロジェクトにたどり着かないもの（ルーティンなど）は、未分類として別に合計する", () => {
     const plans = [{ plannedMinutes: 20, projectId: null, task: null }];
     const entries = [entry(40, {}), entry(5, { projectId: "deleted" })];
-    const r = summarizeByClient({ plans, entries, projects, now });
+    const r = summarizeByClient({ plans, entries, projects, clients: ["c1", "c2"], now });
     expect(r.clients).toEqual([]);
     expect(r.unassigned).toEqual({ plannedMin: 20, actualMin: 45 });
+  });
+
+  it("ルーティンの実績は、ルーティンのプロジェクト、なければルーティンのクライアントに数える", () => {
+    const entries = [
+      { ...entry(30, {}), routine: { projectId: "p1", clientId: "c1" } },
+      { ...entry(20, {}), routine: { projectId: null, clientId: "c2" } },
+      { ...entry(10, {}), routine: { projectId: null, clientId: null } },
+    ];
+    const r = summarizeByClient({ plans: [], entries, projects, clients: ["c1", "c2"], now });
+    expect(r.clients).toEqual([
+      { clientId: "c1", plannedMin: 0, actualMin: 30, projects: [{ projectId: "p1", plannedMin: 0, actualMin: 30 }] },
+      { clientId: "c2", plannedMin: 0, actualMin: 20, projects: [{ projectId: null, plannedMin: 0, actualMin: 20 }] },
+    ]);
+    expect(r.unassigned).toEqual({ plannedMin: 0, actualMin: 10 });
   });
 
   it("計測中のタイマーは、現在時刻までの分数で数える", () => {
     const entries = [
       { minutes: null, startedAt: "2026-10-06T04:30:00Z", endedAt: null, projectId: "p1", task: null, plan: null },
     ];
-    const r = summarizeByClient({ plans: [], entries, projects, now });
+    const r = summarizeByClient({ plans: [], entries, projects, clients: ["c1", "c2"], now });
     expect(r.clients[0]).toMatchObject({ clientId: "c1", actualMin: 30 });
   });
 
@@ -73,7 +87,7 @@ describe("summarizeByClient（クライアント別の計画・実績）", () =>
       { plannedMinutes: 10, projectId: "p1", task: null },
       { plannedMinutes: 100, projectId: "p3", task: null },
     ];
-    const r = summarizeByClient({ plans, entries: [], projects, now });
+    const r = summarizeByClient({ plans, entries: [], projects, clients: ["c1", "c2"], now });
     expect(r.clients.map((c) => c.clientId)).toEqual(["c2", "c1"]);
   });
 });

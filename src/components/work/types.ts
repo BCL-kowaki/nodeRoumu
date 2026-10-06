@@ -64,6 +64,8 @@ export type Routine = {
   endDate: string | null;
   projectId: string | null;
   project: ProjectRef | null;
+  clientId: string | null;
+  client: { id: string; name: string } | null;
 };
 
 export type CheckStatus = "done" | "skipped" | null;

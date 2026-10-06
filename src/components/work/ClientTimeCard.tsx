@@ -67,14 +67,18 @@ export default function ClientTimeCard({
       const p = data.clients.flatMap((c) => c.projects).find((x) => x.projectId === projectId);
       rows = [{ key: projectId, label: projectById.get(projectId)?.name ?? "", color: projectById.get(projectId)?.color, plannedMin: p?.plannedMin ?? 0, actualMin: p?.actualMin ?? 0 }];
     } else if (clientId) {
-      rows = (data.clients.find((c) => c.clientId === clientId)?.projects ?? []).map((p) => ({
-        key: p.projectId,
-        label: projectById.get(p.projectId)?.name ?? "（削除済み）",
-        color: projectById.get(p.projectId)?.color,
-        plannedMin: p.plannedMin,
-        actualMin: p.actualMin,
-        select: p.projectId,
-      }));
+      rows = (data.clients.find((c) => c.clientId === clientId)?.projects ?? []).map((p) =>
+        p.projectId === null
+          ? { key: "client-only", label: "プロジェクトなし（ルーティンなど）", plannedMin: p.plannedMin, actualMin: p.actualMin }
+          : {
+              key: p.projectId,
+              label: projectById.get(p.projectId)?.name ?? "（削除済み）",
+              color: projectById.get(p.projectId)?.color,
+              plannedMin: p.plannedMin,
+              actualMin: p.actualMin,
+              select: p.projectId,
+            }
+      );
     } else {
       rows = data.clients.map((c) => ({
         key: c.clientId,

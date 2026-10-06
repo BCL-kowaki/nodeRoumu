@@ -1,6 +1,7 @@
 // クライアント別の計画・実績の集計（決まった答えになる処理なのでテストで固定）
 // 計画・実績はプロジェクトを通してクライアントに振り分ける。
-// プロジェクトは「直接の指定 → タスクのプロジェクト → （実績なら）計画のプロジェクト」の順にたどる。
+// プロジェクトは「直接の指定 → タスクのプロジェクト → （実績なら）計画・ルーティンのプロジェクト」の順にたどる。
+// プロジェクトにたどり着かないルーティンの実績は、ルーティンのクライアントの「プロジェクトなし」に数える。
 import { entryMinutes, type EntryLike } from "./time";
 
 type PlanLike = { plannedMinutes: number; projectId: string | null; task: { projectId: string | null } | null };
@@ -8,24 +9,33 @@ type ClientEntryLike = EntryLike & {
   projectId: string | null;
   task: { projectId: string | null } | null;
   plan: { projectId: string | null } | null;
+  routine?: { projectId: string | null; clientId: string | null } | null;
 };
 
 export type Totals = { plannedMin: number; actualMin: number };
-export type ClientSummary = Totals & { clientId: string; projects: (Totals & { projectId: string })[] };
+// projects の projectId が null のものは、そのクライアントの「プロジェクトなし」の時間
+export type ClientSummary = Totals & { clientId: string; projects: (Totals & { projectId: string | null })[] };
 
 export function summarizeByClient(input: {
   plans: PlanLike[];
   entries: ClientEntryLike[];
   projects: { id: string; clientId: string }[];
+  clients: string[]; // クライアントID（並び順のとおり）
   now: Date;
 }): { clients: ClientSummary[]; unassigned: Totals } {
   const clientOf = new Map(input.projects.map((p) => [p.id, p.clientId]));
   const byProject = new Map<string, Totals>();
+  const byClientOnly = new Map<string, Totals>(); // プロジェクトなし・クライアントだけ分かるもの
+  const knownClients = new Set(input.clients);
   const unassigned: Totals = { plannedMin: 0, actualMin: 0 };
 
-  const add = (projectId: string | null, key: keyof Totals, minutes: number) => {
+  const add = (projectId: string | null, key: keyof Totals, minutes: number, clientId: string | null = null) => {
     if (!projectId || !clientOf.has(projectId)) {
-      unassigned[key] += minutes;
+      if (clientId && knownClients.has(clientId)) {
+        const t = byClientOnly.get(clientId) ?? { plannedMin: 0, actualMin: 0 };
+        t[key] += minutes;
+        byClientOnly.set(clientId, t);
+      } else unassigned[key] += minutes;
       return;
     }
     const t = byProject.get(projectId) ?? { plannedMin: 0, actualMin: 0 };
@@ -35,7 +45,12 @@ export function summarizeByClient(input: {
 
   for (const p of input.plans) add(p.projectId ?? p.task?.projectId ?? null, "plannedMin", p.plannedMinutes);
   for (const e of input.entries) {
-    add(e.projectId ?? e.task?.projectId ?? e.plan?.projectId ?? null, "actualMin", entryMinutes(e, input.now));
+    add(
+      e.projectId ?? e.task?.projectId ?? e.plan?.projectId ?? e.routine?.projectId ?? null,
+      "actualMin",
+      entryMinutes(e, input.now),
+      e.routine?.clientId ?? null
+    );
   }
 
   // プロジェクトの並び順（＝渡された順）を保ったままクライアントごとにまとめる
@@ -48,6 +63,15 @@ export function summarizeByClient(input: {
     c.actualMin += t.actualMin;
     c.projects.push({ projectId: p.id, ...t });
     clients.set(p.clientId, c);
+  }
+  for (const clientId of input.clients) {
+    const t = byClientOnly.get(clientId);
+    if (!t) continue;
+    const c = clients.get(clientId) ?? { clientId, plannedMin: 0, actualMin: 0, projects: [] };
+    c.plannedMin += t.plannedMin;
+    c.actualMin += t.actualMin;
+    c.projects.push({ projectId: null, ...t });
+    clients.set(clientId, c);
   }
 
   const total = (t: Totals) => t.plannedMin + t.actualMin;
