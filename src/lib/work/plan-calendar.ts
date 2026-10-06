@@ -8,9 +8,10 @@ const ymd = (d: Date) => d.toISOString().slice(0, 10);
 export type ExportResult = { exported: number; skippedNoTime: number; failed: number; error?: string };
 
 // 指定期間の計画を書き出す（開始時刻のない計画は書き出さない）。再実行すると同じ予定を更新する
+// Google の予定から取り込んだ計画は、元の予定がすでにカレンダーにあるので書き出さない
 export async function exportPlans(ownerId: string, from: Date, to: Date): Promise<ExportResult> {
   const plans = await prisma.workPlan.findMany({
-    where: { ownerId, date: { gte: from, lte: to } },
+    where: { ownerId, date: { gte: from, lte: to }, sourceEventId: null },
     orderBy: [{ date: "asc" }, { startTime: "asc" }],
   });
   const result: ExportResult = { exported: 0, skippedNoTime: 0, failed: 0 };

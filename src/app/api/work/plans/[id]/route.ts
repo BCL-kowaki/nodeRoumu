@@ -33,6 +33,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       title: d.title,
       taskId: d.taskId,
       projectId: d.projectId,
+      routineId: d.routineId,
     },
     include: LINK_INCLUDE,
   });

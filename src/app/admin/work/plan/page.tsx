@@ -4,10 +4,21 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Card from "@/components/Card";
 import TimerBar from "@/components/work/TimerBar";
-import DayTimeline, { type DayGoogleEvent } from "@/components/work/DayTimeline";
+import DayTimeline, { type DayGoogleEvent, type DayRoutine, type NewPlan } from "@/components/work/DayTimeline";
 import { EntryEditor, PlanEditor } from "@/components/work/PlanEntryEditors";
+import TaskEditor from "@/components/work/TaskEditor";
 import { useTimer } from "@/components/work/useTimer";
-import { api, type DaySummary, type Plan, type Project, type Task, type TimeEntry } from "@/components/work/types";
+import {
+  api,
+  type Client,
+  type DaySummary,
+  type Plan,
+  type Project,
+  type Routine,
+  type RoutineDay,
+  type Task,
+  type TimeEntry,
+} from "@/components/work/types";
 import { dayOfWeek } from "@/lib/attendance-status";
 import { addDays, todayJst } from "@/lib/date-jst";
 import { formatMinutes } from "@/lib/work/labels";
@@ -25,6 +36,9 @@ export default function WorkPlanPage() {
   const [summary, setSummary] = useState<DaySummary | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [routines, setRoutines] = useState<DayRoutine[]>([]);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [googleEvents, setGoogleEvents] = useState<DayGoogleEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,19 +48,30 @@ export default function WorkPlanPage() {
   const load = useCallback(async () => {
     try {
       const q = `from=${date}&to=${date}`;
-      const [p, e, s, t, pr, g] = await Promise.all([
+      const [p, e, s, t, pr, g, cl, rs, rc] = await Promise.all([
         api<Plan[]>(`/api/work/plans?${q}`),
         api<TimeEntry[]>(`/api/work/time-entries?${q}`),
         api<{ days: DaySummary[] }>(`/api/work/summary?${q}`),
         api<Task[]>("/api/work/tasks?status=todo,doing"),
         api<Project[]>("/api/work/projects"),
         api<{ connected: boolean; status: string | null }>("/api/work/google/status"),
+        api<Client[]>("/api/work/clients"),
+        api<Routine[]>("/api/work/routines"),
+        api<{ days: RoutineDay[] }>(`/api/work/routines/checks?${q}`),
       ]);
       setPlans(p);
       setEntries(e);
       setSummary(s.days[0] ?? null);
       setTasks(t);
       setProjects(pr);
+      setClients(cl);
+      // その日に実施するルーティンだけ（停止中は実施日に出てこない）
+      const items = rc.days[0]?.items ?? [];
+      setRoutines(
+        items
+          .map((i) => ({ routine: rs.find((r) => r.id === i.routineId), status: i.status }))
+          .filter((x): x is DayRoutine => !!x.routine)
+      );
       // Google カレンダーは接続している場合だけ表示（失敗しても画面は使えるようにする）
       if (g.connected && g.status === "active") {
         setGoogleEvents(await api<DayGoogleEvent[]>(`/api/work/google/events?${q}`).catch(() => []));
@@ -68,18 +93,30 @@ export default function WorkPlanPage() {
   const isToday = date === today;
   const label = `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}（${WEEKDAY_NAMES[dayOfWeek(date)]}）`;
 
-  // タスクを時間に置く → その時間の計画を作る
-  const createPlan = async (task: Task, startTime: string, minutes: number) => {
+  // タスク・ルーティン・Google の予定を時間に置く → その時間の計画を作る
+  const createPlan = async (plan: NewPlan) => {
     setError(null);
     try {
-      await api("/api/work/plans", {
-        method: "POST",
-        body: JSON.stringify({ date, title: task.title, startTime, plannedMinutes: minutes, taskId: task.id, projectId: task.projectId }),
-      });
+      await api("/api/work/plans", { method: "POST", body: JSON.stringify({ date, ...plan }) });
       await load();
     } catch (e) {
       setError((e as Error).message);
     }
+  };
+
+  // Google の予定をまとめて計画に取り込む（1件ずつ登録し、失敗したものは知らせる）
+  const importEvents = async (items: NewPlan[]) => {
+    setError(null);
+    const failed: string[] = [];
+    for (const plan of items) {
+      try {
+        await api("/api/work/plans", { method: "POST", body: JSON.stringify({ date, ...plan }) });
+      } catch (e) {
+        failed.push(`${plan.title}: ${(e as Error).message}`);
+      }
+    }
+    if (failed.length) setError(failed.join("\n"));
+    await load();
   };
 
   // 計画を動かす・伸ばす（画面は先に変え、失敗したら読み直す）
@@ -110,7 +147,7 @@ export default function WorkPlanPage() {
       </div>
 
       <TimerBar running={timer.running} busy={timer.busy} onStop={timer.stop} />
-      {(error || timer.error) && <div className="text-sm text-danger bg-danger-light rounded p-3">{error || timer.error}</div>}
+      {(error || timer.error) && <div className="text-sm text-danger bg-danger-light rounded p-3 whitespace-pre-wrap">{error || timer.error}</div>}
 
       {loading ? (
         <div className="text-center text-app-sub py-10">読み込み中...</div>
@@ -153,10 +190,14 @@ export default function WorkPlanPage() {
             isToday={isToday}
             tasks={tasks}
             projects={projects}
+            clients={clients}
+            routines={routines}
             plans={plans}
             entries={entries}
             googleEvents={googleEvents}
             onCreatePlan={createPlan}
+            onImportEvents={importEvents}
+            onOpenTask={setEditingTask}
             onUpdatePlan={updatePlan}
             onOpenPlan={setEditingPlan}
             onOpenEntry={setEditingEntry}
@@ -173,6 +214,17 @@ export default function WorkPlanPage() {
           onClose={() => setEditingPlan(null)}
           onSaved={() => {
             setEditingPlan(null);
+            load();
+          }}
+        />
+      )}
+      {editingTask && (
+        <TaskEditor
+          task={editingTask}
+          projects={projects}
+          onClose={() => setEditingTask(null)}
+          onSaved={() => {
+            setEditingTask(null);
             load();
           }}
         />

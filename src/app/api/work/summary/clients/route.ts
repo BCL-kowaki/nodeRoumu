@@ -20,7 +20,12 @@ export async function GET(req: NextRequest) {
   const [plans, entries, projects, clients] = await Promise.all([
     prisma.workPlan.findMany({
       where: { ownerId, date },
-      select: { plannedMinutes: true, projectId: true, task: { select: { projectId: true } } },
+      select: {
+        plannedMinutes: true,
+        projectId: true,
+        task: { select: { projectId: true } },
+        routine: { select: { projectId: true, clientId: true } },
+      },
     }),
     prisma.timeEntry.findMany({
       where: { ownerId, date },

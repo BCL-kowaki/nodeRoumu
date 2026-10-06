@@ -4,12 +4,18 @@
 // プロジェクトにたどり着かないルーティンの実績は、ルーティンのクライアントの「プロジェクトなし」に数える。
 import { entryMinutes, type EntryLike } from "./time";
 
-type PlanLike = { plannedMinutes: number; projectId: string | null; task: { projectId: string | null } | null };
+type RoutineLink = { projectId: string | null; clientId: string | null } | null;
+type PlanLike = {
+  plannedMinutes: number;
+  projectId: string | null;
+  task: { projectId: string | null } | null;
+  routine?: RoutineLink;
+};
 type ClientEntryLike = EntryLike & {
   projectId: string | null;
   task: { projectId: string | null } | null;
   plan: { projectId: string | null } | null;
-  routine?: { projectId: string | null; clientId: string | null } | null;
+  routine?: RoutineLink;
 };
 
 export type Totals = { plannedMin: number; actualMin: number };
@@ -43,7 +49,9 @@ export function summarizeByClient(input: {
     byProject.set(projectId, t);
   };
 
-  for (const p of input.plans) add(p.projectId ?? p.task?.projectId ?? null, "plannedMin", p.plannedMinutes);
+  for (const p of input.plans) {
+    add(p.projectId ?? p.task?.projectId ?? p.routine?.projectId ?? null, "plannedMin", p.plannedMinutes, p.routine?.clientId ?? null);
+  }
   for (const e of input.entries) {
     add(
       e.projectId ?? e.task?.projectId ?? e.plan?.projectId ?? e.routine?.projectId ?? null,

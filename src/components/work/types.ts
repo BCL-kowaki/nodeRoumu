@@ -84,6 +84,8 @@ export type Plan = {
   title: string;
   taskId: string | null;
   projectId: string | null;
+  routineId?: string | null;
+  sourceEventId?: string | null;
   task: { id: string; title: string; status: string } | null;
   project: ProjectRef | null;
 };

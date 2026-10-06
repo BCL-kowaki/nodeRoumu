@@ -305,3 +305,21 @@ describe("parseRoutineInput のクライアント", () => {
     expect(parseRoutineInput({ clientId: 3 }, "update")).toEqual({ ok: false, error: "クライアントの指定が正しくありません" });
   });
 });
+
+describe("parsePlanInput のルーティン・Google の予定", () => {
+  it("ルーティンと取り込んだ予定のIDを受け付ける", () => {
+    expect(
+      parsePlanInput({ date: "2026-10-06", title: "日報", plannedMinutes: 15, routineId: "r1", sourceEventId: "g1" }, "create")
+    ).toMatchObject({ ok: true, data: { routineId: "r1", sourceEventId: "g1" } });
+  });
+  it("予定のIDが長すぎる・文字列でないとき、エラーを返す", () => {
+    expect(parsePlanInput({ date: "2026-10-06", title: "a", plannedMinutes: 15, sourceEventId: "x".repeat(1025) }, "create")).toEqual({
+      ok: false,
+      error: "取り込む予定の指定が正しくありません",
+    });
+    expect(parsePlanInput({ date: "2026-10-06", title: "a", plannedMinutes: 15, sourceEventId: 1 }, "create")).toEqual({
+      ok: false,
+      error: "取り込む予定の指定が正しくありません",
+    });
+  });
+});

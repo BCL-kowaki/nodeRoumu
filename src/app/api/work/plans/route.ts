@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { jstDateToDb } from "@/lib/date-jst";
 import { badRequest, requireWorkspace } from "@/lib/work/auth";
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(plans);
 }
 
-// 業務計画の作成  POST /api/work/plans  body: { date, title, plannedMinutes, startTime?, taskId?, projectId? }
+// 業務計画の作成  POST /api/work/plans  body: { date, title, plannedMinutes, startTime?, taskId?, projectId?, routineId?, sourceEventId? }
 export async function POST(req: NextRequest) {
   const auth = await requireWorkspace();
   if (!auth.ok) return auth.response;
@@ -42,8 +43,14 @@ export async function POST(req: NextRequest) {
       title: d.title!,
       taskId: d.taskId ?? null,
       projectId: d.projectId ?? null,
+      routineId: d.routineId ?? null,
+      sourceEventId: d.sourceEventId ?? null,
     },
     include: LINK_INCLUDE,
+  }).catch((e: unknown) => {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return null;
+    throw e;
   });
+  if (!created) return badRequest("この予定はすでに計画に取り込まれています");
   return NextResponse.json(created, { status: 201 });
 }

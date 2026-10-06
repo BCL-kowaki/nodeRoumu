@@ -301,6 +301,7 @@ model Routine {
   client  WorkClient?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
   checks  RoutineCheck[]
   entries TimeEntry[]
+  plans   WorkPlan[]
 
   @@index([ownerId, active])
   @@index([projectId])
@@ -332,6 +333,9 @@ model WorkPlan {
   title          String
   taskId         String?
   projectId      String?
+  routineId      String? // ルーティンから置いた計画
+  // Google カレンダーの予定から取り込んだ計画（元の予定のID）。書き出しの対象にはしない
+  sourceEventId  String?
   sortOrder      Int       @default(0)
   // Google カレンダーへの書き出し（未書き出しは NULL）
   googleEventId  String?
@@ -342,9 +346,13 @@ model WorkPlan {
   owner   Employee     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   task    WorkTask?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
   project WorkProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  routine Routine?     @relation(fields: [routineId], references: [id], onDelete: SetNull)
   entries TimeEntry[]
 
+  // 同じ日に同じ予定を二重に取り込まない（手で作った計画は NULL なので対象外）
+  @@unique([ownerId, date, sourceEventId])
   @@index([ownerId, date])
+  @@index([routineId])
 }
 
 // 実績（タイマーまたは手入力）。計測中のタイマーは endedAt が null で、常に1件まで

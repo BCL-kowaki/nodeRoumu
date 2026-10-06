@@ -74,6 +74,18 @@ describe("summarizeByClient（クライアント別の計画・実績）", () =>
     expect(r.unassigned).toEqual({ plannedMin: 0, actualMin: 10 });
   });
 
+  it("ルーティンから置いた計画は、ルーティンのプロジェクト、なければクライアントに数える", () => {
+    const plans = [
+      { plannedMinutes: 15, projectId: null, task: null, routine: { projectId: "p3", clientId: "c2" } },
+      { plannedMinutes: 30, projectId: null, task: null, routine: { projectId: null, clientId: "c1" } },
+    ];
+    const r = summarizeByClient({ plans, entries: [], projects, clients: ["c1", "c2"], now });
+    expect(r.clients).toEqual([
+      { clientId: "c1", plannedMin: 30, actualMin: 0, projects: [{ projectId: null, plannedMin: 30, actualMin: 0 }] },
+      { clientId: "c2", plannedMin: 15, actualMin: 0, projects: [{ projectId: "p3", plannedMin: 15, actualMin: 0 }] },
+    ]);
+  });
+
   it("計測中のタイマーは、現在時刻までの分数で数える", () => {
     const entries = [
       { minutes: null, startedAt: "2026-10-06T04:30:00Z", endedAt: null, projectId: "p1", task: null, plan: null },

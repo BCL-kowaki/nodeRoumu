@@ -24,10 +24,27 @@ import {
   timeToMinutes,
   yToStart,
 } from "@/lib/work/timeline";
+import Link from "next/link";
+import { Building2, CalendarPlus, Check, Repeat } from "lucide-react";
 import { formatMinutes } from "@/lib/work/labels";
-import { entryTitle, type Plan, type Project, type Task, type TimeEntry } from "./types";
+import { eventToPlan, groupTasksByProject, importableEvents } from "@/lib/work/plan-sources";
+import { entryTitle, type CheckStatus, type Client, type Plan, type Project, type Routine, type Task, type TimeEntry } from "./types";
 
 export type DayGoogleEvent = { id: string; title: string; allDay: boolean; startTime: string | null; endTime: string | null };
+
+// その日に実施するルーティン（実施状況つき）
+export type DayRoutine = { routine: Routine; status: CheckStatus };
+
+// 計画を新しく作るときの中身（タスク・ルーティン・Google の予定から）
+export type NewPlan = {
+  title: string;
+  startTime: string;
+  plannedMinutes: number;
+  taskId?: string | null;
+  projectId?: string | null;
+  routineId?: string | null;
+  sourceEventId?: string | null;
+};
 
 const HOUR_PX = 56;
 const PX_PER_MIN = HOUR_PX / 60;
@@ -35,12 +52,13 @@ const DEFAULT_TASK_MINUTES = 60;
 
 type DragData =
   | { kind: "task"; task: Task; duration: number }
+  | { kind: "routine"; routine: Routine; duration: number }
   | { kind: "unscheduled"; plan: Plan; duration: number }
   | { kind: "plan"; plan: Plan; start: number; duration: number }
   | { kind: "resize"; plan: Plan; start: number; duration: number };
 
 // ===== 左側：置けるタスク（ドラッグ元） =====
-function DraggableTask({ task, projects }: { task: Task; projects: Project[] }) {
+function DraggableTask({ task, projects, onOpen }: { task: Task; projects: Project[]; onOpen: (t: Task) => void }) {
   const duration = task.plannedMinutes ?? DEFAULT_TASK_MINUTES;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `task:${task.id}`,
@@ -52,8 +70,9 @@ function DraggableTask({ task, projects }: { task: Task; projects: Project[] }) 
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      aria-label={`「${task.title}」をタイムラインにドラッグして置く`}
-      className={`shrink-0 w-56 lg:w-auto flex items-stretch rounded-lg border border-app-border bg-white cursor-grab active:cursor-grabbing select-none touch-manipulation ${
+      onClick={() => onOpen(task)}
+      aria-label={`「${task.title}」。押すと詳細、ドラッグでタイムラインに置く`}
+      className={`flex items-stretch rounded-lg border border-app-border bg-white cursor-grab active:cursor-grabbing select-none touch-manipulation hover:border-app-sub ${
         isDragging ? "opacity-40" : ""
       }`}
     >
@@ -62,6 +81,40 @@ function DraggableTask({ task, projects }: { task: Task; projects: Project[] }) 
         <div className="text-sm font-semibold text-app-text truncate">{task.title}</div>
         <div className="text-[11px] text-app-sub">{formatMinutes(duration)}{task.plannedMinutes == null ? "（仮）" : ""}</div>
       </div>
+    </div>
+  );
+}
+
+function DraggableRoutine({ item, planned }: { item: DayRoutine; planned: boolean }) {
+  const { routine, status } = item;
+  const duration = routine.plannedMinutes ?? DEFAULT_TASK_MINUTES;
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `routine:${routine.id}`,
+    data: { kind: "routine", routine, duration } satisfies DragData,
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      aria-label={`ルーティン「${routine.title}」をタイムラインにドラッグして置く`}
+      className={`flex items-center gap-2 rounded-lg border border-app-border bg-white px-3 py-2 cursor-grab active:cursor-grabbing select-none touch-manipulation hover:border-app-sub ${
+        isDragging ? "opacity-40" : ""
+      }`}
+    >
+      <Repeat size={14} className="shrink-0 text-accent" aria-hidden />
+      <div className="flex-1 min-w-0">
+        {routine.client && <div className="text-[10px] text-app-sub truncate">{routine.client.name}</div>}
+        <div className="text-sm font-semibold text-app-text truncate">{routine.title}</div>
+        <div className="text-[11px] text-app-sub">
+          {formatMinutes(duration)}
+          {routine.plannedMinutes == null ? "（仮）" : ""}
+          {planned && "・計画済み"}
+          {status === "done" && "・実施済み"}
+          {status === "skipped" && "・スキップ"}
+        </div>
+      </div>
+      {(planned || status === "done") && <Check size={14} className="shrink-0 text-app-sub" aria-hidden />}
     </div>
   );
 }
@@ -77,7 +130,7 @@ function DraggableUnscheduled({ plan }: { plan: Plan }) {
       {...listeners}
       {...attributes}
       aria-label={`「${plan.title}」をタイムラインにドラッグして時刻を決める`}
-      className={`shrink-0 w-56 lg:w-auto rounded-lg border border-dashed border-work bg-work-light px-3 py-2 cursor-grab active:cursor-grabbing select-none touch-manipulation ${
+      className={`rounded-lg border border-dashed border-work bg-work-light px-3 py-2 cursor-grab active:cursor-grabbing select-none touch-manipulation ${
         isDragging ? "opacity-40" : ""
       }`}
     >
@@ -174,10 +227,14 @@ export default function DayTimeline({
   isToday,
   tasks,
   projects,
+  clients,
+  routines,
   plans,
   entries,
   googleEvents,
   onCreatePlan,
+  onImportEvents,
+  onOpenTask,
   onUpdatePlan,
   onOpenPlan,
   onOpenEntry,
@@ -186,10 +243,14 @@ export default function DayTimeline({
   isToday: boolean;
   tasks: Task[];
   projects: Project[];
+  clients: Client[];
+  routines: DayRoutine[];
   plans: Plan[];
   entries: TimeEntry[];
   googleEvents: DayGoogleEvent[];
-  onCreatePlan: (task: Task, startTime: string, minutes: number) => void;
+  onCreatePlan: (plan: NewPlan) => void;
+  onImportEvents: (plans: NewPlan[]) => void;
+  onOpenTask: (task: Task) => void;
   onUpdatePlan: (plan: Plan, patch: { startTime?: string; plannedMinutes?: number }) => void;
   onOpenPlan: (plan: Plan) => void;
   onOpenEntry: (entry: TimeEntry) => void;
@@ -287,13 +348,28 @@ export default function DayTimeline({
     const y = dropY(ev);
     if (y === null) return;
     const start = yToStart(y, PX_PER_MIN, d.duration);
-    if (d.kind === "task") onCreatePlan(d.task, minutesToTime(start), d.duration);
-    else onUpdatePlan(d.plan, { startTime: minutesToTime(start) });
+    if (d.kind === "task") {
+      onCreatePlan({ title: d.task.title, startTime: minutesToTime(start), plannedMinutes: d.duration, taskId: d.task.id, projectId: d.task.projectId });
+    } else if (d.kind === "routine") {
+      onCreatePlan({
+        title: d.routine.title,
+        startTime: minutesToTime(start),
+        plannedMinutes: d.duration,
+        routineId: d.routine.id,
+        projectId: d.routine.projectId,
+      });
+    } else onUpdatePlan(d.plan, { startTime: minutesToTime(start) });
   };
 
   const jstNow = new Date(now.getTime() + 9 * 3600_000);
   const nowMin = jstNow.getUTCHours() * 60 + jstNow.getUTCMinutes();
   const allDay = googleEvents.filter((e) => e.allDay);
+  const importable = importableEvents(googleEvents, plans.map((p) => ({ sourceEventId: p.sourceEventId ?? null })));
+  const importedIds = new Set(plans.map((p) => p.sourceEventId).filter(Boolean));
+  const plannedRoutineIds = new Set(plans.map((p) => p.routineId).filter(Boolean));
+  const taskGroups = groupTasksByProject(tasks, projects, clients);
+  const projectById = new Map(projects.map((p) => [p.id, p]));
+  const clientName = (id: string | undefined) => clients.find((c) => c.id === id)?.name;
 
   return (
     <DndContext
@@ -307,22 +383,60 @@ export default function DayTimeline({
       }}
     >
       <div className="lg:grid lg:grid-cols-[260px_1fr] lg:gap-6 lg:items-start">
-        {/* ドラッグ元：未完了のタスク・時刻未定の計画 */}
+        {/* ドラッグ元：今日のルーティン・時刻未定の計画・未完了のタスク（プロジェクトごと） */}
         <div className="bg-white rounded-2xl border border-app-border p-3 mb-3 lg:mb-0 lg:sticky lg:top-6">
-          <div className="text-[11px] font-bold tracking-[0.12em] text-app-sub mb-2">
-            未完了のタスク <span className="font-normal tracking-normal">（右の「計画」にドラッグ）</span>
-          </div>
-          <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible lg:max-h-[60vh] lg:overflow-y-auto pb-1">
-            {unscheduled.map((p) => (
-              <DraggableUnscheduled key={p.id} plan={p} />
-            ))}
-            {tasks.length === 0 && unscheduled.length === 0 ? (
-              <div className="text-xs text-app-sub py-2">未完了のタスクはありません</div>
-            ) : (
-              tasks.map((t) => <DraggableTask key={t.id} task={t} projects={projects} />)
+          <div className="text-[10px] text-app-sub mb-2">右の「計画」にドラッグして置きます</div>
+          <div className="flex flex-col gap-3 max-h-[45vh] lg:max-h-[68vh] overflow-y-auto pr-0.5 pb-1">
+            {routines.length > 0 && (
+              <section className="flex flex-col gap-1.5">
+                <div className="text-[11px] font-bold tracking-[0.08em] text-app-sub">今日のルーティン</div>
+                {routines.map((r) => (
+                  <DraggableRoutine key={r.routine.id} item={r} planned={plannedRoutineIds.has(r.routine.id)} />
+                ))}
+              </section>
             )}
+            {unscheduled.length > 0 && (
+              <section className="flex flex-col gap-1.5">
+                <div className="text-[11px] font-bold tracking-[0.08em] text-app-sub">時刻未定の計画</div>
+                {unscheduled.map((p) => (
+                  <DraggableUnscheduled key={p.id} plan={p} />
+                ))}
+              </section>
+            )}
+            <section className="flex flex-col gap-1.5">
+              <div className="text-[11px] font-bold tracking-[0.08em] text-app-sub">未完了のタスク</div>
+              {tasks.length === 0 && <div className="text-xs text-app-sub py-1">未完了のタスクはありません</div>}
+              {taskGroups.map((g) => {
+                const project = g.projectId ? projectById.get(g.projectId) : undefined;
+                return (
+                  <div key={g.projectId ?? "none"} className="flex flex-col gap-1.5">
+                    {g.projectId ? (
+                      <Link
+                        href={`/admin/work/projects?project=${g.projectId}`}
+                        className="flex items-center gap-1.5 mt-1 text-xs font-semibold text-app-text no-underline hover:underline min-w-0"
+                        title="プロジェクト・タスクの画面で開く"
+                      >
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: project?.color || "#9AA6A2" }} aria-hidden />
+                        <span className="truncate">{project?.name ?? "（プロジェクト）"}</span>
+                        {clientName(project?.clientId) && (
+                          <span className="flex items-center gap-0.5 text-[10px] font-normal text-app-sub shrink-0">
+                            <Building2 size={10} aria-hidden />
+                            {clientName(project?.clientId)}
+                          </span>
+                        )}
+                      </Link>
+                    ) : (
+                      <div className="mt-1 text-xs font-semibold text-app-sub">プロジェクトなし</div>
+                    )}
+                    {g.tasks.map((t) => (
+                      <DraggableTask key={t.id} task={t} projects={projects} onOpen={onOpenTask} />
+                    ))}
+                  </div>
+                );
+              })}
+            </section>
           </div>
-          <div className="text-[10px] text-app-sub mt-2 hidden lg:block">予定時間が未設定のタスクは60分で置きます。置いたあと下端を引いて調整できます。</div>
+          <div className="text-[10px] text-app-sub mt-2 hidden lg:block">タスクを押すと詳細を開きます。予定時間が未設定のものは60分で置き、下端を引いて調整できます。</div>
           <div className="text-[10px] text-app-sub mt-1 lg:hidden">スマホは長押ししてからドラッグします。</div>
         </div>
 
@@ -336,6 +450,21 @@ export default function DayTimeline({
                   {e.title}
                 </span>
               ))}
+            </div>
+          )}
+          {importable.length > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-app-border bg-accent-light">
+              <span className="text-xs text-app-text">
+                Google の予定が {importable.length} 件、まだ計画に入っていません（予定を押すと1件ずつ取り込めます）
+              </span>
+              <button
+                type="button"
+                onClick={() => onImportEvents(importable.map((e) => eventToPlan(e)!))}
+                className="ml-auto shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary text-white text-xs font-bold border-none cursor-pointer"
+              >
+                <CalendarPlus size={13} aria-hidden />
+                すべて計画に取り込む
+              </button>
             </div>
           )}
           <div className="grid grid-cols-[44px_minmax(0,22%)_1fr_minmax(0,18%)] text-[10px] font-bold text-app-sub border-b border-app-border">
@@ -361,20 +490,31 @@ export default function DayTimeline({
                   const s = timeToMinutes(e.startTime!);
                   const end = timeToMinutes(e.endTime!) || DAY_END;
                   const lay = googleLayout[e.id] ?? { col: 0, cols: 1 };
+                  const imported = importedIds.has(e.id);
+                  const asPlan = eventToPlan(e);
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={e.id}
-                      className="absolute rounded-md bg-app-bg border border-app-border px-1.5 py-0.5 overflow-hidden"
+                      disabled={imported || !asPlan}
+                      onClick={() => asPlan && onImportEvents([asPlan])}
+                      className={`absolute rounded-md border px-1.5 py-0.5 overflow-hidden text-left ${
+                        imported ? "bg-white border-dashed border-app-border cursor-default" : "bg-app-bg border-app-border cursor-pointer hover:border-app-sub"
+                      }`}
                       style={{
                         top: s * PX_PER_MIN,
                         height: Math.max((Math.max(end, s + 15) - s) * PX_PER_MIN, 16),
                         left: `calc(${(lay.col / lay.cols) * 100}% + 2px)`,
                         width: `calc(${100 / lay.cols}% - 4px)`,
                       }}
-                      title={`${e.title}（${e.startTime}〜${e.endTime}）`}
+                      title={`${e.title}（${e.startTime}〜${e.endTime}）${imported ? "・計画に取り込み済み" : "・押すと計画に取り込む"}`}
+                      aria-label={`Google の予定「${e.title}」${e.startTime}〜${e.endTime}${imported ? "（計画に取り込み済み）" : "。押すと計画に取り込む"}`}
                     >
-                      <div className="text-[11px] text-app-text truncate">{e.title}</div>
-                    </div>
+                      <div className={`flex items-center gap-0.5 text-[11px] truncate ${imported ? "text-app-sub" : "text-app-text"}`}>
+                        {imported && <Check size={10} className="shrink-0" aria-hidden />}
+                        {e.title}
+                      </div>
+                    </button>
                   );
                 })}
               </div>
@@ -453,13 +593,13 @@ export default function DayTimeline({
 
       {/* ドラッグ中に指の下に表示する見た目 */}
       <DragOverlay dropAnimation={null}>
-        {active && (active.kind === "task" || active.kind === "unscheduled") ? (
+        {active && (active.kind === "task" || active.kind === "unscheduled" || active.kind === "routine") ? (
           <div
             className="rounded-lg bg-work-light border-2 border-work px-3 py-1.5 shadow-xl w-48"
             style={{ height: Math.max(active.duration * PX_PER_MIN, 28) }}
           >
             <div className="text-[12px] font-bold text-work-dark truncate">
-              {active.kind === "task" ? active.task.title : active.plan.title}
+              {active.kind === "task" ? active.task.title : active.kind === "routine" ? active.routine.title : active.plan.title}
             </div>
             <div className="text-[10px] text-app-sub">{formatMinutes(active.duration)}</div>
           </div>

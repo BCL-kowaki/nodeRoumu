@@ -365,6 +365,7 @@ function minutesInRange(v: unknown, message: string): number {
 }
 
 export type PlanInput = LinkInput & {
+  sourceEventId?: string | null; // Google カレンダーから取り込んだ予定のID
   date?: string;
   startTime?: string | null;
   plannedMinutes?: number;
@@ -392,7 +393,13 @@ export function parsePlanInput(body: unknown, mode: Mode): ParseResult<PlanInput
     if (mode === "create" || has(b, "title")) {
       out.title = requiredText(b.title, MAX_TITLE, "タイトルを入力してください", `タイトルは${MAX_TITLE}文字以内で入力してください`);
     }
-    readLinks(b, out, ["taskId", "projectId"]);
+    readLinks(b, out, ["taskId", "projectId", "routineId"]);
+    if (has(b, "sourceEventId")) {
+      const v = b.sourceEventId;
+      if (v === null || v === "") out.sourceEventId = null;
+      else if (typeof v === "string" && v.length <= 1024) out.sourceEventId = v;
+      else throw new InputError("取り込む予定の指定が正しくありません");
+    }
     return out;
   });
 }
