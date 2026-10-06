@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LogOut, UserCog } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
 import { useAuth } from "@/lib/auth-context";
-import { roleLabel } from "@/lib/roles";
+import { homePathFor, roleLabel } from "@/lib/roles";
 import { isActive, sidebarGroups, type Domain } from "./nav";
 
 // 緑で塗ったサイドバーの上で、帳簿ごとの区別をつける色（見出しの点と、選択中の文字色）
@@ -32,7 +32,7 @@ export default function Sidebar() {
       <div className="relative overflow-hidden h-20 flex items-center px-4 border-b border-white/10 shrink-0">
         <span className="absolute -right-8 top-0 bottom-0 w-14 -skew-x-[18deg] bg-accent" aria-hidden />
         <Link
-          href={isAdminArea ? "/admin" : "/"}
+          href={homePathFor(user?.role)}
           className="relative no-underline bg-white rounded-xl px-3 py-1.5 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
           aria-label="ホームへ"
         >

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Card from "@/components/Card";
 import PasswordInput from "@/components/PasswordInput";
 import BrandLogo from "@/components/BrandLogo";
+import { homePathFor } from "@/lib/roles";
 
 // Google ログイン（代表者用）から戻ってきたときのエラー表示
 const GOOGLE_ERRORS: Record<string, string> = {
@@ -46,11 +47,7 @@ export default function LoginPage() {
       return;
     }
 
-    if (data.role === "admin" || data.role === "manager") {
-      router.push("/admin");
-    } else {
-      router.push("/");
-    }
+    router.push(homePathFor(data.role));
   };
 
   return (

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 type AuthUser = {
   authenticated: boolean;
@@ -27,16 +27,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
+  const signedIn = !!user;
 
+  // ログイン中の人を読み込む。ログイン画面から画面を再読み込みせずに移ったときも、
+  // まだ読み込めていなければ移動先で読み直す（読み込み済みなら何もしない）
   useEffect(() => {
+    if (signedIn || pathname === "/login") {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
     fetch("/api/auth/me")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
+        if (cancelled) return;
         setUser(data);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
-  }, []);
+      .catch(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, signedIn]);
 
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { homePathFor } from "@/lib/roles";
 import { createToken, sessionCookie } from "@/lib/auth";
 import {
   GOOGLE_OAUTH_COOKIE,
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest) {
     role: "admin",
     name: employee.name,
   });
-  const res = NextResponse.redirect(new URL("/admin", req.url));
+  const res = NextResponse.redirect(new URL(homePathFor("admin"), req.url));
   res.cookies.set(sessionCookie(token));
   res.cookies.delete({ name: GOOGLE_OAUTH_COOKIE, path: "/api/auth/google" });
   return res;

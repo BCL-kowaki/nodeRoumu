@@ -35,8 +35,8 @@ const LABOR_ADMIN: NavItem[] = [
 ];
 
 const WORK: NavItem[] = [
-  { href: "/admin/work", label: "今日", icon: CheckCircle2, exact: true },
   { href: "/admin/work/plan", label: "計画・実績", icon: Timer },
+  { href: "/admin/work", label: "今日", icon: CheckCircle2, exact: true },
   { href: "/admin/work/routines", label: "ルーティン", icon: Repeat },
   { href: "/admin/work/projects", label: "プロジェクト・タスク", icon: FolderKanban },
   { href: "/admin/work/schedule", label: "スケジュール", icon: CalendarRange },
@@ -59,12 +59,12 @@ const EMPLOYEE: NavItem[] = [
   { href: "/status", label: "ステータス", icon: UserRound },
 ];
 
-// サイドバーに出すグループ（ロール別）
+// サイドバーに出すグループ（ロール別）。代表者は業務管理を先頭に置く
 export function sidebarGroups(role: Role): NavGroup[] {
   if (role === "admin") {
     return [
-      { domain: "labor", title: "労務管理", items: LABOR_ADMIN },
       { domain: "work", title: "業務管理", items: WORK },
+      { domain: "labor", title: "労務管理", items: LABOR_ADMIN },
       { domain: "settings", title: "設定", items: SETTINGS_ADMIN },
     ];
   }

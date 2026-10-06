@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { homePathFor } from "@/lib/roles";
 import { getSessionFromRequest } from "@/lib/session-token";
 
 const PUBLIC_PATHS = ["/login", "/api/auth/login"];
@@ -40,10 +41,10 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // 従業員ルート → admin/managerがアクセスしたら管理画面へ
+  // 従業員ルート → admin/managerがアクセスしたら、それぞれの最初の画面へ（代表者は計画・実績）
   if (!pathname.startsWith("/admin") && (session.role === "admin" || session.role === "manager")) {
     const adminUrl = req.nextUrl.clone();
-    adminUrl.pathname = "/admin";
+    adminUrl.pathname = homePathFor(session.role);
     return NextResponse.redirect(adminUrl);
   }
 

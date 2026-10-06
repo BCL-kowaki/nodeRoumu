@@ -11,3 +11,11 @@ export function roleLabel(role: string | undefined): string {
   if (!role) return "";
   return ROLE_LABELS[role] || role;
 }
+
+// ログイン後やロゴから開く最初の画面。
+// 代表者は業務管理の「計画・実績」、社労士は労務管理のホーム（業務管理は使えない）、従業員は従業員のホーム
+export function homePathFor(role: string | undefined): string {
+  if (role === "admin") return "/admin/work/plan";
+  if (role === "manager") return "/admin";
+  return "/";
+}
