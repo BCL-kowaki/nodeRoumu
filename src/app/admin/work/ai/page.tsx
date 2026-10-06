@@ -115,6 +115,7 @@ export default function WorkAiPage() {
         <ul className="mt-2 mb-0 pl-5 text-xs text-app-sub leading-relaxed">
           <li>できるのは「読む」と「追加・変更」だけです。削除はこの画面（アプリ）からだけ行えます。</li>
           <li>労務（給与・出勤簿・従業員）の情報は、AI からは扱えません。</li>
+          <li>タスクの状態を変えると GitHub の Issue に、計画を変えると書き出し済みの Google カレンダーの予定にも反映されます（画面で操作したときと同じ）。</li>
           <li>鍵はパスワードと同じです。人に渡したり、GitHub などに載せたりしないでください。漏れたら下の一覧から取り消してください。</li>
         </ul>
       </Card>
@@ -124,7 +125,11 @@ export default function WorkAiPage() {
       {issued ? (
         <Card className="!p-4 border-accent">
           <div className="text-sm font-bold text-app-text mb-1">鍵「{issued.name}」を発行しました</div>
-          <div className="text-xs text-danger mb-3">この鍵は今だけ表示されます。閉じると二度と表示できません（なくしたら発行し直してください）。</div>
+          <div className="text-xs text-danger mb-1">この鍵は今だけ表示されます。閉じると二度と表示できません（なくしたら発行し直してください）。</div>
+          <div className="text-[11px] text-app-sub mb-3 leading-relaxed">
+            下のコマンドを実行すると、鍵はターミナルの履歴と Claude Code・Codex の設定ファイルにそのまま残ります。
+            設定ファイル（~/.zshrc など）を GitHub などに公開している場合は、公開しない別のファイルに書いてください。
+          </div>
           <div className="flex flex-col gap-3">
             <CopyBlock label="鍵" text={issued.token} />
             <CopyBlock

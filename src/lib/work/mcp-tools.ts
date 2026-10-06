@@ -43,11 +43,11 @@ async function call<T = unknown>(
 }
 
 const ok = (data: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(data) }] });
-const fail = (e: unknown) => ({
-  isError: true,
-  content: [{ type: "text" as const, text: e instanceof ToolError ? e.message : "処理に失敗しました" }],
-});
-const run = (fn: () => Promise<unknown>) => fn().then(ok, fail);
+const fail = (tool: string, e: unknown) => {
+  // 想定外のエラーは原因を追えるよう記録する（鍵・入力内容は出さない）。AI には中身を見せない
+  if (!(e instanceof ToolError)) console.error(`[mcp] ${tool} で失敗しました`, e instanceof Error ? e.message : e);
+  return { isError: true, content: [{ type: "text" as const, text: e instanceof ToolError ? e.message : "処理に失敗しました" }] };
+};
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe("日付 YYYY-MM-DD（日本時間）");
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).describe("開始時刻 HH:MM");
@@ -134,7 +134,7 @@ const slimEntry = (e: EntryRow) => ({
   routine: refName(e.routine),
 });
 
-export function buildMcpServer(scope: TokenScope): McpServer {
+export function buildMcpServer(scope: TokenScope, onWrite?: (tool: string) => void): McpServer {
   const server = new McpServer(
     { name: "node-portal", version: "1.0.0" },
     {
@@ -144,11 +144,25 @@ export function buildMcpServer(scope: TokenScope): McpServer {
         "削除はできません。労務（給与・出勤簿・従業員）の情報は扱いません。",
     }
   );
+  // 道具ごとに「成功なら結果、失敗ならエラー文」を返す実行役
+  let current = "";
+  const run = (fn: () => Promise<unknown>) => {
+    const tool = current;
+    return fn().then(ok, (e) => fail(tool, e));
+  };
+  const register: typeof server.registerTool = ((name: string, config: never, cb: (...a: never[]) => unknown) =>
+    server.registerTool(name, config, ((...args: never[]) => {
+      current = name;
+      if (!(config as { annotations?: { readOnlyHint?: boolean } }).annotations?.readOnlyHint) onWrite?.(name);
+      return cb(...args);
+    }) as never)) as never;
   const read = { readOnlyHint: true, openWorldHint: false } as const;
   const write = { readOnlyHint: false, destructiveHint: false, openWorldHint: false } as const;
+  // GitHub・Google カレンダーにも反映される操作
+  const writeExternal = { readOnlyHint: false, destructiveHint: false, openWorldHint: true } as const;
 
   // ===== 読む =====
-  server.registerTool(
+  register(
     "list_clients_and_projects",
     {
       title: "クライアントとプロジェクトの一覧",
@@ -189,7 +203,7 @@ export function buildMcpServer(scope: TokenScope): McpServer {
       })
   );
 
-  server.registerTool(
+  register(
     "list_tasks",
     {
       title: "タスクの一覧",
@@ -210,12 +224,12 @@ export function buildMcpServer(scope: TokenScope): McpServer {
       })
   );
 
-  server.registerTool(
+  register(
     "get_day",
     {
       title: "1日の計画・実績",
       description:
-        "指定日（既定: 今日）の計画・実績・集計（計画/実績/出勤簿/未記録の分数）・その日に実施するルーティン・計測中のタイマー・Google の予定をまとめて返す。",
+        "指定日（既定: 今日）の計画・実績・集計（計画と実績の分数）・その日に実施するルーティン・計測中のタイマー・Google の予定をまとめて返す。",
       inputSchema: { date: date.optional() },
       annotations: read,
     },
@@ -226,7 +240,7 @@ export function buildMcpServer(scope: TokenScope): McpServer {
         const [plans, entries, summary, routines, checks, timer, google] = await Promise.all([
           call<PlanRow[]>(plansApi.GET, `/api/work/plans?${q}`),
           call<EntryRow[]>(entriesApi.GET, `/api/work/time-entries?${q}`),
-          call<{ days: unknown[] }>(summaryApi.GET, `/api/work/summary?${q}`),
+          call<{ days: { plannedMin: number; actualMin: number }[] }>(summaryApi.GET, `/api/work/summary?${q}`),
           call<{ id: string; title: string; plannedMinutes: number | null; client?: { name: string } | null }[]>(
             routinesApi.GET,
             "/api/work/routines"
@@ -241,7 +255,8 @@ export function buildMcpServer(scope: TokenScope): McpServer {
             : "（Google カレンダー未接続）";
         return {
           date: day,
-          summary: summary.days[0],
+          // 出勤簿（労務）の勤務時間は AI に渡さない方針のため、計画と実績の分数だけを返す
+          summary: summary.days[0] ? { plannedMin: summary.days[0].plannedMin, actualMin: summary.days[0].actualMin } : null,
           plans: plans.map(slimPlan),
           entries: entries.map(slimEntry),
           runningTimer: timer ? slimEntry(timer) : null,
@@ -254,7 +269,7 @@ export function buildMcpServer(scope: TokenScope): McpServer {
       })
   );
 
-  server.registerTool(
+  register(
     "list_task_attachments",
     {
       title: "タスクの添付資料",
@@ -265,7 +280,7 @@ export function buildMcpServer(scope: TokenScope): McpServer {
     ({ taskId }) => run(() => call(attachmentsApi.GET, `/api/work/tasks/${taskId}/attachments`, { params: { id: taskId } }))
   );
 
-  server.registerTool(
+  register(
     "list_google_events",
     {
       title: "Google カレンダーの予定",
@@ -288,13 +303,13 @@ export function buildMcpServer(scope: TokenScope): McpServer {
     projectId: z.string().nullable().optional().describe("プロジェクトID（なしは null）"),
   };
 
-  server.registerTool(
+  register(
     "create_client",
     { title: "クライアントを追加", inputSchema: { name: z.string().min(1).max(100) }, annotations: write },
     ({ name }) => run(() => call(clientsApi.POST, "/api/work/clients", { method: "POST", body: { name } }))
   );
 
-  server.registerTool(
+  register(
     "create_project",
     {
       title: "プロジェクトを追加",
@@ -311,19 +326,20 @@ export function buildMcpServer(scope: TokenScope): McpServer {
     (args) => run(() => call(projectsApi.POST, "/api/work/projects", { method: "POST", body: args }))
   );
 
-  server.registerTool(
+  register(
     "create_task",
     { title: "タスクを追加", inputSchema: { title: z.string().min(1).max(200), ...taskFields }, annotations: write },
     (args) => run(async () => slimTask(await call<TaskRow>(tasksApi.POST, "/api/work/tasks", { method: "POST", body: args })))
   );
 
-  server.registerTool(
+  register(
     "update_task",
     {
       title: "タスクを変更",
-      description: "送った項目だけを変える。完了にするときは status を done にする。",
+      description:
+        "送った項目だけを変える。完了にするときは status を done にする。GitHub の Issue から取り込んだタスクは、状態の変更が GitHub の Issue にも反映される（close / reopen）。",
       inputSchema: { taskId: id("タスク"), title: z.string().min(1).max(200).optional(), ...taskFields },
-      annotations: write,
+      annotations: writeExternal,
     },
     ({ taskId, ...patch }) =>
       run(async () =>
@@ -331,7 +347,7 @@ export function buildMcpServer(scope: TokenScope): McpServer {
       )
   );
 
-  server.registerTool(
+  register(
     "create_plan",
     {
       title: "計画を追加",
@@ -353,11 +369,11 @@ export function buildMcpServer(scope: TokenScope): McpServer {
       )
   );
 
-  server.registerTool(
+  register(
     "update_plan",
     {
       title: "計画を変更",
-      description: "開始時刻・長さ・タイトルなどを変える（送った項目だけ）。",
+      description: "開始時刻・長さ・タイトルなどを変える（送った項目だけ）。Google カレンダーに書き出し済みの計画は、カレンダーの予定も更新される。",
       inputSchema: {
         planId: id("計画"),
         title: z.string().min(1).max(200).optional(),
@@ -365,7 +381,7 @@ export function buildMcpServer(scope: TokenScope): McpServer {
         plannedMinutes: z.number().int().min(1).max(1440).optional(),
         date: date.optional(),
       },
-      annotations: write,
+      annotations: writeExternal,
     },
     ({ planId, ...patch }) =>
       run(async () =>
@@ -373,7 +389,7 @@ export function buildMcpServer(scope: TokenScope): McpServer {
       )
   );
 
-  server.registerTool(
+  register(
     "start_timer",
     {
       title: "タイマーを開始",
@@ -394,7 +410,7 @@ export function buildMcpServer(scope: TokenScope): McpServer {
       })
   );
 
-  server.registerTool(
+  register(
     "stop_timer",
     { title: "タイマーを止める", description: "計測中のタイマーを止めて、実績として確定する。", annotations: write },
     () =>
@@ -404,7 +420,7 @@ export function buildMcpServer(scope: TokenScope): McpServer {
       })
   );
 
-  server.registerTool(
+  register(
     "add_time_entry",
     {
       title: "実績を手入力",
@@ -426,7 +442,7 @@ export function buildMcpServer(scope: TokenScope): McpServer {
       )
   );
 
-  server.registerTool(
+  register(
     "check_routine",
     {
       title: "ルーティンの実施を記録",
