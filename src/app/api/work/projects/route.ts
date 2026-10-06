@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { badRequest, requireWorkspace } from "@/lib/work/auth";
+import { ownsClient } from "@/lib/work/links";
 import { PROJECT_STATUSES, parseProjectInput, toDbDate } from "@/lib/work/validate";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
 }
 
 // プロジェクト作成
-// POST /api/work/projects  body: { name, description?, status?, color?, startDate?, dueDate? }
+// POST /api/work/projects  body: { name, clientId, description?, status?, color?, startDate?, dueDate? }
 export async function POST(req: NextRequest) {
   const auth = await requireWorkspace();
   if (!auth.ok) return auth.response;
@@ -37,10 +38,12 @@ export async function POST(req: NextRequest) {
   const parsed = parseProjectInput(await req.json().catch(() => null), "create");
   if (!parsed.ok) return badRequest(parsed.error);
   const d = parsed.data;
+  if (!(await ownsClient(auth.ctx.ownerId, d.clientId!))) return badRequest("クライアントが見つかりません");
 
   const created = await prisma.workProject.create({
     data: {
       ownerId: auth.ctx.ownerId,
+      clientId: d.clientId!,
       name: d.name!,
       description: d.description,
       status: d.status,

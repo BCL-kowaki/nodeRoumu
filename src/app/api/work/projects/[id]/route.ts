@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { badRequest, notFound, requireWorkspace } from "@/lib/work/auth";
+import { ownsClient } from "@/lib/work/links";
 import { parseProjectInput, toDbDate } from "@/lib/work/validate";
 
 export const dynamic = "force-dynamic";
@@ -40,10 +41,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const start = d.startDate !== undefined ? d.startDate : current.startDate?.toISOString().slice(0, 10) ?? null;
   const due = d.dueDate !== undefined ? d.dueDate : current.dueDate?.toISOString().slice(0, 10) ?? null;
   if (start && due && due < start) return badRequest("期限日は開始日以降にしてください");
+  if (d.clientId && !(await ownsClient(auth.ctx.ownerId, d.clientId))) return badRequest("クライアントが見つかりません");
 
   const updated = await prisma.workProject.update({
     where: { id: current.id },
     data: {
+      clientId: d.clientId,
       name: d.name,
       description: d.description,
       status: d.status,

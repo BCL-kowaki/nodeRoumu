@@ -3,24 +3,29 @@
 import { useState } from "react";
 import { PROJECT_STATUS_LABELS } from "@/lib/work/labels";
 import { PROJECT_STATUSES } from "@/lib/work/validate";
-import { api, inputClass, labelClass, type Project } from "./types";
+import { api, inputClass, labelClass, type Client, type Project } from "./types";
 
 const COLORS = ["#21977f", "#1e88e5", "#8e24aa", "#f4511e", "#fb8c00", "#6d4c41", "#546e7a"];
 
 // プロジェクトの作成・編集ウィンドウ。project が null なら新規作成
 export default function ProjectEditor({
   project,
+  clients,
+  defaultClientId,
   onClose,
   onSaved,
   onDeleted,
 }: {
   project: Project | null;
+  clients: Client[];
+  defaultClientId?: string;
   onClose: () => void;
   onSaved: (saved: Project) => void;
   onDeleted?: () => void;
 }) {
   const [form, setForm] = useState({
     name: project?.name ?? "",
+    clientId: project?.clientId ?? defaultClientId ?? clients[0]?.id ?? "",
     description: project?.description ?? "",
     status: project?.status ?? "active",
     color: project?.color ?? COLORS[0],
@@ -77,8 +82,17 @@ export default function ProjectEditor({
         </div>
         <div className="flex flex-col gap-3">
           <div>
+            <label className={labelClass} htmlFor="project-client">クライアント</label>
+            <select id="project-client" className={inputClass} value={form.clientId} onChange={(e) => set("clientId", e.target.value)}>
+              {!form.clientId && <option value="">選んでください</option>}
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className={labelClass} htmlFor="project-name">プロジェクト名</label>
-            <input id="project-name" className={inputClass} value={form.name} onChange={(e) => set("name", e.target.value)} autoFocus />
+            <input id="project-name" className={inputClass} value={form.name} onChange={(e) => set("name", e.target.value)} autoFocus={!project} />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>

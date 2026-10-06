@@ -22,6 +22,7 @@ export type TaskInput = {
 
 export type ProjectInput = {
   name?: string;
+  clientId?: string;
   description?: string | null;
   status?: ProjectStatus;
   color?: string | null;
@@ -156,6 +157,11 @@ export function parseProjectInput(body: unknown, mode: Mode): ParseResult<Projec
         `プロジェクト名は${MAX_PROJECT_NAME}文字以内で入力してください`
       );
     }
+    // プロジェクトは必ずどこかのクライアントに所属する（作成時は必須、更新で外すことはできない）
+    if (mode === "create" || Object.prototype.hasOwnProperty.call(b, "clientId")) {
+      if (typeof b.clientId !== "string" || !b.clientId.trim()) throw new InputError("クライアントを選んでください");
+      out.clientId = b.clientId.trim();
+    }
     if (has(b, "description")) out.description = optionalText(b.description, MAX_DESCRIPTION, "説明");
     if (has(b, "status")) out.status = oneOf(b.status, PROJECT_STATUSES);
     else if (mode === "create") out.status = "active";
@@ -170,6 +176,25 @@ export function parseProjectInput(body: unknown, mode: Mode): ParseResult<Projec
     // "YYYY-MM-DD" 同士は文字列比較で前後関係を判定できる
     if (out.startDate && out.dueDate && out.dueDate < out.startDate) {
       throw new InputError("期限日は開始日以降にしてください");
+    }
+    return out;
+  });
+}
+
+// ===== クライアント =====
+export type ClientInput = { name?: string };
+const MAX_CLIENT_NAME = 100;
+
+export function parseClientInput(body: unknown, mode: Mode): ParseResult<ClientInput> {
+  return run(body, mode, (b) => {
+    const out: ClientInput = {};
+    if (mode === "create" || has(b, "name")) {
+      out.name = requiredText(
+        b.name,
+        MAX_CLIENT_NAME,
+        "クライアント名を入力してください",
+        `クライアント名は${MAX_CLIENT_NAME}文字以内で入力してください`
+      );
     }
     return out;
   });

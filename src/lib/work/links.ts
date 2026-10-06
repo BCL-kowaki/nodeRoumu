@@ -23,6 +23,11 @@ export async function checkLinks(ownerId: string, links: Links): Promise<string 
   return null;
 }
 
+// プロジェクトの所属先に指定されたクライアントが、ログイン中の代表者のものか
+export async function ownsClient(ownerId: string, clientId: string): Promise<boolean> {
+  return !!(await prisma.workClient.findFirst({ where: { id: clientId, ownerId }, select: { id: true } }));
+}
+
 // 一覧表示用に一緒に返す紐づけ先の項目
 export const LINK_INCLUDE = {
   task: { select: { id: true, title: true, status: true } },

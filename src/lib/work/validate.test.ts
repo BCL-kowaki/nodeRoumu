@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   completedAtFor,
   parsePlanInput,
+  parseClientInput,
   parseProjectInput,
   parseRoutineCheckInput,
   parseRoutineInput,
@@ -123,34 +124,65 @@ describe("parseProjectInput（プロジェクト）", () => {
   it("正しい入力のとき、値を返す", () => {
     expect(
       parseProjectInput(
-        { name: " node-portal 開発 ", status: "active", color: "#21977F", startDate: "2026-10-01", dueDate: "2026-12-31" },
+        { name: " node-portal 開発 ", clientId: "c1", status: "active", color: "#21977F", startDate: "2026-10-01", dueDate: "2026-12-31" },
         "create"
       )
     ).toEqual({
       ok: true,
-      data: { name: "node-portal 開発", status: "active", color: "#21977f", startDate: "2026-10-01", dueDate: "2026-12-31" },
+      data: { name: "node-portal 開発", clientId: "c1", status: "active", color: "#21977f", startDate: "2026-10-01", dueDate: "2026-12-31" },
     });
   });
 
   it("任意項目を省略したとき、状態を「進行中」にする", () => {
-    expect(parseProjectInput({ name: "経理" }, "create")).toEqual({
+    expect(parseProjectInput({ name: "経理", clientId: "c1" }, "create")).toEqual({
       ok: true,
-      data: { name: "経理", status: "active" },
+      data: { name: "経理", clientId: "c1", status: "active" },
     });
+  });
+
+  it("クライアントを指定しないで作成したとき、エラーを返す", () => {
+    expect(parseProjectInput({ name: "経理" }, "create")).toEqual({ ok: false, error: "クライアントを選んでください" });
+  });
+
+  it("更新でクライアントを空にしようとしたとき、エラーを返す", () => {
+    expect(parseProjectInput({ clientId: "" }, "update")).toEqual({ ok: false, error: "クライアントを選んでください" });
+    expect(parseProjectInput({ clientId: null }, "update")).toEqual({ ok: false, error: "クライアントを選んでください" });
+  });
+
+  it("更新でクライアントだけを変えたとき、その値だけを返す", () => {
+    expect(parseProjectInput({ clientId: "c2" }, "update")).toEqual({ ok: true, data: { clientId: "c2" } });
   });
 
   it.each([
     ["名前が無い", {}, "プロジェクト名を入力してください"],
-    ["名前が長すぎる", { name: "あ".repeat(101) }, "プロジェクト名は100文字以内で入力してください"],
-    ["状態が不正", { name: "a", status: "closed" }, "状態の値が正しくありません"],
-    ["色の形式が不正", { name: "a", color: "red" }, "色は #RRGGBB の形式で指定してください"],
-    ["期限が開始より前", { name: "a", startDate: "2026-10-10", dueDate: "2026-10-01" }, "期限日は開始日以降にしてください"],
+    ["名前が長すぎる", { name: "あ".repeat(101), clientId: "c1" }, "プロジェクト名は100文字以内で入力してください"],
+    ["状態が不正", { name: "a", status: "closed", clientId: "c1" }, "状態の値が正しくありません"],
+    ["色の形式が不正", { name: "a", color: "red", clientId: "c1" }, "色は #RRGGBB の形式で指定してください"],
+    ["期限が開始より前", { name: "a", startDate: "2026-10-10", dueDate: "2026-10-01", clientId: "c1" }, "期限日は開始日以降にしてください"],
   ])("%s のとき、エラーを返す", (_name, body, message) => {
     expect(parseProjectInput(body, "create")).toEqual({ ok: false, error: message });
   });
 
   it("更新で変更する項目が無いとき、エラーを返す", () => {
     expect(parseProjectInput({}, "update")).toEqual({ ok: false, error: "変更する内容がありません" });
+  });
+});
+
+describe("parseClientInput（クライアント）", () => {
+  it("正しい入力のとき、前後の空白を除いた名前を返す", () => {
+    expect(parseClientInput({ name: "  株式会社サンプル  " }, "create")).toEqual({ ok: true, data: { name: "株式会社サンプル" } });
+  });
+
+  it.each([
+    ["名前が無い", {}, "クライアント名を入力してください"],
+    ["名前が空白だけ", { name: "   " }, "クライアント名を入力してください"],
+    ["名前が長すぎる", { name: "あ".repeat(101) }, "クライアント名は100文字以内で入力してください"],
+  ])("%s のとき、エラーを返す", (_name, body, message) => {
+    expect(parseClientInput(body, "create")).toEqual({ ok: false, error: message });
+  });
+
+  it("更新で変更する項目が無いとき、エラーを返す", () => {
+    expect(parseClientInput({}, "update")).toEqual({ ok: false, error: "変更する内容がありません" });
   });
 });
 

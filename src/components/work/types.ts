@@ -17,8 +17,15 @@ export type Task = {
   githubRepo?: { fullName: string } | null;
 };
 
+export type Client = {
+  id: string;
+  name: string;
+  projectCount?: number;
+};
+
 export type Project = {
   id: string;
+  clientId: string;
   name: string;
   description: string | null;
   status: string;

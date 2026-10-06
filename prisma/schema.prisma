@@ -41,6 +41,7 @@ model Employee {
 
   // 業務管理（代表者のみ利用）
   workProjects        WorkProject[]
+  workClients         WorkClient[]
   workTasks           WorkTask[]
   routines            Routine[]
   workPlans           WorkPlan[]
@@ -173,9 +174,25 @@ model FaqDocument {
 // どのデータも ownerId（Employee.id）で持ち主を持ち、検索・更新は必ず ownerId で絞る。
 // 持ち主の従業員レコードを誤って削除して業務データが消えないよう onDelete: Restrict にしている。
 
+// 業務管理のクライアント（取引先）。プロジェクトは必ずどこかのクライアントに所属する
+model WorkClient {
+  id        String   @id @default(cuid())
+  ownerId   String
+  name      String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner    Employee      @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  projects WorkProject[]
+
+  @@unique([ownerId, name])
+}
+
 model WorkProject {
   id               String    @id @default(cuid())
   ownerId          String
+  clientId         String
   name             String
   description      String?   @db.Text
   status           String    @default("active") // "active" | "on_hold" | "done" | "archived"
@@ -190,12 +207,15 @@ model WorkProject {
   updatedAt        DateTime  @updatedAt
 
   owner    Employee    @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  // プロジェクトが残っているクライアントは削除できない
+  client   WorkClient  @relation(fields: [clientId], references: [id], onDelete: Restrict)
   tasks    WorkTask[]
   routines Routine[]
   plans    WorkPlan[]
   entries  TimeEntry[]
 
   @@index([ownerId, status])
+  @@index([clientId])
 }
 
 model WorkTask {
