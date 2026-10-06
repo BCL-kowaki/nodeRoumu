@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Card from "@/components/Card";
 import { api, inputClass, type NoteInfo, type ObsidianStatus } from "./types";
+import LinkifiedText from "@/components/LinkifiedText";
 
 // プロジェクトに紐づく Obsidian ノートの表示・作成・ログ追記
 // ノートの本文は書式なしの文字のまま表示する（Markdown を画面の部品に変換すると、
@@ -127,7 +128,7 @@ export default function ProjectNote({ projectId, onLinked }: { projectId: string
               <pre
                 className={`text-xs text-app-text bg-app-bg rounded p-3 whitespace-pre-wrap break-words overflow-y-auto font-sans ${open ? "max-h-[70vh]" : "max-h-48"}`}
               >
-                {note.content}
+                <LinkifiedText text={note.content ?? ""} />
               </pre>
               <button onClick={() => setOpen((v) => !v)} className="text-[11px] text-primary bg-transparent border-none cursor-pointer self-start p-0">
                 {open ? "折りたたむ" : "全体を表示"}

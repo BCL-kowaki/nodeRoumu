@@ -5,6 +5,7 @@ import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import { useAuth } from "@/lib/auth-context";
 import { canWriteFaqDocuments } from "@/lib/permissions";
+import LinkifiedText from "@/components/LinkifiedText";
 
 // FAQ書類の一覧表示＋（管理者のみ）アップロード・削除
 // 従業員・社労士・管理者の全ロールが閲覧可能
@@ -304,7 +305,7 @@ export default function FaqList() {
                 )}
                 {doc.description && (
                   <div className="text-xs text-app-sub mt-1.5 whitespace-pre-wrap">
-                    {doc.description}
+                    <LinkifiedText text={doc.description} />
                   </div>
                 )}
               </div>
