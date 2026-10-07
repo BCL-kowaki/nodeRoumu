@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { ObsidianError, listPaths, obsidianErrorMessage, readNote, updateNote, writeNote } from "@/lib/obsidian";
 import { badRequest, notFound, requireWorkspace } from "@/lib/work/auth";
 import { appendToSection, parseNotePath } from "@/lib/work/obsidian-note";
@@ -9,10 +8,10 @@ import {
   isInFolder,
   newNotePath,
   parseEntryName,
-  projectFolderFor,
   type NoteTemplate,
 } from "@/lib/work/obsidian-tree";
 import { todayJst } from "@/lib/date-jst";
+import { allowedNote, loadProjectNotes } from "@/lib/work/project-notes";
 
 export const dynamic = "force-dynamic";
 
@@ -20,18 +19,7 @@ type Params = { params: Promise<{ id: string }> };
 const MAX_CONTENT = 500_000; // アプリから保存できるノートの大きさ（文字数）
 const NOTES_HEADING = "ノート";
 
-async function load(id: string, ownerId: string) {
-  const project = await prisma.workProject.findFirst({ where: { id, ownerId }, select: { id: true, name: true, obsidianPath: true } });
-  if (!project) return null;
-  return { project, folder: projectFolderFor(project.obsidianPath, project.name) };
-}
-
-// 扱ってよいノートか：プロジェクトのノートそのもの、または専用フォルダの中の .md
-function allowedNote(path: unknown, folder: string, projectNote: string | null): string | null {
-  const parsed = parseNotePath(path);
-  if (!parsed.ok) return null;
-  return parsed.path === projectNote || isInFolder(parsed.path, folder) ? parsed.path : null;
-}
+const load = loadProjectNotes;
 
 // 作る場所（専用フォルダ、またはその中のフォルダ）
 function allowedParent(parent: unknown, folder: string): string | null {

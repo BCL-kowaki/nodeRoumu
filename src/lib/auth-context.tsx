@@ -33,7 +33,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ログイン中の人を読み込む。ログイン画面から画面を再読み込みせずに移ったときも、
   // まだ読み込めていなければ移動先で読み直す（読み込み済みなら何もしない）
   useEffect(() => {
-    if (signedIn || pathname === "/login") {
+    // ログイン画面・共有ページ（社外の方が見る）では、ログイン中の人を読み込まない
+    if (signedIn || pathname === "/login" || pathname.startsWith("/share/")) {
       setLoading(false);
       return;
     }

@@ -18,6 +18,11 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // ノートの共有ページ（社外の方が見る。ログイン不要。見せてよいかはページ側でリンクとパスワードを確かめる）
+  if (pathname.startsWith("/share/")) {
+    return NextResponse.next();
+  }
+
   // API routeは認証チェック不要（個別APIで対応）
   if (pathname.startsWith("/api/")) {
     return NextResponse.next();

@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, FilePlus, FileText, Folder, FolderPlus, Pencil, RefreshCw } from "lucide-react";
+import { ChevronDown, FilePlus, FileText, Folder, FolderPlus, Pencil, RefreshCw, Share2 } from "lucide-react";
 import type { TreeNode } from "@/lib/work/obsidian-tree";
 import NoteMarkdown from "./NoteMarkdown";
+import NoteSharePanel from "./NoteSharePanel";
 import { api, inputClass } from "./types";
 import RichTextEditor from "@/components/RichTextEditor";
 
@@ -21,6 +22,7 @@ export default function NoteBrowser({ projectId, projectNotePath }: { projectId:
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState<null | { kind: "note" | "folder"; parent: string; name: string; template: "blank" | "minutes" }>(null);
   const [log, setLog] = useState("");
+  const [sharing, setSharing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const base = `/api/work/projects/${projectId}/notes`;
@@ -33,6 +35,7 @@ export default function NoteBrowser({ projectId, projectNotePath }: { projectId:
     async (path: string) => {
       setError(null);
       setEditing(false);
+      setSharing(false);
       try {
         setOpen(await api<OpenNote>(`${base}?path=${encodeURIComponent(path)}`));
       } catch (e) {
@@ -252,6 +255,11 @@ export default function NoteBrowser({ projectId, projectNotePath }: { projectId:
               <div className="flex items-center gap-2 mb-2">
                 <div className="text-[11px] text-app-sub break-all mr-auto min-w-0">{open.path}</div>
                 {!editing && (
+                  <button type="button" className={`${smallBtn} shrink-0 whitespace-nowrap`} onClick={() => setSharing((v) => !v)}>
+                    <Share2 size={12} aria-hidden /> 共有
+                  </button>
+                )}
+                {!editing && (
                   <button
                     type="button"
                     className={`${smallBtn} shrink-0 whitespace-nowrap`}
@@ -264,6 +272,7 @@ export default function NoteBrowser({ projectId, projectNotePath }: { projectId:
                   </button>
                 )}
               </div>
+              {sharing && !editing && <NoteSharePanel projectId={projectId} notePath={open.path} onClose={() => setSharing(false)} />}
               {editing ? (
                 <div className="flex flex-col gap-2">
                   <RichTextEditor ariaLabel="ノートの本文" value={draft} onChange={setDraft} minHeight={420} mono />

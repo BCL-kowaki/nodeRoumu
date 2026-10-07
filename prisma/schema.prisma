@@ -45,6 +45,7 @@ model Employee {
   taskAttachments     TaskAttachment[]
   apiTokens           ApiToken[]
   attendanceChanges   AttendanceChange[]
+  noteShares          NoteShare[]
   workTasks           WorkTask[]
   routines            Routine[]
   workPlans           WorkPlan[]
@@ -220,6 +221,7 @@ model WorkProject {
   plans       WorkPlan[]
   entries     TimeEntry[]
   githubRepos GithubRepo[]
+  noteShares  NoteShare[]
 
   @@index([ownerId, status])
   @@index([clientId])
@@ -240,6 +242,33 @@ model AttendanceChange {
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([employeeId, date])
+}
+
+// ノートの共有リンク（社外の方が見られる読み取り専用ページ）。
+// 内容は発行時点（または「更新」時点）の写しを暗号化して持つ。リンクの文字列は SHA-256 で引き、表示用に暗号化しても持つ
+model NoteShare {
+  id               String    @id @default(cuid())
+  ownerId          String
+  projectId        String?
+  notePath         String // 元のノート（Obsidian）
+  title            String
+  encryptedContent String    @db.Text
+  tokenHash        String    @unique
+  encryptedToken   String // 発行した人が、あとでリンクをコピーできるように
+  passwordHash     String? // パスワード（bcrypt）。無ければリンクだけで見られる
+  expiresAt        DateTime? // 無期限は NULL
+  revokedAt        DateTime?
+  failedAttempts   Int       @default(0)
+  lockedUntil      DateTime?
+  viewCount        Int       @default(0)
+  lastViewedAt     DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  owner   Employee     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  project WorkProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId, notePath])
 }
 
 // AI 連携（MCP）用の鍵。鍵そのものは保存せず、SHA-256 の値だけを持つ

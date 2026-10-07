@@ -57,3 +57,23 @@ export async function getSessionFromRequest(req: NextRequest): Promise<SessionPa
   if (!token) return null;
   return verifyToken(token);
 }
+
+
+// 共有ページ（パスワード付き）を開けたことの証明。共有ごとに別のクッキーにし、12時間で切れる
+export async function createShareAccess(shareId: string): Promise<string> {
+  return new SignJWT({ share: shareId })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("12h")
+    .sign(getSecret());
+}
+
+export async function verifyShareAccess(token: string | undefined, shareId: string): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const { payload } = await jwtVerify(token, getSecret());
+    return payload.share === shareId;
+  } catch {
+    return false;
+  }
+}
