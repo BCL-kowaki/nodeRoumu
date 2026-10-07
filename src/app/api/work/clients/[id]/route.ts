@@ -20,7 +20,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const current = await prisma.workClient.findFirst({ where: { id, ownerId: auth.ctx.ownerId } });
   if (!current) return notFound();
   try {
-    const updated = await prisma.workClient.update({ where: { id: current.id }, data: { name: parsed.data.name } });
+    const updated = await prisma.workClient.update({
+      where: { id: current.id },
+      data: { name: parsed.data.name },
+      select: { id: true, name: true, sortOrder: true, createdAt: true, updatedAt: true },
+    });
     return NextResponse.json(updated);
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {

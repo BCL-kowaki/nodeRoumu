@@ -6,6 +6,9 @@ import { parseClientInput } from "@/lib/work/validate";
 
 export const dynamic = "force-dynamic";
 
+// 返す項目（メモの暗号文は返さない。メモは /memo で、画面からだけ読む）
+const SELECT = { id: true, name: true, sortOrder: true, createdAt: true, updatedAt: true } as const;
+
 // クライアント一覧（プロジェクト数つき）
 export async function GET() {
   const auth = await requireWorkspace();
@@ -14,9 +17,11 @@ export async function GET() {
   const clients = await prisma.workClient.findMany({
     where: { ownerId: auth.ctx.ownerId },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    include: { _count: { select: { projects: true } } },
+    select: { ...SELECT, encryptedMemo: true, _count: { select: { projects: true } } },
   });
-  return NextResponse.json(clients.map(({ _count, ...c }) => ({ ...c, projectCount: _count.projects })));
+  return NextResponse.json(
+    clients.map(({ _count, encryptedMemo, ...c }) => ({ ...c, projectCount: _count.projects, hasMemo: !!encryptedMemo }))
+  );
 }
 
 // クライアント作成
@@ -29,7 +34,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.ok) return badRequest(parsed.error);
 
   try {
-    const created = await prisma.workClient.create({ data: { ownerId: auth.ctx.ownerId, name: parsed.data.name! } });
+    const created = await prisma.workClient.create({ data: { ownerId: auth.ctx.ownerId, name: parsed.data.name! }, select: SELECT });
     return NextResponse.json(created, { status: 201 });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {

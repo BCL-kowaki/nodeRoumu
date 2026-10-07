@@ -7,6 +7,7 @@ import { Building2, ChevronDown, GitBranch } from "lucide-react";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import ClientEditor from "@/components/work/ClientEditor";
+import ClientMemo from "@/components/work/ClientMemo";
 import ClientTimeCard from "@/components/work/ClientTimeCard";
 import ProjectEditor from "@/components/work/ProjectEditor";
 import ProjectNote from "@/components/work/ProjectNote";
@@ -383,6 +384,9 @@ function ProjectsAndTasks() {
               ))}
             </div>
           </Card>
+
+          {/* クライアントを選んでいるときは、そのクライアントのメモ（アカウント情報など） */}
+          {client && !project && <ClientMemo clientId={client.id} hasMemo={!!client.hasMemo} onChanged={load} />}
 
           {selected !== "none" && (
             <ClientTimeCard

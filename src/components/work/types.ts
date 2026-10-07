@@ -22,6 +22,7 @@ export type Client = {
   id: string;
   name: string;
   projectCount?: number;
+  hasMemo?: boolean;
 };
 
 export type Project = {

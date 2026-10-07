@@ -4,6 +4,7 @@ import {
   parsePlanInput,
   parseRepoPatch,
   parseClientInput,
+  parseClientMemo,
   parseIdOrder,
   parseProjectInput,
   parseRoutineCheckInput,
@@ -353,5 +354,23 @@ describe("parseTimeEntryInput の開始・終了時刻", () => {
     ["形が違う", { startTime: "9:00", endTime: "10:00" }, "時刻は HH:MM の形式で入力してください"],
   ])("%s のとき、エラーを返す", (_n, body, message) => {
     expect(parseTimeEntryInput(body, "update")).toEqual({ ok: false, error: message });
+  });
+});
+
+describe("parseClientMemo（クライアントのメモ）", () => {
+  it("文字列を受け付ける（前後の空白・改行はそのまま）。空・null は「なし」", () => {
+    expect(parseClientMemo({ memo: "ログインID: abc\nURL: https://example.com\n" })).toEqual({
+      ok: true,
+      data: "ログインID: abc\nURL: https://example.com\n",
+    });
+    expect(parseClientMemo({ memo: "" })).toEqual({ ok: true, data: null });
+    expect(parseClientMemo({ memo: null })).toEqual({ ok: true, data: null });
+  });
+  it.each([
+    ["memo が無い", {}, "メモの内容が正しくありません"],
+    ["文字列でない", { memo: 1 }, "メモの内容が正しくありません"],
+    ["長すぎる", { memo: "あ".repeat(10001) }, "メモは10000文字以内で入力してください"],
+  ])("%s のとき、エラーを返す", (_n, body, message) => {
+    expect(parseClientMemo(body)).toEqual({ ok: false, error: message });
   });
 });

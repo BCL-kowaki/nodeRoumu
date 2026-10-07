@@ -179,12 +179,14 @@ model FaqDocument {
 
 // 業務管理のクライアント（取引先）。プロジェクトは必ずどこかのクライアントに所属する
 model WorkClient {
-  id        String   @id @default(cuid())
-  ownerId   String
-  name      String
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  ownerId       String
+  name          String
+  // メモ（アカウント情報など）。暗号化して保存する（"v1:iv:tag:暗号文"）。一覧の API や AI 連携には出さない
+  encryptedMemo String?  @db.Text
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   owner    Employee      @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   projects WorkProject[]

@@ -462,3 +462,18 @@ export function parseRepoPatch(body: unknown): ParseResult<RepoPatch> {
     return out;
   });
 }
+
+// ===== クライアントのメモ（アカウント情報などを書く。保存時に暗号化する） =====
+const MAX_CLIENT_MEMO = 10000;
+
+export function parseClientMemo(body: unknown): ParseResult<string | null> {
+  if (!isRecord(body) || !Object.prototype.hasOwnProperty.call(body, "memo")) {
+    return { ok: false, error: "メモの内容が正しくありません" };
+  }
+  const m = body.memo;
+  if (m === null || m === "") return { ok: true, data: null };
+  if (typeof m !== "string") return { ok: false, error: "メモの内容が正しくありません" };
+  if (m.length > MAX_CLIENT_MEMO) return { ok: false, error: `メモは${MAX_CLIENT_MEMO}文字以内で入力してください` };
+  // 書いた内容をそのまま残す（前後の空白・改行も含めて。アカウント情報などの形を崩さない）
+  return { ok: true, data: m.trim() ? m : null };
+}
