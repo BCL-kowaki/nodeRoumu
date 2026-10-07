@@ -132,6 +132,17 @@ export default function WorkPlanPage() {
     }
   };
 
+  // 実績の時間帯を動かす・伸ばす（タイムラインのドラッグ）
+  const updateEntryTime = async (entry: TimeEntry, startTime: string, endTime: string) => {
+    setError(null);
+    try {
+      await api(`/api/work/time-entries/${entry.id}`, { method: "PUT", body: JSON.stringify({ startTime, endTime }) });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+    load();
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -200,6 +211,7 @@ export default function WorkPlanPage() {
             onOpenTask={setEditingTask}
             timer={{ runningFor: timer.runningFor, start: timer.start, stop: timer.stop, busy: timer.busy }}
             onUpdatePlan={updatePlan}
+            onUpdateEntryTime={updateEntryTime}
             onOpenPlan={setEditingPlan}
             onOpenEntry={setEditingEntry}
           />

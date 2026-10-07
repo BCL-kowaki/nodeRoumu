@@ -340,3 +340,18 @@ describe("parseRepoPatch（リポジトリの設定変更）", () => {
     expect(parseRepoPatch(body)).toEqual({ ok: false, error: message });
   });
 });
+
+describe("parseTimeEntryInput の開始・終了時刻", () => {
+  it("開始と終了を両方受け付ける", () => {
+    expect(parseTimeEntryInput({ startTime: "09:00", endTime: "10:30" }, "update")).toEqual({
+      ok: true,
+      data: { startTime: "09:00", endTime: "10:30" },
+    });
+  });
+  it.each([
+    ["片方だけ", { startTime: "09:00" }, "開始時刻と終了時刻は両方指定してください"],
+    ["形が違う", { startTime: "9:00", endTime: "10:00" }, "時刻は HH:MM の形式で入力してください"],
+  ])("%s のとき、エラーを返す", (_n, body, message) => {
+    expect(parseTimeEntryInput(body, "update")).toEqual({ ok: false, error: message });
+  });
+});

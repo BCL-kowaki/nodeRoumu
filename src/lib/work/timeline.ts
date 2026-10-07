@@ -14,7 +14,7 @@ export function minutesToTime(min: number): string {
   return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 }
 
-const snap = (min: number) => Math.round(min / SNAP_MINUTES) * SNAP_MINUTES;
+const snap = (min: number, unit = SNAP_MINUTES) => Math.round(min / unit) * unit;
 const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
 
 // タイムラインの上端からの位置（px）→ 開始時刻（分）。長さ duration が 24:00 に収まる範囲に寄せる
@@ -22,14 +22,14 @@ export function yToStart(y: number, pxPerMin: number, duration: number): number 
   return clamp(snap(y / pxPerMin), 0, Math.max(0, DAY_END - duration));
 }
 
-// 置いた計画を deltaY（px）だけ動かしたときの開始時刻
-export function moveStart(start: number, deltaY: number, pxPerMin: number, duration: number): number {
-  return clamp(snap(start + deltaY / pxPerMin), 0, Math.max(0, DAY_END - duration));
+// 置いた計画（実績）を deltaY（px）だけ動かしたときの開始時刻。unit 分単位に寄せる（既定15分、実績は5分）
+export function moveStart(start: number, deltaY: number, pxPerMin: number, duration: number, unit = SNAP_MINUTES): number {
+  return clamp(snap(start + deltaY / pxPerMin, unit), 0, Math.max(0, DAY_END - duration));
 }
 
-// 下の端を deltaY（px）だけ引いたときの長さ（15分以上、24:00 まで）
-export function resizeDuration(start: number, duration: number, deltaY: number, pxPerMin: number): number {
-  return clamp(snap(duration + deltaY / pxPerMin), SNAP_MINUTES, Math.max(SNAP_MINUTES, DAY_END - start));
+// 下の端を deltaY（px）だけ引いたときの長さ（unit 分以上、24:00 まで）
+export function resizeDuration(start: number, duration: number, deltaY: number, pxPerMin: number, unit = SNAP_MINUTES): number {
+  return clamp(snap(duration + deltaY / pxPerMin, unit), unit, Math.max(unit, DAY_END - start));
 }
 
 export type Interval = { id: string; start: number; end: number };

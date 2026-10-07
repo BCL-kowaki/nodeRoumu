@@ -451,10 +451,13 @@ export function buildMcpServer(ctx: McpContext, onWrite?: (tool: string) => void
     "add_time_entry",
     {
       title: "実績を手入力",
-      description: "タイマーを使わなかった作業時間を記録する。",
+      description:
+        "タイマーを使わなかった作業時間を記録する。時間帯（startTime・endTime）を付けるとタイムラインに表示され、分数はその長さになる（minutes は不要）。",
       inputSchema: {
         date: date.optional().describe("日付（既定: 今日）"),
-        minutes: z.number().int().min(1).max(1440),
+        minutes: z.number().int().min(1).max(1440).optional().describe("かかった時間（分）。時間帯を付けないときは必須"),
+        startTime: time.optional().describe("開始時刻 HH:MM"),
+        endTime: time.optional().describe("終了時刻 HH:MM"),
         note: z.string().max(200).optional(),
         taskId: z.string().optional(),
         projectId: z.string().optional(),

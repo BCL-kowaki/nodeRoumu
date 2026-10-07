@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { toJstTime } from "@/lib/work/entry-time";
+import { formatMinutes } from "@/lib/work/labels";
+import { timeToMinutes } from "@/lib/work/timeline";
 import ProjectOptions, { TaskOptions } from "./ProjectOptions";
-import { api, entryTitle, inputClass, labelClass, type Plan, type Project, type Task, type TimeEntry } from "./types";
+import { api, entryTitle, inputClass, labelClass, type Plan, type Project, type Routine, type Task, type TimeEntry } from "./types";
 
 function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -184,28 +187,52 @@ export function EntryEditor({
   const running = !!entry?.startedAt && !entry.endedAt;
   const [form, setForm] = useState({
     minutes: entry?.minutes != null ? String(entry.minutes) : "30",
+    // 時間帯（任意）。入れるとタイムラインにも表示され、時間は開始〜終了の長さになる
+    startTime: entry?.startedAt && entry.endedAt ? toJstTime(entry.startedAt) : "",
+    endTime: entry?.startedAt && entry.endedAt ? toJstTime(entry.endedAt) : "",
     note: entry?.note ?? "",
     taskId: entry?.taskId ?? "",
     projectId: entry?.projectId ?? "",
+    routineId: entry?.routineId ?? "",
   });
+  // ルーティンの選択肢（停止中のものは、すでに紐づいている場合だけ出す）
+  const [routines, setRoutines] = useState<Routine[]>([]);
+  useEffect(() => {
+    let alive = true;
+    api<Routine[]>("/api/work/routines")
+      .then((r) => alive && setRoutines(r))
+      .catch(() => alive && setRoutines([]));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const useRange = !running && !!(form.startTime || form.endTime);
+  const rangeMinutes =
+    form.startTime && form.endTime ? timeToMinutes(form.endTime) - timeToMinutes(form.startTime) : null;
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const save = async () => {
     const minutes = toMinutes(form.minutes);
-    if (!running && minutes === null) return setError("時間は分単位の数字で入力してください");
+    if (useRange) {
+      if (!form.startTime || !form.endTime) return setError("開始時刻と終了時刻は両方入力してください");
+      if (rangeMinutes === null || rangeMinutes <= 0) return setError("終了時刻は開始時刻より後にしてください");
+    } else if (!running && minutes === null) return setError("時間は分単位の数字で入力してください");
     setSaving(true);
     setError(null);
     try {
-      const links = { note: form.note, taskId: form.taskId || null, projectId: form.projectId || null };
+      const links = {
+        note: form.note,
+        taskId: form.taskId || null,
+        projectId: form.projectId || null,
+        routineId: form.routineId || null,
+      };
+      const time = running ? {} : useRange ? { startTime: form.startTime, endTime: form.endTime } : { minutes };
       if (entry) {
-        await api(`/api/work/time-entries/${entry.id}`, {
-          method: "PUT",
-          body: JSON.stringify(running ? links : { ...links, minutes }),
-        });
+        await api(`/api/work/time-entries/${entry.id}`, { method: "PUT", body: JSON.stringify({ ...links, ...time }) });
       } else {
-        await api("/api/work/time-entries", { method: "POST", body: JSON.stringify({ ...links, date, minutes }) });
+        await api("/api/work/time-entries", { method: "POST", body: JSON.stringify({ ...links, ...time, date }) });
       }
       onSaved();
     } catch (e) {
@@ -230,10 +257,37 @@ export function EntryEditor({
   return (
     <Dialog title={entry ? "実績の編集" : "実績の手入力"} onClose={onClose}>
       <div className="flex flex-col gap-3">
+        {!running && (
+          <div>
+            <span className={labelClass}>時間帯（任意）</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="time"
+                aria-label="開始時刻"
+                className={inputClass}
+                value={form.startTime}
+                onChange={(e) => set("startTime", e.target.value)}
+              />
+              <span className="text-app-sub">〜</span>
+              <input
+                type="time"
+                aria-label="終了時刻"
+                className={inputClass}
+                value={form.endTime}
+                onChange={(e) => set("endTime", e.target.value)}
+              />
+            </div>
+            <div className="text-[11px] text-app-sub mt-1">
+              入れるとタイムラインに表示され、時間は開始〜終了の長さになります。タイムライン上でもドラッグで動かせます
+            </div>
+          </div>
+        )}
         <div>
           <label className={labelClass} htmlFor="entry-minutes">かかった時間（分）</label>
           {running ? (
             <div className="text-xs text-app-sub">計測中のため、時間は停止後に確定します</div>
+          ) : useRange ? (
+            <div className="text-sm text-app-text py-1">{rangeMinutes && rangeMinutes > 0 ? formatMinutes(rangeMinutes) : "—"}（時間帯から計算）</div>
           ) : (
             <input id="entry-minutes" inputMode="numeric" className={inputClass} value={form.minutes} onChange={(e) => set("minutes", e.target.value)} />
           )}
@@ -256,6 +310,20 @@ export function EntryEditor({
           <select id="entry-project" className={inputClass} value={form.projectId} onChange={(e) => set("projectId", e.target.value)}>
             <option value="">（なし）</option>
             <ProjectOptions projects={projects.filter((p) => p.status === "active" || p.status === "on_hold" || p.id === form.projectId)} />
+          </select>
+        </div>
+        <div>
+          <label className={labelClass} htmlFor="entry-routine">ルーティン（任意）</label>
+          <select id="entry-routine" className={inputClass} value={form.routineId} onChange={(e) => set("routineId", e.target.value)}>
+            <option value="">（なし）</option>
+            {routines
+              .filter((r) => r.active || r.id === form.routineId)
+              .map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.client ? `${r.client.name} ／ ` : ""}
+                  {r.title}
+                </option>
+              ))}
           </select>
         </div>
         <div>

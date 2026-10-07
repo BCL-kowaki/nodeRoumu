@@ -47,6 +47,13 @@ describe("moveStart（置いた計画を上下に動かす）", () => {
   });
 });
 
+describe("5分単位で動かす（実績用）", () => {
+  it("動かした分を5分単位に寄せる", () => {
+    expect(moveStart(547, 12, PX, 40, 5)).toBe(560); // 9:07 → +12分 → 9:19 → 9:20
+    expect(resizeDuration(547, 40, 7, PX, 5)).toBe(45);
+  });
+});
+
 describe("resizeDuration（下の端を引いて長さを変える）", () => {
   it("引いた分だけ長くし、15分単位に寄せる", () => {
     expect(resizeDuration(600, 60, 32, PX)).toBe(90);

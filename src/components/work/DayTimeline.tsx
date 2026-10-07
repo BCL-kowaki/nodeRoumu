@@ -56,7 +56,12 @@ type DragData =
   | { kind: "routine"; routine: Routine; duration: number }
   | { kind: "unscheduled"; plan: Plan; duration: number }
   | { kind: "plan"; plan: Plan; start: number; duration: number }
-  | { kind: "resize"; plan: Plan; start: number; duration: number };
+  | { kind: "resize"; plan: Plan; start: number; duration: number }
+  | { kind: "entry"; entry: TimeEntry; start: number; duration: number }
+  | { kind: "entry-resize"; entry: TimeEntry; start: number; duration: number };
+
+// 実績は計画より細かく、5分単位で動かす
+const ENTRY_SNAP = 5;
 
 // ===== タイマー（左の一覧のカードに付ける ▶ / ■） =====
 export type TimerControls = {
@@ -331,6 +336,76 @@ function PlanBlock({
   );
 }
 
+// ===== 実績のブロック（止めた実績は、動かす・下端で伸ばす・押して編集。計測中は押して編集だけ） =====
+function EntryBlock({
+  entry,
+  start,
+  end,
+  col,
+  cols,
+  onOpen,
+  preview,
+  movable: canMove,
+}: {
+  entry: TimeEntry;
+  start: number;
+  end: number;
+  movable: boolean;
+  col: number;
+  cols: number;
+  onOpen: (e: TimeEntry) => void;
+  preview: { start: number; duration: number } | null;
+}) {
+  const movable = canMove && !!entry.endedAt;
+  const duration = end - start;
+  const move = useDraggable({ id: `entry:${entry.id}`, data: { kind: "entry", entry, start, duration } satisfies DragData, disabled: !movable });
+  const resize = useDraggable({
+    id: `entry-resize:${entry.id}`,
+    data: { kind: "entry-resize", entry, start, duration } satisfies DragData,
+    disabled: !movable,
+  });
+  const s = preview?.start ?? start;
+  const d = preview?.duration ?? duration;
+  return (
+    <div
+      ref={move.setNodeRef}
+      className={`absolute rounded-md overflow-hidden select-none touch-manipulation ${entry.endedAt ? "bg-primary/80" : "bg-danger/80"} ${
+        preview ? "shadow-lg z-20 ring-2 ring-accent" : "z-10"
+      }`}
+      style={{
+        top: s * PX_PER_MIN,
+        height: Math.max(d * PX_PER_MIN, 6),
+        left: `calc(${(col / cols) * 100}% + 2px)`,
+        width: `calc(${100 / cols}% - 4px)`,
+      }}
+    >
+      <button
+        type="button"
+        {...(movable ? move.listeners : {})}
+        {...(movable ? move.attributes : {})}
+        onClick={() => onOpen(entry)}
+        title={`${entryTitle(entry)}（${minutesToTime(s)}〜${minutesToTime(s + d)}）`}
+        aria-label={`実績「${entryTitle(entry)}」${minutesToTime(s)}〜${minutesToTime(s + d)}。${movable ? "ドラッグで時間帯を変更、" : ""}押すと編集`}
+        className={`block w-full h-full px-1.5 py-0.5 text-left bg-transparent border-none ${movable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
+      >
+        <span className="text-[10px] text-white font-semibold truncate block">{entryTitle(entry)}</span>
+        {d * PX_PER_MIN >= 30 && <span className="text-[9px] text-white/85 tabular-nums block">{minutesToTime(s)}〜{minutesToTime(s + d)}</span>}
+      </button>
+      {movable && (
+        <div
+          ref={resize.setNodeRef}
+          {...resize.listeners}
+          {...resize.attributes}
+          aria-label={`実績「${entryTitle(entry)}」の長さを変える`}
+          className="absolute left-0 right-0 bottom-0 h-2 cursor-ns-resize flex justify-center items-end pb-0.5"
+        >
+          <span className="w-5 h-[3px] rounded-full bg-white/60" aria-hidden />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ===== 計画の列（ドロップ先） =====
 function PlanLane({ children, laneRef }: { children: React.ReactNode; laneRef: React.MutableRefObject<HTMLDivElement | null> }) {
   const { setNodeRef, isOver } = useDroppable({ id: "plan-lane" });
@@ -364,6 +439,7 @@ export default function DayTimeline({
   onOpenTask,
   timer,
   onUpdatePlan,
+  onUpdateEntryTime,
   onOpenPlan,
   onOpenEntry,
 }: {
@@ -381,6 +457,7 @@ export default function DayTimeline({
   onOpenTask: (task: Task) => void;
   timer: TimerControls;
   onUpdatePlan: (plan: Plan, patch: { startTime?: string; plannedMinutes?: number }) => void;
+  onUpdateEntryTime: (entry: TimeEntry, startTime: string, endTime: string) => void;
   onOpenPlan: (plan: Plan) => void;
   onOpenEntry: (entry: TimeEntry) => void;
 }) {
@@ -459,6 +536,10 @@ export default function DayTimeline({
     const d = ev.active.data.current as DragData;
     if (d.kind === "plan") setPreview({ id: d.plan.id, start: moveStart(d.start, ev.delta.y, PX_PER_MIN, d.duration), duration: d.duration });
     else if (d.kind === "resize") setPreview({ id: d.plan.id, start: d.start, duration: resizeDuration(d.start, d.duration, ev.delta.y, PX_PER_MIN) });
+    else if (d.kind === "entry")
+      setPreview({ id: d.entry.id, start: moveStart(d.start, ev.delta.y, PX_PER_MIN, d.duration, ENTRY_SNAP), duration: d.duration });
+    else if (d.kind === "entry-resize")
+      setPreview({ id: d.entry.id, start: d.start, duration: resizeDuration(d.start, d.duration, ev.delta.y, PX_PER_MIN, ENTRY_SNAP) });
   };
 
   const onDragEnd = (ev: DragEndEvent) => {
@@ -473,6 +554,16 @@ export default function DayTimeline({
     if (d.kind === "resize") {
       const minutes = resizeDuration(d.start, d.duration, ev.delta.y, PX_PER_MIN);
       if (minutes !== d.duration) onUpdatePlan(d.plan, { plannedMinutes: minutes });
+      return;
+    }
+    if (d.kind === "entry") {
+      const start = moveStart(d.start, ev.delta.y, PX_PER_MIN, d.duration, ENTRY_SNAP);
+      if (start !== d.start) onUpdateEntryTime(d.entry, minutesToTime(start), minutesToTime(Math.min(DAY_END - 1, start + d.duration)));
+      return;
+    }
+    if (d.kind === "entry-resize") {
+      const minutes = resizeDuration(d.start, d.duration, ev.delta.y, PX_PER_MIN, ENTRY_SNAP);
+      if (minutes !== d.duration) onUpdateEntryTime(d.entry, minutesToTime(d.start), minutesToTime(Math.min(DAY_END - 1, d.start + minutes)));
       return;
     }
     // タスク・時刻未定の計画は、計画の列の上に落としたときだけ置く
@@ -697,23 +788,18 @@ export default function DayTimeline({
                 {actuals.map(({ e, iv }) => {
                   const lay = actualLayout[e.id] ?? { col: 0, cols: 1 };
                   return (
-                  <button
-                    key={e.id}
-                    type="button"
-                    onClick={() => onOpenEntry(e)}
-                    title={`${entryTitle(e)}（${minutesToTime(iv.start)}〜${minutesToTime(iv.end)}）`}
-                    className={`absolute rounded-md border-none px-1.5 py-0.5 text-left overflow-hidden cursor-pointer ${
-                      e.endedAt ? "bg-primary/80" : "bg-danger/80"
-                    }`}
-                    style={{
-                      top: iv.start * PX_PER_MIN,
-                      height: Math.max((iv.end - iv.start) * PX_PER_MIN, 6),
-                      left: `calc(${(lay.col / lay.cols) * 100}% + 2px)`,
-                      width: `calc(${100 / lay.cols}% - 4px)`,
-                    }}
-                  >
-                    <span className="text-[10px] text-white font-semibold truncate block">{entryTitle(e)}</span>
-                  </button>
+                    <EntryBlock
+                      key={e.id}
+                      entry={e}
+                      start={iv.start}
+                      end={iv.end}
+                      col={lay.col}
+                      cols={lay.cols}
+                      onOpen={onOpenEntry}
+                      preview={preview?.id === e.id ? preview : null}
+                      // 日をまたいだ実績（別の日に記録したもの）は、この日の時間帯だけでは直せないので動かさない
+                      movable={e.date.slice(0, 10) === date && !!e.startedAt && iv.end < DAY_END && iv.start > 0}
+                    />
                   );
                 })}
               </div>

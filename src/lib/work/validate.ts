@@ -407,6 +407,8 @@ export function parsePlanInput(body: unknown, mode: Mode): ParseResult<PlanInput
 export type TimeEntryInput = LinkInput & {
   date?: string;
   minutes?: number;
+  startTime?: string; // 時間帯（日本時間 HH:MM）。開始と終了は必ず両方
+  endTime?: string;
   note?: string | null;
   planId?: string | null;
 };
@@ -420,7 +422,17 @@ export function parseTimeEntryInput(body: unknown, mode: Mode): ParseResult<Time
       if (!d) throw new InputError("日付の形式が正しくありません");
       out.date = d;
     }
-    if (mode === "create" || has(b, "minutes")) {
+    if (has(b, "startTime") || has(b, "endTime")) {
+      if (!has(b, "startTime") || !has(b, "endTime")) throw new InputError("開始時刻と終了時刻は両方指定してください");
+      const t = /^([01]\d|2[0-3]):[0-5]\d$/;
+      if (typeof b.startTime !== "string" || typeof b.endTime !== "string" || !t.test(b.startTime) || !t.test(b.endTime)) {
+        throw new InputError("時刻は HH:MM の形式で入力してください");
+      }
+      out.startTime = b.startTime;
+      out.endTime = b.endTime;
+    }
+    // 時間帯を指定したときは、分数は時間帯から決まるので省略できる
+    if ((mode === "create" && !out.startTime) || has(b, "minutes")) {
       out.minutes = minutesInRange(b.minutes, "時間は1〜1440分で入力してください");
     }
     if (has(b, "note")) out.note = optionalText(b.note, MAX_TITLE, "メモ");
