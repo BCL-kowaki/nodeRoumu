@@ -25,7 +25,7 @@ import {
   yToStart,
 } from "@/lib/work/timeline";
 import Link from "next/link";
-import { Building2, CalendarPlus, Check, ChevronDown, Play, Repeat, Square } from "lucide-react";
+import { Building2, CalendarPlus, Check, ChevronDown, Pencil, Play, Repeat, Square } from "lucide-react";
 import { formatMinutes } from "@/lib/work/labels";
 import { eventToPlan, groupByClient, groupTasksByProject, importableEvents } from "@/lib/work/plan-sources";
 import { useCollapsedClients } from "./useCollapsedClients";
@@ -282,6 +282,7 @@ function PlanBlock({
   color,
   onOpen,
   preview,
+  timer,
 }: {
   plan: Plan;
   start: number;
@@ -291,7 +292,10 @@ function PlanBlock({
   color: string;
   onOpen: (p: Plan) => void;
   preview: { start: number; duration: number } | null;
+  // 今日の計画なら、押すとタイマーの開始・停止（無ければ押すと編集）
+  timer: TimerControls | null;
 }) {
+  const running = timer ? runningForPlan(plan, timer) : undefined;
   const move = useDraggable({ id: `plan:${plan.id}`, data: { kind: "plan", plan, start, duration } satisfies DragData });
   const resize = useDraggable({ id: `resize:${plan.id}`, data: { kind: "resize", plan, start, duration } satisfies DragData });
   // ドラッグ中は、15分単位に寄せた位置・長さで表示する
@@ -302,9 +306,9 @@ function PlanBlock({
   return (
     <div
       ref={move.setNodeRef}
-      className={`absolute rounded-lg border bg-work-light border-work/30 overflow-hidden select-none touch-manipulation ${
-        preview ? "shadow-lg z-20 ring-2 ring-work" : "z-10"
-      }`}
+      className={`absolute rounded-lg border bg-work-light overflow-hidden select-none touch-manipulation ${
+        running ? "border-danger ring-1 ring-danger" : "border-work/30"
+      } ${preview ? "shadow-lg z-20 ring-2 ring-work" : "z-10"}`}
       style={{ top, height, left: `calc(${(col / cols) * 100}% + 2px)`, width: `calc(${100 / cols}% - 4px)` }}
     >
       <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: color }} aria-hidden />
@@ -312,17 +316,41 @@ function PlanBlock({
         type="button"
         {...move.listeners}
         {...move.attributes}
-        onClick={() => onOpen(plan)}
-        aria-label={`計画「${plan.title}」${minutesToTime(s)}〜${minutesToTime(s + d)}。ドラッグで時刻を変更、押すと編集`}
-        className="block w-full h-full text-left pl-2.5 pr-1.5 pt-1 bg-transparent border-none cursor-grab active:cursor-grabbing"
+        disabled={timer?.busy}
+        onClick={() => {
+          if (!timer) return onOpen(plan);
+          if (running) timer.stop(running.id);
+          else timer.start({ planId: plan.id });
+        }}
+        aria-label={`計画「${plan.title}」${minutesToTime(s)}〜${minutesToTime(s + d)}。ドラッグで時刻を変更、${
+          timer ? (running ? "押すとタイマーを停止" : "押すとタイマーを開始") : "押すと編集"
+        }`}
+        title={timer ? (running ? "押すとタイマーを停止" : "押すとタイマーを開始") : "押すと編集"}
+        className="block w-full h-full text-left pl-2.5 pr-6 pt-1 bg-transparent border-none cursor-grab active:cursor-grabbing"
       >
         <div className="text-[12px] font-bold text-work-dark leading-tight truncate">{plan.title}</div>
-        {height >= 34 && (
-          <div className="text-[10px] text-app-sub tabular-nums">
-            {minutesToTime(s)}〜{minutesToTime(s + d)}
-          </div>
-        )}
+        {height >= 34 &&
+          (running?.startedAt ? (
+            <div className="text-[10px] text-danger font-semibold">
+              ● <Elapsed startedAt={running.startedAt} />
+            </div>
+          ) : (
+            <div className="text-[10px] text-app-sub tabular-nums">
+              {minutesToTime(s)}〜{minutesToTime(s + d)}
+            </div>
+          ))}
       </button>
+      {timer && (
+        <button
+          type="button"
+          onClick={() => onOpen(plan)}
+          aria-label={`計画「${plan.title}」を編集`}
+          title="編集"
+          className="absolute top-0.5 right-0.5 w-5 h-5 flex items-center justify-center rounded text-app-sub bg-white/70 border-none cursor-pointer hover:bg-white hover:text-app-text"
+        >
+          <Pencil size={11} aria-hidden />
+        </button>
+      )}
       <div
         ref={resize.setNodeRef}
         {...resize.listeners}
@@ -778,6 +806,7 @@ export default function DayTimeline({
                       color={projectColor(p.projectId)}
                       onOpen={onOpenPlan}
                       preview={preview?.id === p.id ? preview : null}
+                      timer={isToday ? timer : null}
                     />
                   );
                 })}
