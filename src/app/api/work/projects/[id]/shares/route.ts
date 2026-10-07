@@ -64,7 +64,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       ownerId: auth.ctx.ownerId,
       projectId: ctx.project.id,
       notePath: path,
-      title: shareTitle(content, path).slice(0, 200),
+      encryptedTitle: encrypt(shareTitle(content, path).slice(0, 200)),
       encryptedContent: encrypt(content),
       tokenHash: hashToken(token),
       encryptedToken: encrypt(token),

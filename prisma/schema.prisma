@@ -249,9 +249,9 @@ model AttendanceChange {
 model NoteShare {
   id               String    @id @default(cuid())
   ownerId          String
-  projectId        String?
+  projectId        String // プロジェクトを消したら共有も消える（停止できない共有を残さない）
   notePath         String // 元のノート（Obsidian）
-  title            String
+  encryptedTitle   String // 題名（最初の見出し）も中身の一部なので暗号化する
   encryptedContent String    @db.Text
   tokenHash        String    @unique
   encryptedToken   String // 発行した人が、あとでリンクをコピーできるように
@@ -265,10 +265,11 @@ model NoteShare {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  owner   Employee     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  project WorkProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  owner   Employee    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  project WorkProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([ownerId, notePath])
+  @@index([projectId])
 }
 
 // AI 連携（MCP）用の鍵。鍵そのものは保存せず、SHA-256 の値だけを持つ

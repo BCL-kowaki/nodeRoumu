@@ -32,7 +32,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       const { content } = await readNote(share.notePath);
       const updated = await prisma.noteShare.update({
         where: { id: share.id },
-        data: { encryptedContent: encrypt(content), title: shareTitle(content, share.notePath).slice(0, 200) },
+        data: { encryptedContent: encrypt(content), encryptedTitle: encrypt(shareTitle(content, share.notePath).slice(0, 200)) },
       });
       return NextResponse.json(toShareView(updated, req.nextUrl.origin, new Date()));
     } catch (e) {

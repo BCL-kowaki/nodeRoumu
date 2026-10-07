@@ -5,6 +5,14 @@ import { decrypt } from "@/lib/crypto";
 import { hashToken } from "@/lib/api-token";
 import { isShareOpen } from "./note-share";
 
+function safeDecrypt(value: string): string | null {
+  try {
+    return decrypt(value);
+  } catch {
+    return null;
+  }
+}
+
 export function newShareToken(): string {
   return randomBytes(32).toString("base64url");
 }
@@ -14,7 +22,7 @@ export function toShareView(
   s: {
     id: string;
     notePath: string;
-    title: string;
+    encryptedTitle: string;
     encryptedToken: string;
     passwordHash: string | null;
     expiresAt: Date | null;
@@ -30,8 +38,12 @@ export function toShareView(
   return {
     id: s.id,
     notePath: s.notePath,
-    title: s.title,
-    url: `${origin}/share/${decrypt(s.encryptedToken)}`,
+    title: safeDecrypt(s.encryptedTitle) ?? "（読み取れません）",
+    // 暗号化の鍵を替えた後などで読めないときは、一覧全体を止めずにリンクだけ出さない
+    url: (() => {
+      const token = safeDecrypt(s.encryptedToken);
+      return token ? `${origin}/share/${token}` : null;
+    })(),
     hasPassword: !!s.passwordHash,
     expiresAt: s.expiresAt,
     revokedAt: s.revokedAt,

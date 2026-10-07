@@ -15,6 +15,12 @@ const nextConfig = {
           { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "X-Frame-Options", value: "DENY" },
+          // 外部の画像などを読み込ませない（閲覧者の情報が外部に渡らないように）。Next の初期化スクリプトのため inline は許可
+          {
+            key: "Content-Security-Policy",
+            value:
+              "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'",
+          },
         ],
       },
     ];

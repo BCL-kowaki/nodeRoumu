@@ -1,8 +1,10 @@
 // ノートの共有リンク（社外の方が見られる読み取り専用ページ）の判定（決まった答えになる処理なのでテストで固定）
 
 export const SHARE_EXPIRY_DAYS = [7, 30, 90] as const;
-const MAX_FAILED = 5; // この回数パスワードを間違えたら、しばらく入力できなくする
+export const MAX_FAILED = 5; // この回数パスワードを間違えたら、しばらく入力できなくする
 const LOCK_MINUTES = 15;
+const MIN_PASSWORD = 8;
+const PASSWORD_ERROR = `パスワードは${MIN_PASSWORD}〜100文字で入力してください`;
 
 export type ShareCreate = { path: string; expiresInDays: number | null; password: string | null };
 
@@ -15,9 +17,9 @@ export function parseShareCreate(body: unknown): { ok: true; data: ShareCreate }
   }
   let password: string | null = null;
   if (b.password !== undefined && b.password !== null && b.password !== "") {
-    if (typeof b.password !== "string") return { ok: false, error: "パスワードは4〜100文字で入力してください" };
+    if (typeof b.password !== "string") return { ok: false, error: PASSWORD_ERROR };
     const p = b.password.trim();
-    if (p.length < 4 || p.length > 100) return { ok: false, error: "パスワードは4〜100文字で入力してください" };
+    if (p.length < MIN_PASSWORD || p.length > 100) return { ok: false, error: PASSWORD_ERROR };
     password = p;
   }
   return { ok: true, data: { path: b.path, expiresInDays: days as number | null, password } };
@@ -31,10 +33,13 @@ export function isShareOpen(s: { revokedAt: Date | null; expiresAt: Date | null 
   return !s.revokedAt && (!s.expiresAt || s.expiresAt.getTime() > now.getTime());
 }
 
-export function afterFailedAttempt(failedAttempts: number, now: Date): { failedAttempts: number; lockedUntil: Date | null } {
-  const next = failedAttempts + 1;
-  if (next >= MAX_FAILED) return { failedAttempts: 0, lockedUntil: new Date(now.getTime() + LOCK_MINUTES * 60 * 1000) };
-  return { failedAttempts: next, lockedUntil: null };
+export function isShareLocked(lockedUntil: Date | null, now: Date): boolean {
+  return !!lockedUntil && lockedUntil.getTime() > now.getTime();
+}
+
+// MAX_FAILED 回間違えたら、この時刻まで入力できなくする
+export function shareLockUntil(now: Date): Date {
+  return new Date(now.getTime() + LOCK_MINUTES * 60 * 1000);
 }
 
 // 共有ページの題名：最初の「# 見出し」、無ければファイル名

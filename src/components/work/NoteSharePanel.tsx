@@ -6,7 +6,7 @@ import { api } from "./types";
 
 type Share = {
   id: string;
-  url: string;
+  url: string | null; // 暗号化の鍵を替えた後などで読めないときは null
   hasPassword: boolean;
   expiresAt: string | null;
   revokedAt: string | null;
@@ -63,6 +63,7 @@ export default function NoteSharePanel({ projectId, notePath, onClose }: { proje
 
   const copy = async (s: Share) => {
     try {
+      if (!s.url) return;
       await navigator.clipboard.writeText(s.url);
       setCopied(s.id);
       setTimeout(() => setCopied(null), 2000);
@@ -92,8 +93,8 @@ export default function NoteSharePanel({ projectId, notePath, onClose }: { proje
       {active.map((s) => (
         <div key={s.id} className="rounded-lg bg-white border border-app-border p-2.5 flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5">
-            <input readOnly value={s.url} aria-label="共有リンク" className="flex-1 min-w-0 px-2 py-1 rounded border border-app-border text-[11px] bg-app-bg" onFocus={(e) => e.target.select()} />
-            <button type="button" className={small} onClick={() => copy(s)}>
+            <input readOnly value={s.url ?? "（リンクを読み取れません。停止して発行し直してください）"} aria-label="共有リンク" className="flex-1 min-w-0 px-2 py-1 rounded border border-app-border text-[11px] bg-app-bg" onFocus={(e) => e.target.select()} />
+            <button type="button" className={small} disabled={!s.url} onClick={() => copy(s)}>
               {copied === s.id ? <Check size={12} aria-hidden /> : <Copy size={12} aria-hidden />}
               {copied === s.id ? "コピーしました" : "コピー"}
             </button>
@@ -152,7 +153,7 @@ export default function NoteSharePanel({ projectId, notePath, onClose }: { proje
             <input
               aria-label="共有ページのパスワード"
               className="px-2 py-1 rounded border border-app-border text-xs bg-white w-40"
-              placeholder="4文字以上"
+              placeholder="8文字以上"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -161,7 +162,7 @@ export default function NoteSharePanel({ projectId, notePath, onClose }: { proje
         <button
           type="button"
           onClick={issue}
-          disabled={busy || (usePassword && password.trim().length < 4)}
+          disabled={busy || (usePassword && password.trim().length < 8)}
           className="py-2 rounded bg-primary text-white text-xs font-bold border-none cursor-pointer disabled:opacity-50"
         >
           {busy ? "発行中…" : "共有リンクを発行する"}

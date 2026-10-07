@@ -12,6 +12,10 @@ export const dynamic = "force-dynamic";
 // 共有ページは検索エンジンに載せない。題名も出さない（リンクが知られても中身の手がかりにならないように）
 export const metadata: Metadata = {
   title: "共有ドキュメント",
+  // 社内ポータルの説明文・アプリ名を引き継がない（チャットのリンクプレビューにも出るため）
+  description: "共有されたドキュメントです。",
+  manifest: null,
+  appleWebApp: { title: "共有ドキュメント" },
   robots: { index: false, follow: false, nocache: true },
   referrer: "no-referrer",
 };

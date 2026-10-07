@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { afterFailedAttempt, isShareOpen, parseShareCreate, shareExpiresAt, shareTitle } from "./note-share";
+import { isShareLocked, isShareOpen, parseShareCreate, shareExpiresAt, shareLockUntil, shareTitle } from "./note-share";
 
 const now = new Date("2026-10-07T00:00:00Z");
 
@@ -9,15 +9,15 @@ describe("parseShareCreate（共有リンクの発行の入力）", () => {
       ok: true,
       data: { path: "Projects/A/議事録/x.md", expiresInDays: 30, password: null },
     });
-    expect(parseShareCreate({ path: "a.md", expiresInDays: null, password: " abcd " })).toEqual({
+    expect(parseShareCreate({ path: "a.md", expiresInDays: null, password: " abcd1234 " })).toEqual({
       ok: true,
-      data: { path: "a.md", expiresInDays: null, password: "abcd" },
+      data: { path: "a.md", expiresInDays: null, password: "abcd1234" },
     });
   });
   it.each([
     ["日数が選択肢にない", { path: "a.md", expiresInDays: 10 }, "有効期限は7日・30日・90日・無期限から選んでください"],
-    ["パスワードが短い", { path: "a.md", expiresInDays: 7, password: "abc" }, "パスワードは4〜100文字で入力してください"],
-    ["パスワードが長い", { path: "a.md", expiresInDays: 7, password: "a".repeat(101) }, "パスワードは4〜100文字で入力してください"],
+    ["パスワードが短い", { path: "a.md", expiresInDays: 7, password: "abcdefg" }, "パスワードは8〜100文字で入力してください"],
+    ["パスワードが長い", { path: "a.md", expiresInDays: 7, password: "a".repeat(101) }, "パスワードは8〜100文字で入力してください"],
     ["ノートの指定が無い", { expiresInDays: 7 }, "共有するノートを選んでください"],
   ])("%s のとき、エラーを返す", (_n, body, message) => {
     expect(parseShareCreate(body)).toEqual({ ok: false, error: message });
@@ -42,12 +42,14 @@ describe("isShareOpen（共有ページを見せてよいか）", () => {
   });
 });
 
-describe("afterFailedAttempt（パスワードを間違えたとき）", () => {
-  it("5回目までは回数を数えるだけ", () => {
-    expect(afterFailedAttempt(3, now)).toEqual({ failedAttempts: 4, lockedUntil: null });
+describe("パスワードを続けて間違えたときのロック", () => {
+  it("15分入力できなくする", () => {
+    expect(shareLockUntil(now)).toEqual(new Date("2026-10-07T00:15:00Z"));
   });
-  it("5回間違えたら15分入力できなくし、回数を戻す", () => {
-    expect(afterFailedAttempt(4, now)).toEqual({ failedAttempts: 0, lockedUntil: new Date("2026-10-07T00:15:00Z") });
+  it("ロック中かどうか（時刻を過ぎたら解ける）", () => {
+    expect(isShareLocked(null, now)).toBe(false);
+    expect(isShareLocked(new Date("2026-10-07T00:00:01Z"), now)).toBe(true);
+    expect(isShareLocked(now, now)).toBe(false);
   });
 });
 

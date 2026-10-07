@@ -43,6 +43,8 @@ export async function verifyToken(token: string): Promise<SessionPayload | null>
   const secret = getSecret();
   try {
     const { payload } = await jwtVerify(token, secret);
+    // ログイン以外の用途のトークン（共有ページ用など）は受け付けない
+    if (payload.aud !== undefined || typeof payload.employeeId !== "string") return null;
     return payload as unknown as SessionPayload;
   } catch {
     return null;
@@ -59,10 +61,14 @@ export async function getSessionFromRequest(req: NextRequest): Promise<SessionPa
 }
 
 
+// 共有ページ用のトークンの用途名。ログイン用のトークンと取り違えないようにする
+const SHARE_AUDIENCE = "note-share";
+
 // 共有ページ（パスワード付き）を開けたことの証明。共有ごとに別のクッキーにし、12時間で切れる
 export async function createShareAccess(shareId: string): Promise<string> {
   return new SignJWT({ share: shareId })
     .setProtectedHeader({ alg: "HS256" })
+    .setAudience(SHARE_AUDIENCE)
     .setIssuedAt()
     .setExpirationTime("12h")
     .sign(getSecret());
@@ -71,7 +77,7 @@ export async function createShareAccess(shareId: string): Promise<string> {
 export async function verifyShareAccess(token: string | undefined, shareId: string): Promise<boolean> {
   if (!token) return false;
   try {
-    const { payload } = await jwtVerify(token, getSecret());
+    const { payload } = await jwtVerify(token, getSecret(), { audience: SHARE_AUDIENCE });
     return payload.share === shareId;
   } catch {
     return false;
