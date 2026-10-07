@@ -6,8 +6,7 @@ import { TASK_STATUSES } from "@/lib/work/validate";
 import ProjectOptions from "./ProjectOptions";
 import TaskAttachments from "./TaskAttachments";
 import { api, inputClass, labelClass, type Project, type Task } from "./types";
-import { ExternalLink } from "lucide-react";
-import { extractUrls } from "@/lib/linkify";
+import RichTextEditor from "@/components/RichTextEditor";
 
 type Form = {
   title: string;
@@ -168,29 +167,8 @@ export default function TaskEditor({
           </div>
           <div>
             <label className={labelClass} htmlFor="task-desc">メモ</label>
-            <textarea
-              id="task-desc"
-              className={`${inputClass} min-h-[96px]`}
-              value={form.description}
-              onChange={(e) => set("description", e.target.value)}
-            />
-            {/* メモの中の URL は、入力欄の下にリンクとして並べる（入力欄の中では押せないため） */}
-            {extractUrls(form.description).length > 0 && (
-              <div className="mt-1 flex flex-col gap-0.5">
-                {extractUrls(form.description).map((u) => (
-                  <a
-                    key={u}
-                    href={u}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-accent-dark underline underline-offset-2 break-all"
-                  >
-                    <ExternalLink size={11} className="shrink-0" aria-hidden />
-                    {u}
-                  </a>
-                ))}
-              </div>
-            )}
+            {/* 「プレビュー」でリンクを押して開ける */}
+            <RichTextEditor id="task-desc" value={form.description} onChange={(v) => set("description", v)} minHeight={110} />
           </div>
 
           {/* 添付資料は、保存済みのタスクにだけ付けられる（新規作成では先に保存する） */}

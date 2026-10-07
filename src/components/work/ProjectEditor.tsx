@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PROJECT_STATUS_LABELS } from "@/lib/work/labels";
 import { PROJECT_STATUSES } from "@/lib/work/validate";
 import { api, inputClass, labelClass, type Client, type Project } from "./types";
+import RichTextEditor from "@/components/RichTextEditor";
 
 const COLORS = ["#ff9800", "#1a1a1a", "#21977f", "#1e88e5", "#8e24aa", "#f4511e", "#fb8c00", "#6d4c41", "#546e7a"];
 
@@ -129,12 +130,7 @@ export default function ProjectEditor({
           </div>
           <div>
             <label className={labelClass} htmlFor="project-desc">説明</label>
-            <textarea
-              id="project-desc"
-              className={`${inputClass} min-h-[96px]`}
-              value={form.description}
-              onChange={(e) => set("description", e.target.value)}
-            />
+            <RichTextEditor id="project-desc" value={form.description} onChange={(v) => set("description", v)} minHeight={160} />
           </div>
 
           {error && <div className="text-sm text-danger bg-danger-light rounded p-3 text-center">{error}</div>}

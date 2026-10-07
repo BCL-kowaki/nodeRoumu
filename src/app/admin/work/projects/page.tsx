@@ -19,7 +19,7 @@ import { api, type Client, type Project, type Task } from "@/components/work/typ
 import { todayJst } from "@/lib/date-jst";
 import { PROJECT_STATUS_LABELS, dueLabel } from "@/lib/work/labels";
 import PageTitle from "@/components/PageTitle";
-import LinkifiedText from "@/components/LinkifiedText";
+import NoteMarkdown from "@/components/work/NoteMarkdown";
 
 // 選択中の項目。"all"=すべて、"none"=未分類（プロジェクトなし）、"client:<ID>"=クライアント、それ以外はプロジェクトID
 type Selection = "all" | "none" | string;
@@ -363,8 +363,8 @@ function ProjectsAndTasks() {
                   </div>
                 )}
                 {project.description && (
-                  <div className="text-sm text-app-text whitespace-pre-wrap break-words">
-                    <LinkifiedText text={project.description} />
+                  <div className="text-sm text-app-text break-words">
+                    <NoteMarkdown content={project.description} />
                   </div>
                 )}
               </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { linkWikiLinks } from "@/lib/work/obsidian-tree";
 
@@ -11,7 +12,8 @@ export default function NoteMarkdown({ content, onOpenNote }: { content: string;
   return (
     <div className="note-md">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        // 改行はそのまま改行として表示する（Obsidian の既定と同じ。説明欄なども1行ずつ書かれているため）
+        remarkPlugins={[remarkGfm, remarkBreaks]}
         urlTransform={(url) => (url.startsWith("obsidian:") ? url : defaultUrlTransform(url))}
         components={{
           a: ({ href, children }) => {

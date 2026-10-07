@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { Eye, EyeOff, Lock, Pencil } from "lucide-react";
 import Card from "@/components/Card";
-import LinkifiedText from "@/components/LinkifiedText";
-import { api, inputClass } from "./types";
+import RichTextEditor from "@/components/RichTextEditor";
+import NoteMarkdown from "./NoteMarkdown";
+import { api } from "./types";
 
 // クライアントのメモ（アカウント情報など）。中身は最初は隠し、「表示」を押したときだけ読み込む
 export default function ClientMemo({ clientId, hasMemo, onChanged }: { clientId: string; hasMemo: boolean; onChanged: () => void }) {
@@ -94,13 +95,13 @@ export default function ClientMemo({ clientId, hasMemo, onChanged }: { clientId:
 
       {editing ? (
         <div className="mt-2 flex flex-col gap-2">
-          <textarea
-            className={`${inputClass} min-h-[160px] font-mono text-[13px]`}
+          <RichTextEditor
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={"例:\n管理画面 https://example.com/admin\nID: ○○○\n担当: ○○さん"}
-            autoFocus
-            aria-label="クライアントのメモ"
+            onChange={setDraft}
+            placeholder={"例:\n[管理画面](https://example.com/admin)\nID: ○○○\n担当: ○○さん"}
+            minHeight={160}
+            ariaLabel="クライアントのメモ"
+            mono
           />
           <div className="flex gap-2">
             <button type="button" onClick={save} disabled={busy} className="flex-1 py-2 rounded bg-primary text-white text-sm font-bold border-none cursor-pointer disabled:opacity-50">
@@ -113,8 +114,8 @@ export default function ClientMemo({ clientId, hasMemo, onChanged }: { clientId:
         </div>
       ) : hasMemo ? (
         shown && memo !== null ? (
-          <div className="mt-2 text-sm text-app-text whitespace-pre-wrap break-words bg-app-bg rounded p-3">
-            <LinkifiedText text={memo} />
+          <div className="mt-2 bg-app-bg rounded p-3">
+            <NoteMarkdown content={memo} />
           </div>
         ) : (
           <div className="mt-1 text-xs text-app-sub">メモがあります。「表示」を押すと見られます</div>
