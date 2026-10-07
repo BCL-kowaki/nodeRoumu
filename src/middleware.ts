@@ -5,8 +5,18 @@ import { getSessionFromRequest } from "@/lib/session-token";
 const PUBLIC_PATHS = ["/login", "/api/auth/login"];
 const STATIC_PREFIXES = ["/_next", "/favicon.ico", "/favicon.png", "/apple-touch-icon.png", "/icon-192.png", "/icon-512.png", "/logo.png", "/manifest.json"];
 
+// 本番のドメイン。古い Vercel の URL で開かれた画面は、こちらへ転送する
+const CANONICAL_ORIGIN = "https://portal.node-llc.com";
+const OLD_HOSTS = ["node-roumu.vercel.app"];
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // 古い URL → 新しいドメイン（パス・クエリはそのまま）。
+  // API は転送しない（AI 連携などは転送先へ認証情報が渡らず止まるため。古い URL のままでも動かす）
+  if (OLD_HOSTS.includes(req.headers.get("host") ?? "") && !pathname.startsWith("/api/") && !pathname.startsWith("/_next/")) {
+    return NextResponse.redirect(`${CANONICAL_ORIGIN}${pathname}${req.nextUrl.search}`, 308);
+  }
 
   // 静的アセットはスキップ
   if (STATIC_PREFIXES.some((p) => pathname.startsWith(p))) {
