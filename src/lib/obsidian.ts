@@ -121,3 +121,11 @@ export async function updateNote(
     }
   }
 }
+
+// フォルダの中のファイルのパス（.md 以外も含む。空のフォルダの目印 .gitkeep を拾うため）
+export async function listPaths(folder: string): Promise<string[]> {
+  const { repo } = config();
+  const res = await gh(`/repos/${repo}/git/trees/HEAD?recursive=1`);
+  const data = (await res.json()) as { tree: { path: string; type: string }[] };
+  return data.tree.filter((t) => t.type === "blob" && t.path.startsWith(folder + "/")).map((t) => t.path);
+}
