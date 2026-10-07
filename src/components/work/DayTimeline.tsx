@@ -711,14 +711,14 @@ export default function DayTimeline({
               </button>
             </div>
           )}
-          <div className="grid grid-cols-[44px_minmax(0,22%)_1fr_minmax(0,18%)] text-[10px] font-bold text-app-sub border-b border-app-border">
+          <div className="grid grid-cols-[44px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.6fr)] text-[10px] font-bold text-app-sub border-b border-app-border">
             <div />
             <div className="px-2 py-1.5">予定（Google）</div>
             <div className="px-2 py-1.5 border-x border-app-border text-work-dark">計画</div>
             <div className="px-2 py-1.5">実績</div>
           </div>
           <div ref={scrollRef} className="relative overflow-y-auto" style={{ height: "min(70vh, 720px)" }}>
-            <div className="grid grid-cols-[44px_minmax(0,22%)_1fr_minmax(0,18%)] relative">
+            <div className="grid grid-cols-[44px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.6fr)] relative">
               {/* 時刻の目盛り */}
               <div className="relative" style={{ height: DAY_END * PX_PER_MIN }}>
                 {Array.from({ length: 24 }, (_, h) => (
