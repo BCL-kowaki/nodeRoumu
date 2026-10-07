@@ -12,8 +12,8 @@ export const metadata: Metadata = {
     title: "node-portal",
   },
   icons: {
-    icon: "/fav.png",
-    apple: "/fav.png",
+    icon: "/favicon.png",
+    apple: "/apple-touch-icon.png",
   },
 };
 

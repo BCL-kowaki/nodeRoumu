@@ -3,7 +3,7 @@ import { homePathFor } from "@/lib/roles";
 import { getSessionFromRequest } from "@/lib/session-token";
 
 const PUBLIC_PATHS = ["/login", "/api/auth/login"];
-const STATIC_PREFIXES = ["/_next", "/favicon.ico", "/fav.png", "/logo.png", "/manifest.json"];
+const STATIC_PREFIXES = ["/_next", "/favicon.ico", "/favicon.png", "/apple-touch-icon.png", "/icon-192.png", "/icon-512.png", "/logo.png", "/manifest.json"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
