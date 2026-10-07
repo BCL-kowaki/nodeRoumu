@@ -5,7 +5,8 @@ import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import { useAuth } from "@/lib/auth-context";
 import { canWriteFaqDocuments } from "@/lib/permissions";
-import LinkifiedText from "@/components/LinkifiedText";
+import RichTextEditor from "@/components/RichTextEditor";
+import NoteMarkdown from "@/components/work/NoteMarkdown";
 
 // FAQ書類の一覧表示＋（管理者のみ）アップロード・削除
 // 従業員・社労士・管理者の全ロールが閲覧可能
@@ -238,13 +239,7 @@ export default function FaqList() {
             </div>
             <div>
               <label className={labelClass}>説明</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className={`${inputClass} min-h-[60px] resize-y`}
-                rows={2}
-                placeholder="補足説明（任意）"
-              />
+              <RichTextEditor value={description} onChange={setDescription} minHeight={80} placeholder="補足説明（任意）" ariaLabel="説明" />
             </div>
 
             {formMsg && (
@@ -304,8 +299,8 @@ export default function FaqList() {
                   </div>
                 )}
                 {doc.description && (
-                  <div className="text-xs text-app-sub mt-1.5 whitespace-pre-wrap">
-                    <LinkifiedText text={doc.description} />
+                  <div className="mt-1.5 text-app-sub [&_.note-md]:text-[13px] [&_.note-md]:text-app-sub">
+                    <NoteMarkdown content={doc.description} />
                   </div>
                 )}
               </div>

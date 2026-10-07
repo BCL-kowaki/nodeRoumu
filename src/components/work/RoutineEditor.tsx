@@ -5,6 +5,7 @@ import { todayJst } from "@/lib/date-jst";
 import { WEEKDAY_BITS, WEEKDAY_NAMES, WEEKDAY_ORDER } from "@/lib/work/recurrence";
 import ProjectOptions from "./ProjectOptions";
 import { api, inputClass, labelClass, type Client, type Project, type Routine } from "./types";
+import RichTextEditor from "@/components/RichTextEditor";
 
 const FREQUENCIES = [
   { value: "daily", label: "毎日" },
@@ -232,12 +233,7 @@ export default function RoutineEditor({
 
           <div>
             <label className={labelClass} htmlFor="routine-desc">メモ</label>
-            <textarea
-              id="routine-desc"
-              className={`${inputClass} min-h-[72px]`}
-              value={form.description}
-              onChange={(e) => set("description", e.target.value)}
-            />
+            <RichTextEditor id="routine-desc" value={form.description} onChange={(v) => set("description", v)} minHeight={90} />
           </div>
 
           {routine && (

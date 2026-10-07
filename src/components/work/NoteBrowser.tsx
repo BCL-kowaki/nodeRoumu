@@ -5,6 +5,7 @@ import { ChevronDown, FilePlus, FileText, Folder, FolderPlus, Pencil, RefreshCw 
 import type { TreeNode } from "@/lib/work/obsidian-tree";
 import NoteMarkdown from "./NoteMarkdown";
 import { api, inputClass } from "./types";
+import RichTextEditor from "@/components/RichTextEditor";
 
 type Listing = { folder: string; projectNote: string | null; tree: TreeNode[] };
 type OpenNote = { path: string; content: string; sha: string };
@@ -265,12 +266,7 @@ export default function NoteBrowser({ projectId, projectNotePath }: { projectId:
               </div>
               {editing ? (
                 <div className="flex flex-col gap-2">
-                  <textarea
-                    aria-label="ノートの本文"
-                    className={`${inputClass} min-h-[50vh] font-mono text-[13px] leading-relaxed`}
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                  />
+                  <RichTextEditor ariaLabel="ノートの本文" value={draft} onChange={setDraft} minHeight={420} mono />
                   <div className="flex gap-2">
                     <button
                       type="button"
