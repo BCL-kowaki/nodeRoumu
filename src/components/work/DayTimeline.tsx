@@ -25,9 +25,10 @@ import {
   yToStart,
 } from "@/lib/work/timeline";
 import Link from "next/link";
-import { Building2, CalendarPlus, Check, ChevronDown, Pencil, Play, Repeat, Square } from "lucide-react";
+import { CalendarPlus, Check, ChevronDown, Pencil, Play, Repeat, Square } from "lucide-react";
 import { formatMinutes } from "@/lib/work/labels";
 import { eventToPlan, groupByClient, groupTasksByProject, importableEvents } from "@/lib/work/plan-sources";
+import { assignClientColors, clientIdFor } from "@/lib/work/client-colors";
 import { useCollapsedClients } from "./useCollapsedClients";
 import { entryTitle, type CheckStatus, type Client, type Plan, type Project, type Routine, type Task, type TimeEntry } from "./types";
 
@@ -289,7 +290,8 @@ function PlanBlock({
   duration: number;
   col: number;
   cols: number;
-  color: string;
+  // クライアントの色（クライアントが無ければ null）
+  color: string | null;
   onOpen: (p: Plan) => void;
   preview: { start: number; duration: number } | null;
   // 今日の計画なら、押すとタイマーの開始・停止（無ければ押すと編集）
@@ -306,12 +308,19 @@ function PlanBlock({
   return (
     <div
       ref={move.setNodeRef}
-      className={`absolute rounded-lg border bg-work-light overflow-hidden select-none touch-manipulation ${
-        running ? "border-danger ring-1 ring-danger" : "border-work/30"
+      className={`absolute rounded-lg border overflow-hidden select-none touch-manipulation ${color ? "" : "bg-work-light"} ${
+        running ? "border-danger ring-1 ring-danger" : color ? "" : "border-work/30"
       } ${preview ? "shadow-lg z-20 ring-2 ring-work" : "z-10"}`}
-      style={{ top, height, left: `calc(${(col / cols) * 100}% + 2px)`, width: `calc(${100 / cols}% - 4px)` }}
+      style={{
+        top,
+        height,
+        left: `calc(${(col / cols) * 100}% + 2px)`,
+        width: `calc(${100 / cols}% - 4px)`,
+        // クライアントの色を薄く敷く（文字は黒のまま読めるように）
+        ...(color ? { background: `color-mix(in srgb, ${color} 14%, white)`, ...(running ? {} : { borderColor: `color-mix(in srgb, ${color} 45%, white)` }) } : {}),
+      }}
     >
-      <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: color }} aria-hidden />
+      <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: color ?? "#9AA6A2" }} aria-hidden />
       <button
         type="button"
         {...move.listeners}
@@ -371,11 +380,14 @@ function EntryBlock({
   end,
   col,
   cols,
+  color,
   onOpen,
   preview,
   movable: canMove,
 }: {
   entry: TimeEntry;
+  // クライアントの色（クライアントが無ければ null＝黒）
+  color: string | null;
   start: number;
   end: number;
   movable: boolean;
@@ -397,10 +409,11 @@ function EntryBlock({
   return (
     <div
       ref={move.setNodeRef}
-      className={`absolute rounded-md overflow-hidden select-none touch-manipulation ${entry.endedAt ? "bg-primary/80" : "bg-danger/80"} ${
-        preview ? "shadow-lg z-20 ring-2 ring-accent" : "z-10"
-      }`}
+      className={`absolute rounded-md overflow-hidden select-none touch-manipulation ${
+        color ? "" : entry.endedAt ? "bg-primary/80" : "bg-danger/80"
+      } ${preview ? "shadow-lg z-20 ring-2 ring-accent" : color && !entry.endedAt ? "z-10 ring-2 ring-danger" : "z-10"}`}
       style={{
+        ...(color ? { background: color } : {}),
         top: s * PX_PER_MIN,
         height: Math.max(d * PX_PER_MIN, 6),
         left: `calc(${(col / cols) * 100}% + 2px)`,
@@ -519,7 +532,13 @@ export default function DayTimeline({
 
   const timed = plans.filter((p) => p.startTime);
   const unscheduled = plans.filter((p) => !p.startTime);
-  const projectColor = (id: string | null) => projects.find((p) => p.id === id)?.color ?? "#9AA6A2";
+  // カードの色はクライアントごと（登録順に、被らないように自動で割り当てる）
+  const clientColors = useMemo(() => assignClientColors(clients), [clients]);
+  const routineList = useMemo(() => routines.map((r) => r.routine), [routines]);
+  const clientColor = (item: { projectId: string | null; routineId?: string | null }) => {
+    const id = clientIdFor(item, projects, routineList);
+    return id ? clientColors.get(id) ?? null : null;
+  };
 
   const planLayout = useMemo(
     () =>
@@ -652,10 +671,10 @@ export default function DayTimeline({
                 {[...timed]
                   .sort((a, b) => a.startTime!.localeCompare(b.startTime!))
                   .map((p) => (
-                    <PlanCard key={p.id} plan={p} color={projectColor(p.projectId)} onOpen={onOpenPlan} timer={timer} showTimer={isToday} />
+                    <PlanCard key={p.id} plan={p} color={clientColor(p) ?? "#9AA6A2"} onOpen={onOpenPlan} timer={timer} showTimer={isToday} />
                   ))}
                 {unscheduled.map((p) => (
-                  <DraggableUnscheduled key={p.id} plan={p} color={projectColor(p.projectId)} timer={timer} showTimer={isToday} />
+                  <DraggableUnscheduled key={p.id} plan={p} color={clientColor(p) ?? "#9AA6A2"} timer={timer} showTimer={isToday} />
                 ))}
               </section>
             )}
@@ -676,7 +695,9 @@ export default function DayTimeline({
                       className="flex items-center gap-1.5 mt-1 px-1 py-1 rounded-lg text-left text-xs font-bold text-app-text bg-transparent border-none cursor-pointer hover:bg-app-bg"
                     >
                       <ChevronDown size={13} className={`shrink-0 text-app-sub transition-transform ${isCollapsed ? "-rotate-90" : ""}`} aria-hidden />
-                      {cg.clientId ? <Building2 size={12} className="shrink-0 text-app-sub" aria-hidden /> : null}
+                      {cg.clientId ? (
+                        <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: clientColors.get(cg.clientId) ?? "#9AA6A2" }} title="計画・実績のカードの色" aria-hidden />
+                      ) : null}
                       <span className="flex-1 min-w-0 truncate">{cg.clientId ? clientName(cg.clientId) : "クライアントなし・その他"}</span>
                       <span className="text-[11px] font-normal text-app-sub tabular-nums">{count}</span>
                     </button>
@@ -803,7 +824,7 @@ export default function DayTimeline({
                       duration={p.plannedMinutes}
                       col={lay.col}
                       cols={lay.cols}
-                      color={projectColor(p.projectId)}
+                      color={clientColor(p)}
                       onOpen={onOpenPlan}
                       preview={preview?.id === p.id ? preview : null}
                       timer={isToday ? timer : null}
@@ -824,6 +845,7 @@ export default function DayTimeline({
                       end={iv.end}
                       col={lay.col}
                       cols={lay.cols}
+                      color={clientColor(e)}
                       onOpen={onOpenEntry}
                       preview={preview?.id === e.id ? preview : null}
                       // 日をまたいだ実績（別の日に記録したもの）は、この日の時間帯だけでは直せないので動かさない
