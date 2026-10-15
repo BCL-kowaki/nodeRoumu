@@ -30,3 +30,26 @@ export function breakdownByClient(rows: BreakdownRow[], clientOrder: string[]): 
   });
   return { totalMin: list.reduce((n, g) => n + g.totalMin, 0), groups: list };
 }
+
+export type ClientDiff = { clientId: string | null; plannedMin: number; actualMin: number; diffMin: number };
+
+// クライアントごとの計画と実績の差（差＝実績−計画。プラスは計画より多くかかった）。
+// 並びは計画・実績の多いほうの時間が長い順、同じなら一覧の並び順。クライアントなしは最後
+export function compareByClient(planned: BreakdownGroup[], actual: BreakdownGroup[], clientOrder: string[]): ClientDiff[] {
+  const order = new Map(clientOrder.map((id, i) => [id, i]));
+  const rows = new Map<string | null, ClientDiff>();
+  const row = (clientId: string | null) => {
+    const r = rows.get(clientId) ?? { clientId, plannedMin: 0, actualMin: 0, diffMin: 0 };
+    rows.set(clientId, r);
+    return r;
+  };
+  for (const g of planned) row(g.clientId).plannedMin += g.totalMin;
+  for (const g of actual) row(g.clientId).actualMin += g.totalMin;
+  const list = [...rows.values()].map((r) => ({ ...r, diffMin: r.actualMin - r.plannedMin }));
+  const size = (r: ClientDiff) => Math.max(r.plannedMin, r.actualMin);
+  return list.sort((a, b) => {
+    if (a.clientId === null) return 1;
+    if (b.clientId === null) return -1;
+    return size(b) - size(a) || (order.get(a.clientId) ?? Infinity) - (order.get(b.clientId) ?? Infinity);
+  });
+}

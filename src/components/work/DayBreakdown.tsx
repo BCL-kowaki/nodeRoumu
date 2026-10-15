@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import Card from "@/components/Card";
 import { assignClientColors, clientIdFor } from "@/lib/work/client-colors";
-import { breakdownByClient, type BreakdownGroup, type BreakdownRow } from "@/lib/work/day-breakdown";
+import { breakdownByClient, compareByClient, type BreakdownGroup, type BreakdownRow, type ClientDiff } from "@/lib/work/day-breakdown";
 import { formatMinutes } from "@/lib/work/labels";
 import { entryMinutes } from "@/lib/work/time";
 import { entryTitle, type Client, type Plan, type Project, type Routine, type TimeEntry } from "./types";
@@ -11,6 +11,8 @@ import { entryTitle, type Client, type Plan, type Project, type Routine, type Ti
 const NO_CLIENT = "#9AA6A2";
 const fmt = (m: number) => (m === 0 ? "0分" : formatMinutes(m));
 const percent = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 100) : 0);
+// 差（実績−計画）の表示。プラスは計画より多くかかった
+const fmtDiff = (m: number) => (m === 0 ? "±0" : `${m > 0 ? "+" : "−"}${formatMinutes(Math.abs(m))}`);
 
 // 1日の計画・実績の一覧（何をどれだけ計画したか／実績として何に何時間使ったか）。クライアントごとにまとめる
 export default function DayBreakdown({
@@ -47,11 +49,73 @@ export default function DayBreakdown({
   );
 
   const props = { clients, projects, colors };
+  const diffs = compareByClient(planned.groups, actual.groups, order);
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
-      <Section kind="plan" title="計画" caption="何をどれだけ計画したか" data={planned} empty="この日の計画はまだありません" {...props} />
-      <Section kind="actual" title="実績" caption="実際に何に何時間使ったか" data={actual} empty="この日の実績はまだありません" {...props} />
+    <div className="flex flex-col gap-3">
+      {diffs.length > 0 && (
+        <Comparison
+          rows={diffs}
+          total={{ clientId: null, plannedMin: planned.totalMin, actualMin: actual.totalMin, diffMin: actual.totalMin - planned.totalMin }}
+          clients={clients}
+          colors={colors}
+        />
+      )}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
+        <Section kind="plan" title="計画" caption="何をどれだけ計画したか" data={planned} empty="この日の計画はまだありません" {...props} />
+        <Section kind="actual" title="実績" caption="実際に何に何時間使ったか" data={actual} empty="この日の実績はまだありません" {...props} />
+      </div>
     </div>
+  );
+}
+
+// クライアントごとの計画と実績の差（バーは上が計画・下が実績。長さはいちばん長いものに合わせる）
+function Comparison({ rows, total, clients, colors }: { rows: ClientDiff[]; total: ClientDiff; clients: Client[]; colors: Map<string, string> }) {
+  const max = Math.max(...rows.map((r) => Math.max(r.plannedMin, r.actualMin)), 1);
+  const diffClass = (m: number) => (m > 0 ? "text-accent-dark" : m < 0 ? "text-app-text" : "text-app-sub");
+  // スマホは「クライアント名」を1行目に出し、2行目に計画・実績・差を並べる
+  const cols = "grid grid-cols-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_80px_80px_88px] items-center gap-x-3 gap-y-1";
+  return (
+    <Card className="!p-0 overflow-hidden">
+      <div className="px-4 py-3 border-b border-app-border">
+        <div className="text-sm font-bold text-app-text">計画と実績の差</div>
+        <div className="text-[11px] text-app-sub">クライアントごと。差は「実績 − 計画」で、＋は計画より多くかかった時間</div>
+      </div>
+      <div className={`${cols} px-4 py-1.5 text-[10px] text-app-sub border-b border-app-border bg-app-bg`}>
+        <span className="hidden sm:block">クライアント</span>
+        <span className="hidden sm:block" aria-hidden />
+        <span className="text-right">計画</span>
+        <span className="text-right">実績</span>
+        <span className="text-right">差</span>
+      </div>
+      <ul className="list-none m-0 p-0">
+        {rows.map((r) => {
+          const color = r.clientId ? colors.get(r.clientId) ?? NO_CLIENT : NO_CLIENT;
+          const name = r.clientId ? clients.find((c) => c.id === r.clientId)?.name ?? "（クライアント）" : "クライアントなし・その他";
+          return (
+            <li key={r.clientId ?? "__none__"} className={`${cols} px-4 py-2.5 border-b border-app-border last:border-b-0`}>
+              <span className="col-span-3 sm:col-span-1 flex items-center gap-2 min-w-0">
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: color }} aria-hidden />
+                <span className="truncate text-xs font-bold text-app-text">{name}</span>
+              </span>
+              <span className="hidden sm:flex flex-col gap-1" aria-hidden>
+                <span className="h-1.5 rounded-full" style={{ width: `${percent(r.plannedMin, max)}%`, background: `color-mix(in srgb, ${color} 45%, white)` }} />
+                <span className="h-1.5 rounded-full" style={{ width: `${percent(r.actualMin, max)}%`, background: color }} />
+              </span>
+              <span className="text-right text-xs tabular-nums text-app-text">{fmt(r.plannedMin)}</span>
+              <span className="text-right text-xs tabular-nums text-app-text">{fmt(r.actualMin)}</span>
+              <span className={`text-right text-xs font-bold tabular-nums ${diffClass(r.diffMin)}`}>{fmtDiff(r.diffMin)}</span>
+            </li>
+          );
+        })}
+      </ul>
+      <div className={`${cols} px-4 py-2.5 border-t border-app-border bg-app-bg`}>
+        <span className="col-span-3 sm:col-span-1 text-xs font-bold text-app-text">合計</span>
+        <span className="hidden sm:block" aria-hidden />
+        <span className="text-right text-xs font-bold tabular-nums text-app-text">{fmt(total.plannedMin)}</span>
+        <span className="text-right text-xs font-bold tabular-nums text-app-text">{fmt(total.actualMin)}</span>
+        <span className={`text-right text-xs font-bold tabular-nums ${diffClass(total.diffMin)}`}>{fmtDiff(total.diffMin)}</span>
+      </div>
+    </Card>
   );
 }
 
