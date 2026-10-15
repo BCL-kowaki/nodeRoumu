@@ -42,6 +42,7 @@ model Employee {
   // 業務管理（代表者のみ利用）
   workProjects        WorkProject[]
   workClients         WorkClient[]
+  workDailyNotes      WorkDailyNote[]
   taskAttachments     TaskAttachment[]
   apiTokens           ApiToken[]
   attendanceChanges   AttendanceChange[]
@@ -189,9 +190,10 @@ model WorkClient {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  owner    Employee      @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  projects WorkProject[]
-  routines Routine[]
+  owner      Employee        @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  projects   WorkProject[]
+  routines   Routine[]
+  dailyNotes WorkDailyNote[]
 
   @@unique([ownerId, name])
 }
@@ -424,6 +426,23 @@ model WorkPlan {
   @@unique([ownerId, date, sourceEventId])
   @@index([ownerId, date])
   @@index([routineId])
+}
+
+// クライアントごとの日々のメモ（日報）。次にそのクライアントの仕事をするときの引き継ぎに使う。1クライアント1日1件
+model WorkDailyNote {
+  id        String   @id @default(cuid())
+  ownerId   String
+  clientId  String
+  date      DateTime @db.Date // 日本時間の日付
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner  Employee   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  client WorkClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, clientId, date])
+  @@index([ownerId, date])
 }
 
 // 実績（タイマーまたは手入力）。計測中のタイマーは endedAt が null で、常に1件まで

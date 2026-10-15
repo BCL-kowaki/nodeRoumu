@@ -111,6 +111,10 @@ export type TimeEntry = {
   plan: { id: string; title: string; projectId?: string | null } | null;
 };
 
+// クライアントごとの日々のメモ（日報・引き継ぎ）
+export type DailyNote = { clientId: string; clientName: string; date: string; body: string; updatedAt: string };
+export type DailyNotes = { date: string; notes: DailyNote[]; previous: DailyNote[] };
+
 export type DaySummary = {
   date: string;
   plannedMin: number;

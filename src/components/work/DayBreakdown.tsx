@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import Card from "@/components/Card";
 import { assignClientColors, clientIdFor } from "@/lib/work/client-colors";
 import { breakdownByClient, compareByClient, type BreakdownGroup, type BreakdownRow, type ClientDiff } from "@/lib/work/day-breakdown";
@@ -8,7 +8,8 @@ import { formatMinutes } from "@/lib/work/labels";
 import { entryMinutes } from "@/lib/work/time";
 import { dayOfWeek } from "@/lib/attendance-status";
 import { WEEKDAY_NAMES } from "@/lib/work/recurrence";
-import { entryTitle, type Client, type DaySummary, type Plan, type Project, type Routine, type TimeEntry } from "./types";
+import { ClientDailyNote } from "./DailyNotes";
+import { entryTitle, type Client, type DailyNotes, type DaySummary, type Plan, type Project, type Routine, type TimeEntry } from "./types";
 
 const NO_CLIENT = "#9AA6A2";
 const fmt = (m: number) => (m === 0 ? "0分" : formatMinutes(m));
@@ -26,6 +27,9 @@ export default function DayBreakdown({
   now,
   days,
   onOpenDay,
+  date,
+  notes,
+  onNotesChanged,
 }: {
   plans: Plan[];
   entries: TimeEntry[];
@@ -36,6 +40,10 @@ export default function DayBreakdown({
   // 週の一覧のときだけ渡す：日ごとの計画・実績
   days?: DaySummary[];
   onOpenDay?: (date: string) => void;
+  // 1日の一覧のときだけ渡す：クライアントごとのメモ（日報）と前回からの引き継ぎ
+  date?: string;
+  notes?: DailyNotes | null;
+  onNotesChanged?: () => void;
 }) {
   const colors = useMemo(() => assignClientColors(clients), [clients]);
   const order = clients.map((c) => c.id);
@@ -57,6 +65,29 @@ export default function DayBreakdown({
 
   const props = { clients, projects, colors };
   const diffs = compareByClient(planned.groups, actual.groups, order);
+
+  // メモ欄：実績のあるクライアントに加え、計画だけある・メモや引き継ぎがあるクライアントにも出す
+  const withNotes = !!(notes && date && onNotesChanged);
+  const actualIds = new Set(actual.groups.map((g) => g.clientId));
+  const extraClients = withNotes
+    ? order.filter(
+        (id) =>
+          !actualIds.has(id) &&
+          (planned.groups.some((g) => g.clientId === id) || notes!.notes.some((n) => n.clientId === id) || notes!.previous.some((n) => n.clientId === id))
+      )
+    : [];
+  const renderNote = withNotes
+    ? (clientId: string) => (
+        <ClientDailyNote
+          key={`${date}:${clientId}`}
+          clientId={clientId}
+          date={date!}
+          note={notes!.notes.find((n) => n.clientId === clientId)}
+          previous={notes!.previous.find((n) => n.clientId === clientId)}
+          onSaved={onNotesChanged!}
+        />
+      )
+    : undefined;
   return (
     <div className="flex flex-col gap-3">
       {diffs.length > 0 && (
@@ -70,7 +101,16 @@ export default function DayBreakdown({
       {days && days.length > 0 && <ByDay days={days} onOpenDay={onOpenDay} />}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
         <Section kind="plan" title="計画" caption="何をどれだけ計画したか" data={planned} empty="この日の計画はまだありません" {...props} />
-        <Section kind="actual" title="実績" caption="実際に何に何時間使ったか" data={actual} empty="この日の実績はまだありません" {...props} />
+        <Section
+          kind="actual"
+          title="実績"
+          caption={withNotes ? "何に何時間使ったか・引き継ぎメモ" : "実際に何に何時間使ったか"}
+          data={actual}
+          empty="この日の実績はまだありません"
+          renderNote={renderNote}
+          extraClients={extraClients}
+          {...props}
+        />
       </div>
     </div>
   );
@@ -186,6 +226,8 @@ function Section({
   clients,
   projects,
   colors,
+  renderNote,
+  extraClients = [],
 }: {
   kind: "plan" | "actual";
   title: string;
@@ -195,7 +237,11 @@ function Section({
   clients: Client[];
   projects: Project[];
   colors: Map<string, string>;
+  // クライアントごとのメモ欄（実績の一覧だけ）。extraClients は実績は無いがメモ欄を出すクライアント
+  renderNote?: (clientId: string) => ReactNode;
+  extraClients?: string[];
 }) {
+  const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? "（クライアント）";
   return (
     <Card className="!p-0 overflow-hidden">
       <div className="flex items-end justify-between gap-3 px-4 py-3 border-b border-app-border">
@@ -209,13 +255,13 @@ function Section({
         </div>
       </div>
 
-      {data.groups.length === 0 ? (
+      {data.groups.length === 0 && extraClients.length === 0 ? (
         <div className="px-4 py-8 text-center text-xs text-app-sub">{empty}</div>
       ) : (
         <ul className="list-none m-0 p-0">
           {data.groups.map((g) => {
             const color = g.clientId ? colors.get(g.clientId) ?? NO_CLIENT : NO_CLIENT;
-            const name = g.clientId ? clients.find((c) => c.id === g.clientId)?.name ?? "（クライアント）" : "クライアントなし・その他";
+            const name = g.clientId ? clientName(g.clientId) : "クライアントなし・その他";
             return (
               <li key={g.clientId ?? "__none__"} className="px-4 py-3 border-b border-app-border last:border-b-0">
                 {/* クライアントの合計 */}
@@ -253,9 +299,22 @@ function Section({
                     );
                   })}
                 </ul>
+                {g.clientId && renderNote && <div className="pl-[18px]">{renderNote(g.clientId)}</div>}
               </li>
             );
           })}
+          {/* 実績は無いが、計画・メモ・引き継ぎがあるクライアント */}
+          {renderNote &&
+            extraClients.map((id) => (
+              <li key={id} className="px-4 py-3 border-b border-app-border last:border-b-0">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: colors.get(id) ?? NO_CLIENT }} aria-hidden />
+                  <span className="flex-1 min-w-0 truncate text-xs font-bold text-app-text">{clientName(id)}</span>
+                  <span className="text-xs text-app-sub tabular-nums w-[72px] text-right">実績なし</span>
+                </div>
+                <div className="pl-[18px]">{renderNote(id)}</div>
+              </li>
+            ))}
         </ul>
       )}
     </Card>

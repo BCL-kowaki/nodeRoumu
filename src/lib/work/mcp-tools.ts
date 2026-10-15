@@ -21,6 +21,7 @@ import * as routinesApi from "@/app/api/work/routines/route";
 import * as checksApi from "@/app/api/work/routines/checks/route";
 import * as googleEventsApi from "@/app/api/work/google/events/route";
 import * as googleStatusApi from "@/app/api/work/google/status/route";
+import * as dailyNotesApi from "@/app/api/work/daily-notes/route";
 
 type Handler = (req: NextRequest, ctx: { params: Promise<Record<string, string>> }) => Promise<Response>;
 
@@ -297,6 +298,18 @@ export function buildMcpServer(ctx: McpContext, onWrite?: (tool: string) => void
     ({ from, to }) => run(() => call(googleEventsApi.GET, `/api/work/google/events?from=${from}&to=${to}`))
   );
 
+  register(
+    "get_daily_notes",
+    {
+      title: "日報メモと引き継ぎ",
+      description:
+        "指定日（既定: 今日）にクライアントごとに書いた日報メモ（notes）と、前回からの引き継ぎ（previous: クライアントごとに、その日より前で最後に書いたメモ。30日以内）を返す。",
+      inputSchema: { date: date.optional() },
+      annotations: read,
+    },
+    ({ date: d }) => run(() => call(dailyNotesApi.GET, `/api/work/daily-notes?date=${d ?? todayJst()}`))
+  );
+
   // 出勤簿は「出勤簿も扱う」を選んだ鍵でだけ使える（読むだけの鍵なら読むだけ）
   if (ctx.attendance) registerAttendanceTools(server, ctx, onWrite);
 
@@ -470,6 +483,23 @@ export function buildMcpServer(ctx: McpContext, onWrite?: (tool: string) => void
       run(async () =>
         slimEntry(await call<EntryRow>(entriesApi.POST, "/api/work/time-entries", { method: "POST", body: { date: d ?? todayJst(), ...rest } }))
       )
+  );
+
+  register(
+    "write_daily_note",
+    {
+      title: "日報メモを書く",
+      description:
+        "クライアントごとの日報メモ（翌日以降への引き継ぎ）に書き足す。その日のメモがすでにあれば、消さずに後ろへ追記する。最大5000文字。",
+      inputSchema: {
+        clientId: id("クライアント"),
+        date: date.optional().describe("日付（既定: 今日）"),
+        text: z.string().min(1).max(5000).describe("書き足す内容（Markdown 可）"),
+      },
+      annotations: write,
+    },
+    ({ clientId, date: d, text }) =>
+      run(() => call(dailyNotesApi.PUT, "/api/work/daily-notes", { method: "PUT", body: { clientId, date: d ?? todayJst(), body: text } }))
   );
 
   register(

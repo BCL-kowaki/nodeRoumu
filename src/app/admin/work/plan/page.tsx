@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Card from "@/components/Card";
 import TimerBar from "@/components/work/TimerBar";
 import DayBreakdown from "@/components/work/DayBreakdown";
+import { HandoverPanel } from "@/components/work/DailyNotes";
+import { assignClientColors } from "@/lib/work/client-colors";
 import DayTimeline, { type DayGoogleEvent, type DayRoutine, type NewPlan } from "@/components/work/DayTimeline";
 import { EntryEditor, PlanEditor } from "@/components/work/PlanEntryEditors";
 import TaskEditor from "@/components/work/TaskEditor";
@@ -12,6 +14,7 @@ import { useTimer } from "@/components/work/useTimer";
 import {
   api,
   type Client,
+  type DailyNotes,
   type DaySummary,
   type Plan,
   type Project,
@@ -57,6 +60,7 @@ export default function WorkPlanPage() {
   const [allRoutines, setAllRoutines] = useState<Routine[]>([]);
   const [view, setView] = useState<View>("timeline");
   const [span, setSpan] = useState<Span>("day");
+  const [dailyNotes, setDailyNotes] = useState<DailyNotes | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [googleEvents, setGoogleEvents] = useState<DayGoogleEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +71,14 @@ export default function WorkPlanPage() {
   // 週の一覧では、その日を含む週（月曜〜日曜）を読む。タイムラインはいつも1日
   const isWeek = view === "list" && span === "week";
   const range = isWeek ? weekRange(date) : { from: date, to: date };
+
+  // クライアントごとのメモ（日報）と前回からの引き継ぎ。失敗しても画面は使えるようにする
+  const loadNotes = useCallback(async () => {
+    setDailyNotes(await api<DailyNotes>(`/api/work/daily-notes?date=${date}`).catch(() => null));
+  }, [date]);
+  useEffect(() => {
+    loadNotes();
+  }, [loadNotes]);
 
   const load = useCallback(async () => {
     try {
@@ -132,6 +144,7 @@ export default function WorkPlanPage() {
   };
 
   const timer = useTimer(load);
+  const clientColors = useMemo(() => assignClientColors(clients), [clients]);
   const today = todayJst();
   const isToday = date === today;
   const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}（${WEEKDAY_NAMES[dayOfWeek(d)]}）`;
@@ -274,31 +287,37 @@ export default function WorkPlanPage() {
               routines={allRoutines}
               now={new Date()}
               days={isWeek ? summaryDays : undefined}
+              date={isWeek ? undefined : date}
+              notes={isWeek ? undefined : dailyNotes}
+              onNotesChanged={loadNotes}
               onOpenDay={(d) => {
                 setDate(d);
                 changeSpan("day");
               }}
             />
           ) : (
-            <DayTimeline
-              date={date}
-              isToday={isToday}
-              tasks={tasks}
-              projects={projects}
-              clients={clients}
-              routines={routines}
-              plans={plans}
-              entries={entries}
-              googleEvents={googleEvents}
-              onCreatePlan={createPlan}
-              onImportEvents={importEvents}
-              onOpenTask={setEditingTask}
-              timer={{ runningFor: timer.runningFor, start: timer.start, stop: timer.stop, busy: timer.busy }}
-              onUpdatePlan={updatePlan}
-              onUpdateEntryTime={updateEntryTime}
-              onOpenPlan={setEditingPlan}
-              onOpenEntry={setEditingEntry}
-            />
+            <>
+              {dailyNotes && <HandoverPanel previous={dailyNotes.previous} colors={clientColors} />}
+              <DayTimeline
+                date={date}
+                isToday={isToday}
+                tasks={tasks}
+                projects={projects}
+                clients={clients}
+                routines={routines}
+                plans={plans}
+                entries={entries}
+                googleEvents={googleEvents}
+                onCreatePlan={createPlan}
+                onImportEvents={importEvents}
+                onOpenTask={setEditingTask}
+                timer={{ runningFor: timer.runningFor, start: timer.start, stop: timer.stop, busy: timer.busy }}
+                onUpdatePlan={updatePlan}
+                onUpdateEntryTime={updateEntryTime}
+                onOpenPlan={setEditingPlan}
+                onOpenEntry={setEditingEntry}
+              />
+            </>
           )}
         </>
       )}
