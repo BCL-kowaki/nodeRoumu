@@ -31,15 +31,15 @@ export async function ownsClient(ownerId: string, clientId: string): Promise<boo
 
 // 一覧表示用に一緒に返す紐づけ先の項目
 export const LINK_INCLUDE = {
-  task: { select: { id: true, title: true, status: true } },
+  task: { select: { id: true, title: true, status: true, projectId: true } },
   project: { select: { id: true, name: true, color: true } },
 } as const;
 
 // 実績の一覧で一緒に返す項目
 export const ENTRY_INCLUDE = {
   ...LINK_INCLUDE,
-  routine: { select: { id: true, title: true } },
-  plan: { select: { id: true, title: true } },
+  routine: { select: { id: true, title: true, projectId: true, clientId: true } },
+  plan: { select: { id: true, title: true, projectId: true } },
 } as const;
 
 // ルーティンのプロジェクト・クライアントの確認と、保存するクライアントの決定

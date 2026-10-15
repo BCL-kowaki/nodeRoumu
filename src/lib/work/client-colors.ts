@@ -25,16 +25,24 @@ export function assignClientColors(clients: { id: string; createdAt?: string }[]
   return new Map(sorted.map((c, i) => [c.id, CLIENT_PALETTE[i % CLIENT_PALETTE.length]]));
 }
 
-// 計画・実績がどのクライアントのものか：プロジェクトのクライアント → ルーティンのクライアント → ルーティンのプロジェクトのクライアント
+// 計画・実績がどのクライアントのものか。プロジェクトは「直接の指定 → タスク → （実績なら）計画」の順にたどり、
+// 無ければルーティンのクライアント → ルーティンのプロジェクトのクライアント
+type RoutineLink = { projectId?: string | null; clientId?: string | null };
 export function clientIdFor(
-  item: { projectId: string | null; routineId?: string | null },
+  item: {
+    projectId: string | null;
+    routineId?: string | null;
+    task?: { projectId?: string | null } | null;
+    plan?: { projectId?: string | null } | null;
+    routine?: RoutineLink | null;
+  },
   projects: { id: string; clientId: string }[],
-  routines: { id: string; clientId: string | null; projectId: string | null }[]
+  routines: ({ id: string } & RoutineLink)[]
 ): string | null {
-  const projectClient = (id: string | null) => (id ? projects.find((p) => p.id === id)?.clientId ?? null : null);
-  const fromProject = projectClient(item.projectId);
+  const projectClient = (id: string | null | undefined) => (id ? projects.find((p) => p.id === id)?.clientId ?? null : null);
+  const fromProject = projectClient(item.projectId ?? item.task?.projectId ?? item.plan?.projectId);
   if (fromProject) return fromProject;
-  const routine = item.routineId ? routines.find((r) => r.id === item.routineId) : undefined;
+  const routine = item.routine ?? (item.routineId ? routines.find((r) => r.id === item.routineId) : undefined);
   if (!routine) return null;
   return routine.clientId ?? projectClient(routine.projectId);
 }

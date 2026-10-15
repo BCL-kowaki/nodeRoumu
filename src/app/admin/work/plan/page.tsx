@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Card from "@/components/Card";
 import TimerBar from "@/components/work/TimerBar";
+import DayBreakdown from "@/components/work/DayBreakdown";
 import DayTimeline, { type DayGoogleEvent, type DayRoutine, type NewPlan } from "@/components/work/DayTimeline";
 import { EntryEditor, PlanEditor } from "@/components/work/PlanEntryEditors";
 import TaskEditor from "@/components/work/TaskEditor";
@@ -25,6 +26,10 @@ import { formatMinutes } from "@/lib/work/labels";
 import { WEEKDAY_NAMES } from "@/lib/work/recurrence";
 import PageTitle from "@/components/PageTitle";
 
+// 表示の切り替え（タイムライン／一覧）は、この端末に覚えておく
+const VIEW_KEY = "node-portal:plan-view";
+type View = "timeline" | "list";
+
 // 「1時間30分」表示。null は「—」
 const fmt = (m: number | null) => (m === null ? "—" : m === 0 ? "0分" : formatMinutes(m));
 
@@ -38,6 +43,8 @@ export default function WorkPlanPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [routines, setRoutines] = useState<DayRoutine[]>([]);
+  const [allRoutines, setAllRoutines] = useState<Routine[]>([]);
+  const [view, setView] = useState<View>("timeline");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [googleEvents, setGoogleEvents] = useState<DayGoogleEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +72,7 @@ export default function WorkPlanPage() {
       setTasks(t);
       setProjects(pr);
       setClients(cl);
+      setAllRoutines(rs);
       // その日に実施するルーティンだけ（停止中は実施日に出てこない）
       const items = rc.days[0]?.items ?? [];
       setRoutines(
@@ -87,6 +95,22 @@ export default function WorkPlanPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(VIEW_KEY) === "list") setView("list");
+    } catch {
+      // 保存できない環境ではタイムラインで始める
+    }
+  }, []);
+  const changeView = (v: View) => {
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      // 覚えられなくても切り替え自体はできる
+    }
+  };
 
   const timer = useTimer(load);
   const today = todayJst();
@@ -192,29 +216,54 @@ export default function WorkPlanPage() {
                     週の予定
                   </Link>
                 </div>
+                {/* 表示の切り替え */}
+                <div className="flex rounded-lg bg-app-bg p-0.5" role="group" aria-label="表示の切り替え">
+                  {(
+                    [
+                      { v: "timeline", label: "タイムライン" },
+                      { v: "list", label: "一覧" },
+                    ] as const
+                  ).map((t) => (
+                    <button
+                      key={t.v}
+                      type="button"
+                      onClick={() => changeView(t.v)}
+                      aria-pressed={view === t.v}
+                      className={`px-3 py-1 rounded-md text-xs border-none cursor-pointer ${
+                        view === t.v ? "bg-white font-bold text-app-text shadow-sm" : "bg-transparent text-app-sub"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </Card>
           )}
 
-          <DayTimeline
-            date={date}
-            isToday={isToday}
-            tasks={tasks}
-            projects={projects}
-            clients={clients}
-            routines={routines}
-            plans={plans}
-            entries={entries}
-            googleEvents={googleEvents}
-            onCreatePlan={createPlan}
-            onImportEvents={importEvents}
-            onOpenTask={setEditingTask}
-            timer={{ runningFor: timer.runningFor, start: timer.start, stop: timer.stop, busy: timer.busy }}
-            onUpdatePlan={updatePlan}
-            onUpdateEntryTime={updateEntryTime}
-            onOpenPlan={setEditingPlan}
-            onOpenEntry={setEditingEntry}
-          />
+          {view === "list" ? (
+            <DayBreakdown plans={plans} entries={entries} projects={projects} clients={clients} routines={allRoutines} now={new Date()} />
+          ) : (
+            <DayTimeline
+              date={date}
+              isToday={isToday}
+              tasks={tasks}
+              projects={projects}
+              clients={clients}
+              routines={routines}
+              plans={plans}
+              entries={entries}
+              googleEvents={googleEvents}
+              onCreatePlan={createPlan}
+              onImportEvents={importEvents}
+              onOpenTask={setEditingTask}
+              timer={{ runningFor: timer.runningFor, start: timer.start, stop: timer.stop, busy: timer.busy }}
+              onUpdatePlan={updatePlan}
+              onUpdateEntryTime={updateEntryTime}
+              onOpenPlan={setEditingPlan}
+              onOpenEntry={setEditingEntry}
+            />
+          )}
         </>
       )}
 

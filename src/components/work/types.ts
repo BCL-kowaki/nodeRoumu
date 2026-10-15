@@ -89,7 +89,7 @@ export type Plan = {
   projectId: string | null;
   routineId?: string | null;
   sourceEventId?: string | null;
-  task: { id: string; title: string; status: string } | null;
+  task: { id: string; title: string; status: string; projectId?: string | null } | null;
   project: ProjectRef | null;
 };
 
@@ -105,10 +105,10 @@ export type TimeEntry = {
   projectId: string | null;
   routineId: string | null;
   planId: string | null;
-  task: { id: string; title: string; status: string } | null;
+  task: { id: string; title: string; status: string; projectId?: string | null } | null;
   project: ProjectRef | null;
-  routine: { id: string; title: string } | null;
-  plan: { id: string; title: string } | null;
+  routine: { id: string; title: string; projectId?: string | null; clientId?: string | null } | null;
+  plan: { id: string; title: string; projectId?: string | null } | null;
 };
 
 export type DaySummary = {
