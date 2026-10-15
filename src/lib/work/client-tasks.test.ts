@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultProjectFor, noteDraftFromTasks, sortClientTasks, tasksOfClient } from "./client-tasks";
+import { dayTaskGroups, defaultProjectFor, noteDraftFromTasks, sortClientTasks, tasksOfClient } from "./client-tasks";
 
 const projects = [
   { id: "p1", clientId: "c1" },
@@ -67,5 +67,43 @@ describe("noteDraftFromTasks（タスクからメモの下書き）", () => {
     expect(noteDraftFromTasks([], ["要件定義"])).toBe("次にやること\n- 要件定義");
     expect(noteDraftFromTasks(["見積送付"], [])).toBe("完了\n- 見積送付");
     expect(noteDraftFromTasks([], [])).toBe("");
+  });
+});
+
+describe("dayTaskGroups（その日のタスクをクライアントごとに）", () => {
+  const clients = [
+    { id: "c1", name: "A社" },
+    { id: "c2", name: "B社" },
+    { id: "c3", name: "C社" },
+  ];
+  const ps = [...projects, { id: "p4", clientId: "c3" }];
+  it("その日に作業・計画・完了したタスクがあるクライアントだけを、一覧の並び順で返す", () => {
+    const r = dayTaskGroups({
+      clients,
+      projects: ps,
+      open: [t("a"), t("b", { projectId: "p3" }), t("c", { projectId: "p4" })],
+      done: [t("d", { projectId: "p3", status: "done" })],
+      workedTaskIds: new Set(["a"]),
+      plannedTaskIds: new Set<string>(),
+    });
+    expect(r.map((g) => [g.clientId, g.open.map((x) => x.id), g.done.map((x) => x.id)])).toEqual([
+      ["c1", ["a"], []],
+      ["c2", ["b"], ["d"]],
+    ]);
+  });
+  it("未完了には今日作業・今日計画の印を付け、画面と同じ並びにする", () => {
+    const r = dayTaskGroups({
+      clients,
+      projects: ps,
+      open: [t("x", { priority: 1 }), t("y", { priority: 3 }), t("z")],
+      done: [],
+      workedTaskIds: new Set(["y"]),
+      plannedTaskIds: new Set(["z"]),
+    });
+    expect(r[0].open.map((x) => [x.id, x.workedToday, x.plannedToday])).toEqual([
+      ["y", true, false],
+      ["x", false, false],
+      ["z", false, true],
+    ]);
   });
 });

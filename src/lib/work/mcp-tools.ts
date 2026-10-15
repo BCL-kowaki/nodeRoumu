@@ -7,6 +7,7 @@ import { z } from "zod";
 import { registerAttendanceTools } from "./mcp-attendance";
 import type { McpContext } from "./mcp-context";
 import { todayJst } from "@/lib/date-jst";
+import { dayTaskGroups } from "./client-tasks";
 import * as clientsApi from "@/app/api/work/clients/route";
 import * as projectsApi from "@/app/api/work/projects/route";
 import * as tasksApi from "@/app/api/work/tasks/route";
@@ -63,6 +64,8 @@ type TaskRow = {
   priority: number;
   dueDate: string | null;
   plannedMinutes: number | null;
+  projectId: string | null;
+  createdAt?: string;
   project: { id: string; name: string } | null;
   githubHtmlUrl?: string | null;
   attachmentCount?: number;
@@ -219,15 +222,53 @@ export function buildMcpServer(ctx: McpContext, onWrite?: (tool: string) => void
         status: z.array(z.enum(["todo", "doing", "done", "canceled"])).optional().describe("状態（既定: todo, doing）"),
         projectId: z.string().optional().describe("プロジェクトID。プロジェクトなしは \"none\""),
         due: z.enum(["overdue", "today", "week"]).optional().describe("期限で絞る（期限切れ・今日まで・7日以内）"),
+        completedOn: date.optional().describe("その日に完了にしたタスクに絞る（status に done を含めて使う）"),
       },
       annotations: read,
     },
-    ({ status, projectId, due }) =>
+    ({ status, projectId, due, completedOn }) =>
       run(async () => {
         const q = new URLSearchParams({ status: (status ?? ["todo", "doing"]).join(",") });
         if (projectId) q.set("projectId", projectId);
         if (due) q.set("due", due);
+        if (completedOn) q.set("completedOn", completedOn);
         return (await call<TaskRow[]>(tasksApi.GET, `/api/work/tasks?${q}`)).map(slimTask);
+      })
+  );
+
+  register(
+    "get_day_tasks",
+    {
+      title: "その日のタスク（クライアントごと）",
+      description:
+        "指定日（既定: 今日）に作業・計画・完了したタスクがあるクライアントごとに、未完了のタスク（open。workedToday=その日に実績あり、plannedToday=その日の計画あり。画面と同じ並び）と、その日に完了したタスク（done）を返す。" +
+        "「今日のタスクを完了にして」と頼まれたら、ここで対象を確かめてから update_task で status を done にする（戻すときは todo）。",
+      inputSchema: { date: date.optional() },
+      annotations: read,
+    },
+    ({ date: d }) =>
+      run(async () => {
+        const day = d ?? todayJst();
+        const q = `from=${day}&to=${day}`;
+        const [clients, projects, open, done, entries, plans] = await Promise.all([
+          call<{ id: string; name: string }[]>(clientsApi.GET, "/api/work/clients"),
+          call<{ id: string; clientId: string }[]>(projectsApi.GET, "/api/work/projects"),
+          call<TaskRow[]>(tasksApi.GET, "/api/work/tasks?status=todo,doing"),
+          call<TaskRow[]>(tasksApi.GET, `/api/work/tasks?status=done&completedOn=${day}`),
+          call<{ taskId: string | null }[]>(entriesApi.GET, `/api/work/time-entries?${q}`),
+          call<{ taskId: string | null }[]>(plansApi.GET, `/api/work/plans?${q}`),
+        ]);
+        const ids = (rows: { taskId: string | null }[]) => new Set(rows.map((r) => r.taskId).filter((x): x is string => !!x));
+        const groups = dayTaskGroups({ clients, projects, open, done, workedTaskIds: ids(entries), plannedTaskIds: ids(plans) });
+        return {
+          date: day,
+          clients: groups.map((g) => ({
+            clientId: g.clientId,
+            client: g.clientName,
+            open: g.open.map((t) => ({ ...slimTask(t), workedToday: t.workedToday || undefined, plannedToday: t.plannedToday || undefined })),
+            done: g.done.map(slimTask),
+          })),
+        };
       })
   );
 
@@ -359,7 +400,7 @@ export function buildMcpServer(ctx: McpContext, onWrite?: (tool: string) => void
     {
       title: "タスクを変更",
       description:
-        "送った項目だけを変える。完了にするときは status を done にする。GitHub の Issue から取り込んだタスクは、状態の変更が GitHub の Issue にも反映される（close / reopen）。",
+        "送った項目だけを変える。完了にするときは status を done、未完了に戻すときは todo にする。GitHub の Issue から取り込んだタスクは、状態の変更が GitHub の Issue にも反映される（close / reopen）。",
       inputSchema: { taskId: id("タスク"), title: z.string().min(1).max(200).optional(), ...taskFields },
       annotations: writeExternal,
     },

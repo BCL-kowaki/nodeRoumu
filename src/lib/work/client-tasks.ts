@@ -40,3 +40,29 @@ export function noteDraftFromTasks(done: string[], open: string[]): string {
   if (open.length) parts.push(["次にやること", ...open.slice(0, 3).map((x) => `- ${x}`)].join("\n"));
   return parts.join("\n\n");
 }
+
+// その日のタスクをクライアントごとに（AI 連携で「今日のタスク」を渡すときに使う。画面の一覧と同じ考え方）。
+// その日に作業・計画・完了したタスクがあるクライアントだけを、一覧の並び順で返す
+export function dayTaskGroups<T extends TaskLike>(input: {
+  clients: { id: string; name: string }[];
+  projects: { id: string; clientId: string }[];
+  open: T[];
+  done: T[];
+  workedTaskIds: Set<string>;
+  plannedTaskIds: Set<string>;
+}): { clientId: string; clientName: string; open: (T & { workedToday: boolean; plannedToday: boolean })[]; done: T[] }[] {
+  const out = [];
+  for (const c of input.clients) {
+    const open = sortClientTasks(tasksOfClient(input.open, c.id, input.projects), input.workedTaskIds);
+    const done = tasksOfClient(input.done, c.id, input.projects);
+    const active = done.length > 0 || open.some((t) => input.workedTaskIds.has(t.id) || input.plannedTaskIds.has(t.id));
+    if (!active) continue;
+    out.push({
+      clientId: c.id,
+      clientName: c.name,
+      open: open.map((t) => ({ ...t, workedToday: input.workedTaskIds.has(t.id), plannedToday: input.plannedTaskIds.has(t.id) })),
+      done,
+    });
+  }
+  return out;
+}
