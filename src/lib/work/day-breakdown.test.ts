@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { breakdownByClient, compareByClient } from "./day-breakdown";
+import { breakdownByClient, compareByClient, sumDaySummaries, weekRange } from "./day-breakdown";
 
 describe("breakdownByClient（1日の計画・実績の内訳）", () => {
   it("クライアントごとに合計し、時間の長い順に並べる。クライアントなしは最後", () => {
@@ -79,5 +79,37 @@ describe("compareByClient（クライアントごとの計画と実績の差）"
   });
   it("何も無ければ空", () => {
     expect(compareByClient([], [], [])).toEqual([]);
+  });
+});
+
+describe("weekRange（その日を含む週。月曜はじまり）", () => {
+  it("月曜〜日曜を返す", () => {
+    expect(weekRange("2026-10-15")).toEqual({ from: "2026-10-12", to: "2026-10-18" }); // 木曜
+    expect(weekRange("2026-10-12")).toEqual({ from: "2026-10-12", to: "2026-10-18" }); // 月曜
+    expect(weekRange("2026-10-18")).toEqual({ from: "2026-10-12", to: "2026-10-18" }); // 日曜
+  });
+  it("月・年をまたぐ週", () => {
+    expect(weekRange("2027-01-01")).toEqual({ from: "2026-12-28", to: "2027-01-03" });
+  });
+});
+
+describe("sumDaySummaries（期間の合計）", () => {
+  const d = (plannedMin: number, actualMin: number, attendanceMin: number | null, unrecordedMin: number | null) => ({
+    date: "",
+    plannedMin,
+    actualMin,
+    attendanceMin,
+    unrecordedMin,
+  });
+  it("計画・実績は足し、出勤簿・未記録は記録のある日だけ足す", () => {
+    expect(sumDaySummaries([d(60, 30, 480, 450), d(120, 90, null, null), d(0, 15, 240, 225)])).toEqual({
+      plannedMin: 180,
+      actualMin: 135,
+      attendanceMin: 720,
+      unrecordedMin: 675,
+    });
+  });
+  it("出勤簿の記録が1日も無ければ null", () => {
+    expect(sumDaySummaries([d(60, 30, null, null)])).toEqual({ plannedMin: 60, actualMin: 30, attendanceMin: null, unrecordedMin: null });
   });
 });

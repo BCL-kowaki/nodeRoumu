@@ -1,4 +1,6 @@
-// 1日の計画・実績の内訳（何に何分）。クライアントごとにまとめる。決まった答えになる処理なのでテストで固定
+// 1日・1週の計画・実績の内訳（何に何分）。クライアントごとにまとめる。決まった答えになる処理なのでテストで固定
+import { dayOfWeek } from "@/lib/attendance-status";
+import { addDays } from "@/lib/date-jst";
 
 export type BreakdownRow = { title: string; minutes: number; clientId: string | null; projectId: string | null };
 export type BreakdownItem = { title: string; projectId: string | null; minutes: number; count: number };
@@ -52,4 +54,26 @@ export function compareByClient(planned: BreakdownGroup[], actual: BreakdownGrou
     if (b.clientId === null) return -1;
     return size(b) - size(a) || (order.get(a.clientId) ?? Infinity) - (order.get(b.clientId) ?? Infinity);
   });
+}
+
+// その日を含む週（月曜〜日曜）
+export function weekRange(date: string): { from: string; to: string } {
+  const from = addDays(date, -((dayOfWeek(date) + 6) % 7));
+  return { from, to: addDays(from, 6) };
+}
+
+type DayTotals = { plannedMin: number; actualMin: number; attendanceMin: number | null; unrecordedMin: number | null };
+
+// 期間の合計。計画・実績は足し、出勤簿・未記録は記録のある日だけ足す（1日も無ければ null）
+export function sumDaySummaries(days: DayTotals[]): DayTotals {
+  const sumOrNull = (xs: (number | null)[]) => {
+    const vs = xs.filter((x): x is number => x !== null);
+    return vs.length ? vs.reduce((a, b) => a + b, 0) : null;
+  };
+  return {
+    plannedMin: days.reduce((n, d) => n + d.plannedMin, 0),
+    actualMin: days.reduce((n, d) => n + d.actualMin, 0),
+    attendanceMin: sumOrNull(days.map((d) => d.attendanceMin)),
+    unrecordedMin: sumOrNull(days.map((d) => d.unrecordedMin)),
+  };
 }

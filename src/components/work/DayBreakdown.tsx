@@ -6,7 +6,9 @@ import { assignClientColors, clientIdFor } from "@/lib/work/client-colors";
 import { breakdownByClient, compareByClient, type BreakdownGroup, type BreakdownRow, type ClientDiff } from "@/lib/work/day-breakdown";
 import { formatMinutes } from "@/lib/work/labels";
 import { entryMinutes } from "@/lib/work/time";
-import { entryTitle, type Client, type Plan, type Project, type Routine, type TimeEntry } from "./types";
+import { dayOfWeek } from "@/lib/attendance-status";
+import { WEEKDAY_NAMES } from "@/lib/work/recurrence";
+import { entryTitle, type Client, type DaySummary, type Plan, type Project, type Routine, type TimeEntry } from "./types";
 
 const NO_CLIENT = "#9AA6A2";
 const fmt = (m: number) => (m === 0 ? "0分" : formatMinutes(m));
@@ -14,7 +16,7 @@ const percent = (part: number, total: number) => (total > 0 ? Math.round((part /
 // 差（実績−計画）の表示。プラスは計画より多くかかった
 const fmtDiff = (m: number) => (m === 0 ? "±0" : `${m > 0 ? "+" : "−"}${formatMinutes(Math.abs(m))}`);
 
-// 1日の計画・実績の一覧（何をどれだけ計画したか／実績として何に何時間使ったか）。クライアントごとにまとめる
+// 1日・1週の計画・実績の一覧（何をどれだけ計画したか／実績として何に何時間使ったか）。クライアントごとにまとめる
 export default function DayBreakdown({
   plans,
   entries,
@@ -22,6 +24,8 @@ export default function DayBreakdown({
   clients,
   routines,
   now,
+  days,
+  onOpenDay,
 }: {
   plans: Plan[];
   entries: TimeEntry[];
@@ -29,6 +33,9 @@ export default function DayBreakdown({
   clients: Client[];
   routines: Routine[];
   now: Date;
+  // 週の一覧のときだけ渡す：日ごとの計画・実績
+  days?: DaySummary[];
+  onOpenDay?: (date: string) => void;
 }) {
   const colors = useMemo(() => assignClientColors(clients), [clients]);
   const order = clients.map((c) => c.id);
@@ -60,6 +67,7 @@ export default function DayBreakdown({
           colors={colors}
         />
       )}
+      {days && days.length > 0 && <ByDay days={days} onOpenDay={onOpenDay} />}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
         <Section kind="plan" title="計画" caption="何をどれだけ計画したか" data={planned} empty="この日の計画はまだありません" {...props} />
         <Section kind="actual" title="実績" caption="実際に何に何時間使ったか" data={actual} empty="この日の実績はまだありません" {...props} />
@@ -68,12 +76,62 @@ export default function DayBreakdown({
   );
 }
 
+// スマホは「名前」を1行目に出し、2行目に計画・実績・差を並べる
+const COLS = "grid grid-cols-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_80px_80px_88px] items-center gap-x-3 gap-y-1";
+const diffClass = (m: number) => (m > 0 ? "text-accent-dark" : m < 0 ? "text-app-text" : "text-app-sub");
+
+// 週の日ごとの計画と実績（押すとその日の一覧へ）
+function ByDay({ days, onOpenDay }: { days: DaySummary[]; onOpenDay?: (date: string) => void }) {
+  const max = Math.max(...days.map((d) => Math.max(d.plannedMin, d.actualMin)), 1);
+  return (
+    <Card className="!p-0 overflow-hidden">
+      <div className="px-4 py-3 border-b border-app-border">
+        <div className="text-sm font-bold text-app-text">日ごとの計画と実績</div>
+        <div className="text-[11px] text-app-sub">日付を押すと、その日の一覧を開きます</div>
+      </div>
+      <div className={`${COLS} px-4 py-1.5 text-[10px] text-app-sub border-b border-app-border bg-app-bg`}>
+        <span className="hidden sm:block">日付</span>
+        <span className="hidden sm:block" aria-hidden />
+        <span className="text-right">計画</span>
+        <span className="text-right">実績</span>
+        <span className="text-right">差</span>
+      </div>
+      <ul className="list-none m-0 p-0">
+        {days.map((d) => {
+          const dow = dayOfWeek(d.date);
+          const diff = d.actualMin - d.plannedMin;
+          const empty = d.plannedMin === 0 && d.actualMin === 0;
+          return (
+            <li key={d.date} className="border-b border-app-border last:border-b-0">
+              <button
+                type="button"
+                onClick={() => onOpenDay?.(d.date)}
+                disabled={!onOpenDay}
+                className={`${COLS} w-full px-4 py-2.5 text-left bg-transparent border-none cursor-pointer hover:bg-app-bg disabled:cursor-default`}
+              >
+                <span className={`col-span-3 sm:col-span-1 text-xs font-bold ${dow === 0 ? "text-danger" : dow === 6 ? "text-[#2F6FDB]" : "text-app-text"}`}>
+                  {Number(d.date.slice(5, 7))}/{Number(d.date.slice(8, 10))}（{WEEKDAY_NAMES[dow]}）
+                </span>
+                <span className="hidden sm:flex flex-col gap-1" aria-hidden>
+                  <span className="h-1.5 rounded-full bg-[#C9C9C9]" style={{ width: `${percent(d.plannedMin, max)}%` }} />
+                  <span className="h-1.5 rounded-full bg-primary" style={{ width: `${percent(d.actualMin, max)}%` }} />
+                </span>
+                <span className="text-right text-xs tabular-nums text-app-text">{empty ? "—" : fmt(d.plannedMin)}</span>
+                <span className="text-right text-xs tabular-nums text-app-text">{empty ? "—" : fmt(d.actualMin)}</span>
+                <span className={`text-right text-xs font-bold tabular-nums ${diffClass(diff)}`}>{empty ? "—" : fmtDiff(diff)}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+  );
+}
+
 // クライアントごとの計画と実績の差（バーは上が計画・下が実績。長さはいちばん長いものに合わせる）
 function Comparison({ rows, total, clients, colors }: { rows: ClientDiff[]; total: ClientDiff; clients: Client[]; colors: Map<string, string> }) {
   const max = Math.max(...rows.map((r) => Math.max(r.plannedMin, r.actualMin)), 1);
-  const diffClass = (m: number) => (m > 0 ? "text-accent-dark" : m < 0 ? "text-app-text" : "text-app-sub");
-  // スマホは「クライアント名」を1行目に出し、2行目に計画・実績・差を並べる
-  const cols = "grid grid-cols-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_80px_80px_88px] items-center gap-x-3 gap-y-1";
+  const cols = COLS;
   return (
     <Card className="!p-0 overflow-hidden">
       <div className="px-4 py-3 border-b border-app-border">

@@ -22,13 +22,23 @@ import {
 } from "@/components/work/types";
 import { dayOfWeek } from "@/lib/attendance-status";
 import { addDays, todayJst } from "@/lib/date-jst";
+import { sumDaySummaries, weekRange } from "@/lib/work/day-breakdown";
 import { formatMinutes } from "@/lib/work/labels";
 import { WEEKDAY_NAMES } from "@/lib/work/recurrence";
 import PageTitle from "@/components/PageTitle";
 
-// 表示の切り替え（タイムライン／一覧）は、この端末に覚えておく
+// 表示の切り替え（タイムライン／一覧、一覧の日／週）は、この端末に覚えておく
 const VIEW_KEY = "node-portal:plan-view";
+const SPAN_KEY = "node-portal:plan-span";
 type View = "timeline" | "list";
+type Span = "day" | "week";
+const remember = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // 覚えられなくても切り替え自体はできる
+  }
+};
 
 // 「1時間30分」表示。null は「—」
 const fmt = (m: number | null) => (m === null ? "—" : m === 0 ? "0分" : formatMinutes(m));
@@ -38,13 +48,15 @@ export default function WorkPlanPage() {
   const [date, setDate] = useState(() => todayJst());
   const [plans, setPlans] = useState<Plan[]>([]);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
-  const [summary, setSummary] = useState<DaySummary | null>(null);
+  const [summary, setSummary] = useState<Omit<DaySummary, "date"> | null>(null);
+  const [summaryDays, setSummaryDays] = useState<DaySummary[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [routines, setRoutines] = useState<DayRoutine[]>([]);
   const [allRoutines, setAllRoutines] = useState<Routine[]>([]);
   const [view, setView] = useState<View>("timeline");
+  const [span, setSpan] = useState<Span>("day");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [googleEvents, setGoogleEvents] = useState<DayGoogleEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,9 +64,13 @@ export default function WorkPlanPage() {
   const [editingPlan, setEditingPlan] = useState<Plan | null | "new">(null);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null | "new">(null);
 
+  // 週の一覧では、その日を含む週（月曜〜日曜）を読む。タイムラインはいつも1日
+  const isWeek = view === "list" && span === "week";
+  const range = isWeek ? weekRange(date) : { from: date, to: date };
+
   const load = useCallback(async () => {
     try {
-      const q = `from=${date}&to=${date}`;
+      const q = `from=${range.from}&to=${range.to}`;
       const [p, e, s, t, pr, g, cl, rs, rc] = await Promise.all([
         api<Plan[]>(`/api/work/plans?${q}`),
         api<TimeEntry[]>(`/api/work/time-entries?${q}`),
@@ -68,7 +84,8 @@ export default function WorkPlanPage() {
       ]);
       setPlans(p);
       setEntries(e);
-      setSummary(s.days[0] ?? null);
+      setSummaryDays(s.days);
+      setSummary(s.days.length ? sumDaySummaries(s.days) : null);
       setTasks(t);
       setProjects(pr);
       setClients(cl);
@@ -81,7 +98,7 @@ export default function WorkPlanPage() {
           .filter((x): x is DayRoutine => !!x.routine)
       );
       // Google カレンダーは接続している場合だけ表示（失敗しても画面は使えるようにする）
-      if (g.connected && g.status === "active") {
+      if (g.connected && g.status === "active" && !isWeek) {
         setGoogleEvents(await api<DayGoogleEvent[]>(`/api/work/google/events?${q}`).catch(() => []));
       } else setGoogleEvents([]);
       setError(null);
@@ -90,7 +107,8 @@ export default function WorkPlanPage() {
     } finally {
       setLoading(false);
     }
-  }, [date]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range.from, range.to, isWeek]);
 
   useEffect(() => {
     load();
@@ -99,23 +117,27 @@ export default function WorkPlanPage() {
   useEffect(() => {
     try {
       if (localStorage.getItem(VIEW_KEY) === "list") setView("list");
+      if (localStorage.getItem(SPAN_KEY) === "week") setSpan("week");
     } catch {
       // 保存できない環境ではタイムラインで始める
     }
   }, []);
   const changeView = (v: View) => {
     setView(v);
-    try {
-      localStorage.setItem(VIEW_KEY, v);
-    } catch {
-      // 覚えられなくても切り替え自体はできる
-    }
+    remember(VIEW_KEY, v);
+  };
+  const changeSpan = (v: Span) => {
+    setSpan(v);
+    remember(SPAN_KEY, v);
   };
 
   const timer = useTimer(load);
   const today = todayJst();
   const isToday = date === today;
-  const label = `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}（${WEEKDAY_NAMES[dayOfWeek(date)]}）`;
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}（${WEEKDAY_NAMES[dayOfWeek(d)]}）`;
+  const label = isWeek ? `${md(range.from)}〜${md(range.to)}` : md(date);
+  const inRange = range.from <= today && today <= range.to;
+  const step = isWeek ? 7 : 1;
 
   // タスク・ルーティン・Google の予定を時間に置く → その時間の計画を作る
   const createPlan = async (plan: NewPlan) => {
@@ -172,11 +194,11 @@ export default function WorkPlanPage() {
       <div className="flex flex-wrap items-center gap-2">
         <PageTitle className="mr-auto">計画・実績</PageTitle>
         <div className="flex items-center gap-1">
-          <button onClick={() => setDate(addDays(date, -1))} aria-label="前の日" className="px-2 py-1 text-sm text-primary bg-transparent border-none cursor-pointer">←</button>
+          <button onClick={() => setDate(addDays(date, -step))} aria-label={isWeek ? "前の週" : "前の日"} className="px-2 py-1 text-sm text-primary bg-transparent border-none cursor-pointer">←</button>
           <div className="text-sm font-bold min-w-[96px] text-center">{label}</div>
-          <button onClick={() => setDate(addDays(date, 1))} aria-label="次の日" className="px-2 py-1 text-sm text-primary bg-transparent border-none cursor-pointer">→</button>
-          {!isToday && (
-            <button onClick={() => setDate(today)} className="ml-1 px-2 py-1 rounded border border-primary text-primary text-xs bg-white cursor-pointer">今日</button>
+          <button onClick={() => setDate(addDays(date, step))} aria-label={isWeek ? "次の週" : "次の日"} className="px-2 py-1 text-sm text-primary bg-transparent border-none cursor-pointer">→</button>
+          {!inRange && (
+            <button onClick={() => setDate(today)} className="ml-1 px-2 py-1 rounded border border-primary text-primary text-xs bg-white cursor-pointer">{isWeek ? "今週" : "今日"}</button>
           )}
         </div>
       </div>
@@ -216,33 +238,47 @@ export default function WorkPlanPage() {
                     週の予定
                   </Link>
                 </div>
-                {/* 表示の切り替え */}
-                <div className="flex rounded-lg bg-app-bg p-0.5" role="group" aria-label="表示の切り替え">
-                  {(
-                    [
+                {/* 表示の切り替え（一覧のときは、日・週も選べる） */}
+                <div className="flex flex-wrap gap-2">
+                  <Segmented
+                    label="表示の切り替え"
+                    value={view}
+                    onChange={changeView}
+                    options={[
                       { v: "timeline", label: "タイムライン" },
                       { v: "list", label: "一覧" },
-                    ] as const
-                  ).map((t) => (
-                    <button
-                      key={t.v}
-                      type="button"
-                      onClick={() => changeView(t.v)}
-                      aria-pressed={view === t.v}
-                      className={`px-3 py-1 rounded-md text-xs border-none cursor-pointer ${
-                        view === t.v ? "bg-white font-bold text-app-text shadow-sm" : "bg-transparent text-app-sub"
-                      }`}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
+                    ]}
+                  />
+                  {view === "list" && (
+                    <Segmented
+                      label="期間"
+                      value={span}
+                      onChange={changeSpan}
+                      options={[
+                        { v: "day", label: "日" },
+                        { v: "week", label: "週" },
+                      ]}
+                    />
+                  )}
                 </div>
               </div>
             </Card>
           )}
 
           {view === "list" ? (
-            <DayBreakdown plans={plans} entries={entries} projects={projects} clients={clients} routines={allRoutines} now={new Date()} />
+            <DayBreakdown
+              plans={plans}
+              entries={entries}
+              projects={projects}
+              clients={clients}
+              routines={allRoutines}
+              now={new Date()}
+              days={isWeek ? summaryDays : undefined}
+              onOpenDay={(d) => {
+                setDate(d);
+                changeSpan("day");
+              }}
+            />
           ) : (
             <DayTimeline
               date={date}
@@ -305,6 +341,37 @@ export default function WorkPlanPage() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+// 2〜3個から1つを選ぶ切り替えボタン
+function Segmented<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: T;
+  onChange: (v: T) => void;
+  options: { v: T; label: string }[];
+}) {
+  return (
+    <div className="flex rounded-lg bg-app-bg p-0.5" role="group" aria-label={label}>
+      {options.map((t) => (
+        <button
+          key={t.v}
+          type="button"
+          onClick={() => onChange(t.v)}
+          aria-pressed={value === t.v}
+          className={`px-3 py-1 rounded-md text-xs border-none cursor-pointer ${
+            value === t.v ? "bg-white font-bold text-app-text shadow-sm" : "bg-transparent text-app-sub"
+          }`}
+        >
+          {t.label}
+        </button>
+      ))}
     </div>
   );
 }
