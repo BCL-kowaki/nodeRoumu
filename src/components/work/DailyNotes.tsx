@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, NotebookPen, Pencil } from "lucide-react";
+import { ChevronDown, NotebookPen, Pencil, Wand2 } from "lucide-react";
 import Card from "@/components/Card";
 import NoteMarkdown from "./NoteMarkdown";
 import { api, type DailyNote } from "./types";
@@ -27,12 +27,15 @@ export function ClientDailyNote({
   note,
   previous,
   onSaved,
+  draft,
 }: {
   clientId: string;
   date: string;
   note: DailyNote | undefined;
   previous: DailyNote | undefined;
   onSaved: () => void;
+  // 今日のタスク（完了・次にやること）から作るメモの下書き。空なら下書きボタンを出さない
+  draft?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
@@ -78,20 +81,30 @@ export function ClientDailyNote({
             className="w-full p-2 rounded-lg border border-app-border text-[13px] text-app-text bg-white outline-none resize-y focus:border-primary"
           />
           {error && <div className="text-[11px] text-danger">{error}</div>}
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
               onClick={save}
               disabled={busy}
-              className="px-3 py-1 rounded-lg bg-primary text-white text-xs font-bold border-none cursor-pointer disabled:opacity-50"
+              className="px-3 py-1 rounded-lg bg-primary text-white text-xs font-bold border-none cursor-pointer whitespace-nowrap disabled:opacity-50"
             >
               {busy ? "保存中…" : "保存"}
             </button>
-            <button type="button" onClick={() => setEditing(false)} className="px-3 py-1 rounded-lg border border-app-border bg-white text-xs cursor-pointer">
+            <button type="button" onClick={() => setEditing(false)} className="px-3 py-1 rounded-lg border border-app-border bg-white text-xs cursor-pointer whitespace-nowrap">
               やめる
             </button>
-            <span className="ml-auto text-[10px] text-app-sub">⌘+Enter で保存。空にして保存すると消えます</span>
+            {draft && (
+              <button
+                type="button"
+                onClick={() => setText((cur) => (cur.trim() ? `${cur.trimEnd()}\n\n${draft}` : draft))}
+                title="今日完了したタスクと、次にやること（未完了の上から3件）を書き足す"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-app-border bg-white text-xs cursor-pointer whitespace-nowrap hover:border-app-sub"
+              >
+                <Wand2 size={12} aria-hidden /> 今日のタスクから下書き
+              </button>
+            )}
           </div>
+          <div className="text-[10px] text-app-sub">⌘+Enter で保存。空にして保存すると消えます</div>
         </div>
       ) : note ? (
         <div className="group relative rounded-lg border border-app-border bg-white px-3 py-2">

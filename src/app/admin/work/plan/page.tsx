@@ -54,6 +54,7 @@ export default function WorkPlanPage() {
   const [summary, setSummary] = useState<Omit<DaySummary, "date"> | null>(null);
   const [summaryDays, setSummaryDays] = useState<DaySummary[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [doneTasks, setDoneTasks] = useState<Task[]>([]); // その日に完了したタスク（一覧の日表示で使う）
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [routines, setRoutines] = useState<DayRoutine[]>([]);
@@ -83,7 +84,7 @@ export default function WorkPlanPage() {
   const load = useCallback(async () => {
     try {
       const q = `from=${range.from}&to=${range.to}`;
-      const [p, e, s, t, pr, g, cl, rs, rc] = await Promise.all([
+      const [p, e, s, t, pr, g, cl, rs, rc, dt] = await Promise.all([
         api<Plan[]>(`/api/work/plans?${q}`),
         api<TimeEntry[]>(`/api/work/time-entries?${q}`),
         api<{ days: DaySummary[] }>(`/api/work/summary?${q}`),
@@ -93,7 +94,9 @@ export default function WorkPlanPage() {
         api<Client[]>("/api/work/clients"),
         api<Routine[]>("/api/work/routines"),
         api<{ days: RoutineDay[] }>(`/api/work/routines/checks?${q}`),
+        isWeek ? Promise.resolve([] as Task[]) : api<Task[]>(`/api/work/tasks?status=done&completedOn=${range.from}`),
       ]);
+      setDoneTasks(dt);
       setPlans(p);
       setEntries(e);
       setSummaryDays(s.days);
@@ -290,6 +293,10 @@ export default function WorkPlanPage() {
               date={isWeek ? undefined : date}
               notes={isWeek ? undefined : dailyNotes}
               onNotesChanged={loadNotes}
+              tasks={isWeek ? undefined : tasks}
+              doneTasks={isWeek ? undefined : doneTasks}
+              onOpenTask={setEditingTask}
+              onTasksChanged={load}
               onOpenDay={(d) => {
                 setDate(d);
                 changeSpan("day");

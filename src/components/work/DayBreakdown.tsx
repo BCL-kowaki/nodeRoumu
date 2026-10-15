@@ -8,8 +8,10 @@ import { formatMinutes } from "@/lib/work/labels";
 import { entryMinutes } from "@/lib/work/time";
 import { dayOfWeek } from "@/lib/attendance-status";
 import { WEEKDAY_NAMES } from "@/lib/work/recurrence";
+import ClientTasks from "./ClientTasks";
 import { ClientDailyNote } from "./DailyNotes";
-import { entryTitle, type Client, type DailyNotes, type DaySummary, type Plan, type Project, type Routine, type TimeEntry } from "./types";
+import { defaultProjectFor, noteDraftFromTasks, sortClientTasks, tasksOfClient } from "@/lib/work/client-tasks";
+import { entryTitle, type Client, type DailyNotes, type DaySummary, type Task, type Plan, type Project, type Routine, type TimeEntry } from "./types";
 
 const NO_CLIENT = "#9AA6A2";
 const fmt = (m: number) => (m === 0 ? "0分" : formatMinutes(m));
@@ -30,6 +32,10 @@ export default function DayBreakdown({
   date,
   notes,
   onNotesChanged,
+  tasks,
+  doneTasks,
+  onOpenTask,
+  onTasksChanged,
 }: {
   plans: Plan[];
   entries: TimeEntry[];
@@ -44,6 +50,11 @@ export default function DayBreakdown({
   date?: string;
   notes?: DailyNotes | null;
   onNotesChanged?: () => void;
+  // 1日の一覧のときだけ渡す：未完了のタスクと、その日に完了したタスク（クライアントごとに整理できるようにする）
+  tasks?: Task[];
+  doneTasks?: Task[];
+  onOpenTask?: (t: Task) => void;
+  onTasksChanged?: () => void;
 }) {
   const colors = useMemo(() => assignClientColors(clients), [clients]);
   const order = clients.map((c) => c.id);
@@ -76,17 +87,43 @@ export default function DayBreakdown({
           (planned.groups.some((g) => g.clientId === id) || notes!.notes.some((n) => n.clientId === id) || notes!.previous.some((n) => n.clientId === id))
       )
     : [];
+  // タスク：その日に実績を付けたタスクは「今日作業」として先頭に出す
+  const withTasks = !!(tasks && doneTasks && onOpenTask && onTasksChanged);
+  const workedToday = new Set(entries.map((e) => e.taskId).filter((id): id is string => !!id));
+  const usage = entries.map((e) => ({ projectId: projectId(e), minutes: entryMinutes(e, now) }));
   const renderNote = withNotes
-    ? (clientId: string) => (
-        <ClientDailyNote
-          key={`${date}:${clientId}`}
-          clientId={clientId}
-          date={date!}
-          note={notes!.notes.find((n) => n.clientId === clientId)}
-          previous={notes!.previous.find((n) => n.clientId === clientId)}
-          onSaved={onNotesChanged!}
-        />
-      )
+    ? (clientId: string) => {
+        const open = withTasks ? sortClientTasks(tasksOfClient(tasks!, clientId, projects), workedToday) : [];
+        const done = withTasks ? tasksOfClient(doneTasks!, clientId, projects) : [];
+        // タスクを足せるのは、進行中・保留中のプロジェクトだけ
+        const addable = projects.filter((p) => p.clientId === clientId && (p.status === "active" || p.status === "on_hold"));
+        return (
+          <div key={`${date}:${clientId}`}>
+            {withTasks && (
+              <ClientTasks
+                open={open}
+                doneToday={done}
+                workedToday={workedToday}
+                projects={addable}
+                defaultProjectId={defaultProjectFor(clientId, addable, usage)}
+                onOpenTask={onOpenTask!}
+                onChanged={onTasksChanged!}
+              />
+            )}
+            <ClientDailyNote
+              clientId={clientId}
+              date={date!}
+              note={notes!.notes.find((n) => n.clientId === clientId)}
+              previous={notes!.previous.find((n) => n.clientId === clientId)}
+              onSaved={onNotesChanged!}
+              draft={noteDraftFromTasks(
+                done.map((t) => t.title),
+                open.map((t) => t.title)
+              )}
+            />
+          </div>
+        );
+      }
     : undefined;
   return (
     <div className="flex flex-col gap-3">

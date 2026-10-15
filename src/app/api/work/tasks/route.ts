@@ -8,8 +8,9 @@ import { TASK_STATUSES, parseTaskInput, toDbDate } from "@/lib/work/validate";
 export const dynamic = "force-dynamic";
 
 // タスク一覧
-// GET /api/work/tasks?status=todo,doing&projectId=xxx|none&due=overdue|today|week
+// GET /api/work/tasks?status=todo,doing&projectId=xxx|none&due=overdue|today|week&completedOn=YYYY-MM-DD
 //  - due=overdue: 期限が昨日以前 / today: 期限が今日以前 / week: 期限が7日後以内（いずれも日本時間）
+//  - completedOn: その日（日本時間）に完了にしたタスク
 export async function GET(req: NextRequest) {
   const auth = await requireWorkspace();
   if (!auth.ok) return auth.response;
@@ -33,6 +34,17 @@ export async function GET(req: NextRequest) {
   if (due === "overdue") where.dueDate = { lt: jstDateToDb(today) };
   else if (due === "today") where.dueDate = { lte: jstDateToDb(today) };
   else if (due === "week") where.dueDate = { lte: jstDateToDb(addDays(today, 7)) };
+
+  const completedOn = sp.get("completedOn");
+  if (completedOn) {
+    try {
+      jstDateToDb(completedOn);
+    } catch {
+      return badRequest("日付の形式が正しくありません");
+    }
+    const start = new Date(`${completedOn}T00:00:00+09:00`);
+    where.completedAt = { gte: start, lt: new Date(start.getTime() + 24 * 60 * 60 * 1000) };
+  }
 
   const tasks = await prisma.workTask.findMany({
     where,
