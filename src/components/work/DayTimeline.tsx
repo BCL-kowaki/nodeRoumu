@@ -24,20 +24,20 @@ import {
   timeToMinutes,
   yToStart,
 } from "@/lib/work/timeline";
-import Link from "next/link";
 import { CalendarPlus, Check, ChevronDown, Pencil, Play, Repeat, Square } from "lucide-react";
 import { formatMinutes } from "@/lib/work/labels";
-import { eventToPlan, groupByClient, groupTasksByProject, importableEvents } from "@/lib/work/plan-sources";
+import { eventToPlan, importableEvents } from "@/lib/work/plan-sources";
+import { groupProjectsByClient } from "@/lib/work/client-groups";
 import { assignClientColors, clientIdFor } from "@/lib/work/client-colors";
 import { useCollapsedClients } from "./useCollapsedClients";
-import { entryTitle, type CheckStatus, type Client, type Plan, type Project, type Routine, type Task, type TimeEntry } from "./types";
+import { entryTitle, type CheckStatus, type Client, type Plan, type Project, type Routine, type TimeEntry } from "./types";
 
 export type DayGoogleEvent = { id: string; title: string; allDay: boolean; startTime: string | null; endTime: string | null };
 
 // その日に実施するルーティン（実施状況つき）
 export type DayRoutine = { routine: Routine; status: CheckStatus };
 
-// 計画を新しく作るときの中身（タスク・ルーティン・Google の予定から）
+// 計画を新しく作るときの中身（プロジェクト・ルーティン・Google の予定から）
 export type NewPlan = {
   title: string;
   startTime: string;
@@ -53,7 +53,7 @@ const PX_PER_MIN = HOUR_PX / 60;
 const DEFAULT_TASK_MINUTES = 60;
 
 type DragData =
-  | { kind: "task"; task: Task; duration: number }
+  | { kind: "project"; project: Project; duration: number }
   | { kind: "routine"; routine: Routine; duration: number }
   | { kind: "unscheduled"; plan: Plan; duration: number }
   | { kind: "plan"; plan: Plan; start: number; duration: number }
@@ -66,8 +66,8 @@ const ENTRY_SNAP = 5;
 
 // ===== タイマー（左の一覧のカードに付ける ▶ / ■） =====
 export type TimerControls = {
-  runningFor: (t: { taskId?: string; routineId?: string; planId?: string }) => TimeEntry | undefined;
-  start: (links: { taskId?: string; routineId?: string; planId?: string }) => void;
+  runningFor: (t: { taskId?: string; routineId?: string; planId?: string; projectId?: string }) => TimeEntry | undefined;
+  start: (links: { taskId?: string; routineId?: string; planId?: string; projectId?: string }) => void;
   stop: (entryId: string) => void;
   busy: boolean;
 };
@@ -91,7 +91,7 @@ function TimerButton({
   title: string;
   running: TimeEntry | undefined;
   timer: TimerControls;
-  links: { taskId?: string; routineId?: string; planId?: string };
+  links: { taskId?: string; routineId?: string; planId?: string; projectId?: string };
 }) {
   return (
     <button
@@ -109,45 +109,42 @@ function TimerButton({
   );
 }
 
-// ===== 左側：置けるタスク（ドラッグ元） =====
-function DraggableTask({ task, projects, onOpen, timer }: { task: Task; projects: Project[]; onOpen: (t: Task) => void; timer: TimerControls }) {
-  const running = timer.runningFor({ taskId: task.id });
-  const duration = task.plannedMinutes ?? DEFAULT_TASK_MINUTES;
+// ===== 左側：置けるプロジェクト（ドラッグ元）。計画・実績はプロジェクトの単位で計る =====
+function DraggableProject({ project, color, timer }: { project: Project; color: string; timer: TimerControls }) {
+  const running = timer.runningFor({ projectId: project.id });
+  const duration = DEFAULT_TASK_MINUTES;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `task:${task.id}`,
-    data: { kind: "task", task, duration } satisfies DragData,
+    id: `project:${project.id}`,
+    data: { kind: "project", project, duration } satisfies DragData,
   });
-  const color = projects.find((p) => p.id === task.projectId)?.color ?? "#9AA6A2";
   return (
     <div className="relative">
       <div
         ref={setNodeRef}
         {...listeners}
         {...attributes}
-        onClick={() => onOpen(task)}
-        aria-label={`「${task.title}」。押すと詳細、ドラッグでタイムラインに置く`}
+        aria-label={`「${project.name}」。ドラッグでタイムラインに置く`}
         className={`flex items-stretch rounded-lg border bg-white cursor-grab active:cursor-grabbing select-none touch-manipulation hover:border-app-sub ${
           running ? "border-danger" : "border-app-border"
         } ${isDragging ? "opacity-40" : ""}`}
       >
         <span className="w-1 rounded-l-lg shrink-0" style={{ background: color }} aria-hidden />
         <div className="flex-1 min-w-0 pl-3 pr-11 py-2">
-          <div className="text-sm font-semibold text-app-text truncate">{task.title}</div>
+          <div className="text-sm font-semibold text-app-text truncate">{project.name}</div>
           <div className="text-[11px] text-app-sub">
             {running?.startedAt ? (
               <span className="text-danger font-semibold">
                 ● 計測中 <Elapsed startedAt={running.startedAt} />
               </span>
+            ) : project.status === "on_hold" ? (
+              "保留中"
             ) : (
-              <>
-                {formatMinutes(duration)}
-                {task.plannedMinutes == null ? "（仮）" : ""}
-              </>
+              `${formatMinutes(duration)}（仮）`
             )}
           </div>
         </div>
       </div>
-      <TimerButton title={task.title} running={running} timer={timer} links={{ taskId: task.id }} />
+      <TimerButton title={project.name} running={running} timer={timer} links={{ projectId: project.id }} />
     </div>
   );
 }
@@ -468,7 +465,6 @@ function PlanLane({ children, laneRef }: { children: React.ReactNode; laneRef: R
 export default function DayTimeline({
   date,
   isToday,
-  tasks,
   projects,
   clients,
   routines,
@@ -477,7 +473,6 @@ export default function DayTimeline({
   googleEvents,
   onCreatePlan,
   onImportEvents,
-  onOpenTask,
   timer,
   onUpdatePlan,
   onUpdateEntryTime,
@@ -486,7 +481,6 @@ export default function DayTimeline({
 }: {
   date: string;
   isToday: boolean;
-  tasks: Task[];
   projects: Project[];
   clients: Client[];
   routines: DayRoutine[];
@@ -495,7 +489,6 @@ export default function DayTimeline({
   googleEvents: DayGoogleEvent[];
   onCreatePlan: (plan: NewPlan) => void;
   onImportEvents: (plans: NewPlan[]) => void;
-  onOpenTask: (task: Task) => void;
   timer: TimerControls;
   onUpdatePlan: (plan: Plan, patch: { startTime?: string; plannedMinutes?: number }) => void;
   onUpdateEntryTime: (entry: TimeEntry, startTime: string, endTime: string) => void;
@@ -613,13 +606,13 @@ export default function DayTimeline({
       if (minutes !== d.duration) onUpdateEntryTime(d.entry, minutesToTime(d.start), minutesToTime(Math.min(DAY_END - 1, d.start + minutes)));
       return;
     }
-    // タスク・時刻未定の計画は、計画の列の上に落としたときだけ置く
+    // プロジェクト・ルーティン・時刻未定の計画は、計画の列の上に落としたときだけ置く
     if (ev.over?.id !== "plan-lane") return;
     const y = dropY(ev);
     if (y === null) return;
     const start = yToStart(y, PX_PER_MIN, d.duration);
-    if (d.kind === "task") {
-      onCreatePlan({ title: d.task.title, startTime: minutesToTime(start), plannedMinutes: d.duration, taskId: d.task.id, projectId: d.task.projectId });
+    if (d.kind === "project") {
+      onCreatePlan({ title: d.project.name, startTime: minutesToTime(start), plannedMinutes: d.duration, projectId: d.project.id });
     } else if (d.kind === "routine") {
       onCreatePlan({
         title: d.routine.title,
@@ -637,9 +630,11 @@ export default function DayTimeline({
   const importable = importableEvents(googleEvents, plans.map((p) => ({ sourceEventId: p.sourceEventId ?? null })));
   const importedIds = new Set(plans.map((p) => p.sourceEventId).filter(Boolean));
   const plannedRoutineIds = new Set(plans.map((p) => p.routineId).filter(Boolean));
-  const taskGroups = groupTasksByProject(tasks, projects, clients);
-  const projectById = new Map(projects.map((p) => [p.id, p]));
-  const clientName = (id: string | undefined) => clients.find((c) => c.id === id)?.name;
+  // 計れるプロジェクト（進行中・保留中）をクライアントごとに
+  const projectGroups = groupProjectsByClient(
+    projects.filter((p) => p.status === "active" || p.status === "on_hold").sort((a, b) => (a.status === b.status ? 0 : a.status === "active" ? -1 : 1)),
+    clients
+  );
 
   return (
     <DndContext
@@ -679,12 +674,12 @@ export default function DayTimeline({
               </section>
             )}
             <section className="flex flex-col gap-1.5">
-              <div className="text-[11px] font-bold tracking-[0.08em] text-app-sub">未完了のタスク</div>
-              {tasks.length === 0 && <div className="text-xs text-app-sub py-1">未完了のタスクはありません</div>}
-              {groupByClient(taskGroups, projects, clients).map((cg) => {
-                const key = cg.clientId ?? "__none__";
+              <div className="text-[11px] font-bold tracking-[0.08em] text-app-sub">プロジェクト</div>
+              {projectGroups.length === 0 && <div className="text-xs text-app-sub py-1">進行中のプロジェクトはありません</div>}
+              {projectGroups.map((g) => {
+                const key = g.clientId ?? "__none__";
                 const isCollapsed = collapsed.has(key);
-                const count = cg.groups.reduce((n, g) => n + g.tasks.length, 0);
+                const color = (g.clientId && clientColors.get(g.clientId)) || "#9AA6A2";
                 return (
                   <div key={key} className="flex flex-col gap-1.5">
                     {/* クライアントの見出し（押すと開閉） */}
@@ -695,41 +690,23 @@ export default function DayTimeline({
                       className="flex items-center gap-1.5 mt-1 px-1 py-1 rounded-lg text-left text-xs font-bold text-app-text bg-transparent border-none cursor-pointer hover:bg-app-bg"
                     >
                       <ChevronDown size={13} className={`shrink-0 text-app-sub transition-transform ${isCollapsed ? "-rotate-90" : ""}`} aria-hidden />
-                      {cg.clientId ? (
-                        <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: clientColors.get(cg.clientId) ?? "#9AA6A2" }} title="計画・実績のカードの色" aria-hidden />
-                      ) : null}
-                      <span className="flex-1 min-w-0 truncate">{cg.clientId ? clientName(cg.clientId) : "クライアントなし・その他"}</span>
-                      <span className="text-[11px] font-normal text-app-sub tabular-nums">{count}</span>
+                      <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: color }} title="計画・実績のカードの色" aria-hidden />
+                      <span className="flex-1 min-w-0 truncate">{g.label}</span>
+                      <span className="text-[11px] font-normal text-app-sub tabular-nums">{g.projects.length}</span>
                     </button>
-                    {!isCollapsed &&
-                      cg.groups.map((g) => {
-                        const project = g.projectId ? projectById.get(g.projectId) : undefined;
-                        return (
-                          <div key={g.projectId ?? "none"} className="flex flex-col gap-1.5 pl-2">
-                            {g.projectId ? (
-                              <Link
-                                href={`/admin/work/projects?project=${g.projectId}`}
-                                className="flex items-center gap-1.5 text-xs font-semibold text-app-text no-underline hover:underline min-w-0"
-                                title="プロジェクト・タスクの画面で開く"
-                              >
-                                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: project?.color || "#9AA6A2" }} aria-hidden />
-                                <span className="truncate">{project?.name ?? "（プロジェクト）"}</span>
-                              </Link>
-                            ) : (
-                              <div className="text-xs font-semibold text-app-sub">プロジェクトなし</div>
-                            )}
-                            {g.tasks.map((t) => (
-                              <DraggableTask key={t.id} task={t} projects={projects} onOpen={onOpenTask} timer={timer} />
-                            ))}
-                          </div>
-                        );
-                      })}
+                    {!isCollapsed && (
+                      <div className="flex flex-col gap-1.5 pl-2">
+                        {g.projects.map((p) => (
+                          <DraggableProject key={p.id} project={p} color={color} timer={timer} />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </section>
           </div>
-          <div className="text-[10px] text-app-sub mt-2 hidden lg:block">タスクを押すと詳細、▶ でタイマー開始（複数同時に計測できます）。予定時間が未設定のものは60分で置き、下端を引いて調整できます。</div>
+          <div className="text-[10px] text-app-sub mt-2 hidden lg:block">プロジェクトを計画に置くか、▶ でタイマー開始（複数同時に計測できます）。60分で置き、下端を引いて調整できます。小さなタスクは上の「引き継ぎ・タスク」で管理します。</div>
           <div className="text-[10px] text-app-sub mt-1 lg:hidden">スマホは長押ししてからドラッグします。</div>
         </div>
 
@@ -891,13 +868,13 @@ export default function DayTimeline({
 
       {/* ドラッグ中に指の下に表示する見た目 */}
       <DragOverlay dropAnimation={null}>
-        {active && (active.kind === "task" || active.kind === "unscheduled" || active.kind === "routine") ? (
+        {active && (active.kind === "project" || active.kind === "unscheduled" || active.kind === "routine") ? (
           <div
             className="rounded-lg bg-work-light border-2 border-work px-3 py-1.5 shadow-xl w-48"
             style={{ height: Math.max(active.duration * PX_PER_MIN, 28) }}
           >
             <div className="text-[12px] font-bold text-work-dark truncate">
-              {active.kind === "task" ? active.task.title : active.kind === "routine" ? active.routine.title : active.plan.title}
+              {active.kind === "project" ? active.project.name : active.kind === "routine" ? active.routine.title : active.plan.title}
             </div>
             <div className="text-[10px] text-app-sub">{formatMinutes(active.duration)}</div>
           </div>

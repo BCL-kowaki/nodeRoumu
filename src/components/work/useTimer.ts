@@ -39,10 +39,19 @@ export function useTimer(onChange?: () => void) {
   const start = (links: TimerLinks) => call({ action: "start", ...links });
   // entryId を渡すとその1件、渡さなければ計測中をすべて止める
   const stop = (entryId?: string) => call({ action: "stop", ...(entryId ? { entryId } : {}) });
-  // そのタスク・ルーティン・計画で計測中のタイマー（無ければ undefined）
-  const runningFor = (t: { taskId?: string; routineId?: string; planId?: string }) =>
+  // そのタスク・ルーティン・計画・プロジェクトで計測中のタイマー（無ければ undefined）。
+  // プロジェクトは、タスク・ルーティン・計画を付けずにプロジェクトだけで計っているもの
+  const runningFor = (t: { taskId?: string; routineId?: string; planId?: string; projectId?: string }) =>
     running.find((r) =>
-      t.taskId ? r.taskId === t.taskId : t.routineId ? r.routineId === t.routineId : t.planId ? r.planId === t.planId : false
+      t.taskId
+        ? r.taskId === t.taskId
+        : t.routineId
+          ? r.routineId === t.routineId
+          : t.planId
+            ? r.planId === t.planId
+            : t.projectId
+              ? r.projectId === t.projectId && !r.taskId && !r.routineId && !r.planId
+              : false
     );
 
   return { running, error, busy, start, stop, reload, runningFor };

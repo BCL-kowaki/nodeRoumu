@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayTaskGroups, defaultProjectFor, noteDraftFromTasks, sortClientTasks, tasksOfClient } from "./client-tasks";
+import { dayTaskGroups, defaultProjectFor, memoLines, noteDraftFromTasks, sortClientTasks, tasksOfClient } from "./client-tasks";
 
 const projects = [
   { id: "p1", clientId: "c1" },
@@ -105,5 +105,30 @@ describe("dayTaskGroups（その日のタスクをクライアントごとに）
       ["x", false, false],
       ["z", false, true],
     ]);
+  });
+});
+
+describe("memoLines（引き継ぎメモの行。タスクにできる行を見分ける）", () => {
+  it("行頭の記号（- ・ * 番号 チェック）を取り、空行は飛ばす", () => {
+    expect(memoLines("マニュアル作成予定\n\n- 検証チームのチェックリスト\n・広告の設定\n1. 返信を行う\n- [ ] 見積\n- [x] 済んだこと")).toEqual([
+      { text: "マニュアル作成予定", kind: "item" },
+      { text: "検証チームのチェックリスト", kind: "item" },
+      { text: "広告の設定", kind: "item" },
+      { text: "返信を行う", kind: "item" },
+      { text: "見積", kind: "item" },
+      { text: "済んだこと", kind: "done" },
+    ]);
+  });
+  it("下書きの見出し「完了」「次にやること」は見出しにし、「完了」の下の行は済んだこととして扱う", () => {
+    expect(memoLines("完了\n- 見積送付\n\n次にやること\n- 要件定義\n## メモ")).toEqual([
+      { text: "完了", kind: "heading" },
+      { text: "見積送付", kind: "done" },
+      { text: "次にやること", kind: "heading" },
+      { text: "要件定義", kind: "item" },
+      { text: "メモ", kind: "heading" },
+    ]);
+  });
+  it("長すぎる行はタスク名の上限（200文字）に切る", () => {
+    expect(memoLines("あ".repeat(250))[0].text.length).toBe(200);
   });
 });

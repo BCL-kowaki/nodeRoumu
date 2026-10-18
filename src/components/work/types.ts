@@ -126,9 +126,9 @@ export type DaySummary = {
 
 export type TimerLinks = { taskId?: string; projectId?: string; routineId?: string; planId?: string; note?: string };
 
-// 実績の表示名（タスク → 計画 → ルーティン → メモ の順で使う）
+// 実績の表示名（タスク → 計画 → ルーティン → メモ → プロジェクト の順で使う）
 export function entryTitle(e: TimeEntry): string {
-  return e.task?.title || e.plan?.title || e.routine?.title || e.note || "（作業内容なし）";
+  return e.task?.title || e.plan?.title || e.routine?.title || e.note || e.project?.name || "（作業内容なし）";
 }
 
 export type GithubRepo = {

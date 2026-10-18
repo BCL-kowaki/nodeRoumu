@@ -66,3 +66,32 @@ export function dayTaskGroups<T extends TaskLike>(input: {
   }
   return out;
 }
+
+export type MemoLine = { text: string; kind: "item" | "done" | "heading" };
+const MAX_TASK_TITLE = 200;
+
+// 引き継ぎメモを1行ずつに分け、タスクにできる行（item）・済んだこと（done）・見出し（heading）を見分ける。
+// 行頭の記号（- ・ * 番号 チェックボックス）は取る。下書きの「完了」の下の行は済んだこととして扱う
+export function memoLines(body: string): MemoLine[] {
+  const out: MemoLine[] = [];
+  let inDone = false;
+  for (const raw of body.split("\n")) {
+    let line = raw.trim();
+    if (!line) continue;
+    const heading = /^#+\s*/.test(line);
+    line = line.replace(/^#+\s*/, "");
+    const checked = /^[-*・]\s*\[[xX]\]\s*/.test(line);
+    line = line
+      .replace(/^[-*・]\s*\[[ xX]?\]\s*/, "")
+      .replace(/^([-*・•]|\d+[.)．])\s*/, "")
+      .trim();
+    if (!line) continue;
+    if (heading || /^(完了|次にやること)[:：]?$/.test(line)) {
+      inDone = /^完了[:：]?$/.test(line);
+      out.push({ text: line, kind: "heading" });
+      continue;
+    }
+    out.push({ text: line.slice(0, MAX_TASK_TITLE), kind: checked || inDone ? "done" : "item" });
+  }
+  return out;
+}

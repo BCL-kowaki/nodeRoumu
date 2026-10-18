@@ -5,7 +5,7 @@ import Link from "next/link";
 import Card from "@/components/Card";
 import TimerBar from "@/components/work/TimerBar";
 import DayBreakdown from "@/components/work/DayBreakdown";
-import { HandoverPanel } from "@/components/work/DailyNotes";
+import HandoverBoard from "@/components/work/HandoverBoard";
 import { assignClientColors } from "@/lib/work/client-colors";
 import DayTimeline, { type DayGoogleEvent, type DayRoutine, type NewPlan } from "@/components/work/DayTimeline";
 import { EntryEditor, PlanEditor } from "@/components/work/PlanEntryEditors";
@@ -304,11 +304,20 @@ export default function WorkPlanPage() {
             />
           ) : (
             <>
-              {dailyNotes && <HandoverPanel previous={dailyNotes.previous} colors={clientColors} />}
+              <HandoverBoard
+                previous={dailyNotes?.previous ?? []}
+                clients={clients}
+                projects={projects}
+                tasks={tasks}
+                doneTasks={doneTasks}
+                entries={entries}
+                colors={clientColors}
+                onOpenTask={setEditingTask}
+                onTasksChanged={load}
+              />
               <DayTimeline
                 date={date}
                 isToday={isToday}
-                tasks={tasks}
                 projects={projects}
                 clients={clients}
                 routines={routines}
@@ -317,7 +326,6 @@ export default function WorkPlanPage() {
                 googleEvents={googleEvents}
                 onCreatePlan={createPlan}
                 onImportEvents={importEvents}
-                onOpenTask={setEditingTask}
                 timer={{ runningFor: timer.runningFor, start: timer.start, stop: timer.stop, busy: timer.busy }}
                 onUpdatePlan={updatePlan}
                 onUpdateEntryTime={updateEntryTime}

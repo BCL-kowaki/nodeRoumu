@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ChevronDown, NotebookPen, Pencil, Wand2 } from "lucide-react";
-import Card from "@/components/Card";
+import { useState } from "react";
+import { NotebookPen, Pencil, Wand2 } from "lucide-react";
 import NoteMarkdown from "./NoteMarkdown";
 import { api, type DailyNote } from "./types";
 
@@ -134,59 +133,5 @@ export function ClientDailyNote({
         </button>
       )}
     </div>
-  );
-}
-
-const COLLAPSED_KEY = "node-portal:handover-collapsed";
-
-// タイムラインの上に出す「前回からの引き継ぎ」のまとめ（開閉はこの端末に覚える）
-export function HandoverPanel({ previous, colors }: { previous: DailyNote[]; colors: Map<string, string> }) {
-  const [collapsed, setCollapsed] = useState(false);
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(COLLAPSED_KEY) === "1") setCollapsed(true);
-    } catch {
-      // 保存できない環境では開いた状態で始める
-    }
-  }, []);
-  if (previous.length === 0) return null;
-  const toggle = () => {
-    setCollapsed(!collapsed);
-    try {
-      localStorage.setItem(COLLAPSED_KEY, collapsed ? "0" : "1");
-    } catch {
-      // 覚えられなくても開閉はできる
-    }
-  };
-  return (
-    <Card className="!p-0 overflow-hidden">
-      <button
-        type="button"
-        onClick={toggle}
-        aria-expanded={!collapsed}
-        className="w-full flex items-center gap-2 px-4 py-2.5 text-left bg-transparent border-none cursor-pointer hover:bg-app-bg"
-      >
-        <NotebookPen size={14} className="text-accent-dark shrink-0" aria-hidden />
-        <span className="text-sm font-bold text-app-text">前回からの引き継ぎ</span>
-        <span className="text-[11px] text-app-sub">{previous.length}件</span>
-        <ChevronDown size={14} className={`ml-auto text-app-sub transition-transform ${collapsed ? "-rotate-90" : ""}`} aria-hidden />
-      </button>
-      {!collapsed && (
-        <ul className="list-none m-0 p-0 border-t border-app-border grid grid-cols-1 md:grid-cols-2">
-          {previous.map((n) => (
-            <li key={n.clientId} className="px-4 py-2.5 border-b border-app-border md:odd:border-r">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: colors.get(n.clientId) ?? "#9AA6A2" }} aria-hidden />
-                <span className="flex-1 min-w-0 truncate text-xs font-bold text-app-text">{n.clientName}</span>
-                <span className="text-[10px] text-app-sub tabular-nums">{md(n.date)}</span>
-              </div>
-              <div className="text-[12px] text-app-text pl-[18px]">
-                <NoteMarkdown content={n.body} />
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
   );
 }
