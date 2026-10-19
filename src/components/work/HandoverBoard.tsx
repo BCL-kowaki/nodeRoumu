@@ -10,10 +10,13 @@ import { entryMinutes } from "@/lib/work/time";
 import { api, type Client, type DailyNote, type Project, type Task, type TimeEntry } from "./types";
 
 const COLLAPSED_KEY = "node-portal:handover-collapsed";
+// クライアントごとの開閉（覚えていないクライアントは、前回のメモがあれば開く）
+const OPEN_KEY = "node-portal:handover-open";
 const md = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 
 // タイムラインの上に出す「引き継ぎ・タスク」。小さなタスクはここで管理する
-// （前回のメモの行からタスクを作る・その日のうちに足す・完了にする）。開閉はこの端末に覚える
+// （前回のメモの行からタスクを作る・その日のうちに足す・完了にする）。
+// 全クライアントをアコーディオンで並べる（いつでもどのクライアントにもタスクを足せるように）。開閉はこの端末に覚える
 export default function HandoverBoard({
   previous,
   clients,
@@ -36,13 +39,24 @@ export default function HandoverBoard({
   onTasksChanged: () => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
   useEffect(() => {
     try {
       if (localStorage.getItem(COLLAPSED_KEY) === "1") setCollapsed(true);
+      const saved = JSON.parse(localStorage.getItem(OPEN_KEY) ?? "{}");
+      if (saved && typeof saved === "object") setOpenMap(saved);
     } catch {
-      // 保存できない環境では開いた状態で始める
+      // 保存できない環境では既定の開き方で始める
     }
   }, []);
+  const saveOpen = (next: Record<string, boolean>) => {
+    setOpenMap(next);
+    try {
+      localStorage.setItem(OPEN_KEY, JSON.stringify(next));
+    } catch {
+      // 覚えられなくても開閉はできる
+    }
+  };
   const toggle = () => {
     setCollapsed(!collapsed);
     try {
@@ -54,42 +68,69 @@ export default function HandoverBoard({
 
   const workedToday = new Set(entries.map((e) => e.taskId).filter((id): id is string => !!id));
   const usage = entries.map((e) => ({ projectId: e.projectId ?? e.task?.projectId ?? e.plan?.projectId ?? null, minutes: entryMinutes(e, new Date()) }));
-  // 前回のメモがある、または未完了・今日完了のタスクがあるクライアント（一覧の並び順）
-  const shown = clients.filter(
-    (c) => previous.some((n) => n.clientId === c.id) || tasksOfClient(tasks, c.id, projects).length > 0 || tasksOfClient(doneTasks, c.id, projects).length > 0
-  );
-  if (shown.length === 0) return null;
+  if (clients.length === 0) return null;
   const noteCount = previous.length;
+  const hasNote = (id: string) => previous.some((n) => n.clientId === id);
+  const isOpen = (id: string) => openMap[id] ?? hasNote(id);
+  const setAll = (open: boolean) => saveOpen(Object.fromEntries(clients.map((c) => [c.id, open])));
 
   return (
     <Card className="!p-0 overflow-hidden">
-      <button
-        type="button"
-        onClick={toggle}
-        aria-expanded={!collapsed}
-        className="w-full flex items-center gap-2 px-4 py-2.5 text-left bg-transparent border-none cursor-pointer hover:bg-app-bg"
-      >
-        <NotebookPen size={14} className="text-accent-dark shrink-0" aria-hidden />
-        <span className="text-sm font-bold text-app-text">引き継ぎ・タスク</span>
-        <span className="text-[11px] text-app-sub">
-          {shown.length}社{noteCount > 0 && `・前回のメモ ${noteCount}件`}
-        </span>
-        <ChevronDown size={14} className={`ml-auto text-app-sub transition-transform ${collapsed ? "-rotate-90" : ""}`} aria-hidden />
-      </button>
+      <div className="flex items-center gap-1 pr-2">
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={!collapsed}
+          className="flex-1 min-w-0 flex items-center gap-2 px-4 py-2.5 text-left bg-transparent border-none cursor-pointer hover:bg-app-bg"
+        >
+          <ChevronDown size={14} className={`shrink-0 text-app-sub transition-transform ${collapsed ? "-rotate-90" : ""}`} aria-hidden />
+          <NotebookPen size={14} className="text-accent-dark shrink-0" aria-hidden />
+          <span className="text-sm font-bold text-app-text whitespace-nowrap">引き継ぎ・タスク</span>
+          <span className="hidden sm:inline text-[11px] text-app-sub truncate">
+            {clients.length}社{noteCount > 0 && `・前回のメモ ${noteCount}件`}
+          </span>
+        </button>
+        {!collapsed && (
+          <>
+            <button type="button" onClick={() => setAll(true)} className="shrink-0 px-1.5 sm:px-2 py-1 rounded text-[11px] text-app-sub whitespace-nowrap bg-transparent border-none cursor-pointer hover:bg-app-bg hover:text-app-text">
+              すべて開く
+            </button>
+            <button type="button" onClick={() => setAll(false)} className="shrink-0 px-1.5 sm:px-2 py-1 rounded text-[11px] text-app-sub whitespace-nowrap bg-transparent border-none cursor-pointer hover:bg-app-bg hover:text-app-text">
+              すべて閉じる
+            </button>
+          </>
+        )}
+      </div>
       {!collapsed && (
-        <ul className="list-none m-0 p-0 border-t border-app-border grid grid-cols-1 md:grid-cols-2">
-          {shown.map((c) => {
+        <ul className="list-none m-0 p-0 border-t border-app-border">
+          {clients.map((c) => {
             const addable = projects.filter((p) => p.clientId === c.id && (p.status === "active" || p.status === "on_hold"));
             const open = sortClientTasks(tasksOfClient(tasks, c.id, projects), workedToday);
             const done = tasksOfClient(doneTasks, c.id, projects);
             const note = previous.find((n) => n.clientId === c.id);
+            const expanded = isOpen(c.id);
             return (
-              <li key={c.id} className="px-4 py-3 border-b border-app-border md:odd:border-r min-w-0">
-                <div className="flex items-center gap-2">
+              <li key={c.id} className="border-b border-app-border last:border-b-0 min-w-0">
+                {/* クライアントの見出し（押すと開閉） */}
+                <button
+                  type="button"
+                  onClick={() => saveOpen({ ...openMap, [c.id]: !expanded })}
+                  aria-expanded={expanded}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-left bg-transparent border-none cursor-pointer hover:bg-app-bg"
+                >
+                  <ChevronDown size={13} className={`shrink-0 text-app-sub transition-transform ${expanded ? "" : "-rotate-90"}`} aria-hidden />
                   <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: colors.get(c.id) ?? "#9AA6A2" }} aria-hidden />
                   <span className="flex-1 min-w-0 truncate text-xs font-bold text-app-text">{c.name}</span>
-                  {note && <span className="text-[10px] text-app-sub tabular-nums">{md(note.date)} のメモ</span>}
-                </div>
+                  {note && (
+                    <span className="shrink-0 px-1.5 rounded-full bg-accent-light text-accent-dark text-[10px] font-bold tabular-nums">{md(note.date)} のメモ</span>
+                  )}
+                  <span className="shrink-0 text-[10px] text-app-sub tabular-nums">
+                    未完了 {open.length}
+                    {done.length > 0 && `・今日完了 ${done.length}`}
+                  </span>
+                </button>
+                {expanded && (
+                  <div className={`px-4 pb-3 pl-[42px] ${note ? "md:grid md:grid-cols-2 md:gap-4 md:items-start" : ""}`}>
                 {note && (
                   <MemoToTasks
                     note={note}
@@ -109,6 +150,11 @@ export default function HandoverBoard({
                   onOpenTask={onOpenTask}
                   onChanged={onTasksChanged}
                 />
+                {addable.length === 0 && open.length === 0 && done.length === 0 && (
+                  <div className="mt-2 text-[11px] text-app-sub">進行中のプロジェクトが無いため、タスクを足せません（プロジェクト・タスクの画面で作れます）</div>
+                )}
+                  </div>
+                )}
               </li>
             );
           })}
