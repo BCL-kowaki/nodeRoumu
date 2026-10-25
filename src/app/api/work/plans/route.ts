@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { jstDateToDb } from "@/lib/date-jst";
 import { badRequest, requireWorkspace } from "@/lib/work/auth";
-import { LINK_INCLUDE, checkLinks } from "@/lib/work/links";
+import { LINK_INCLUDE, checkLinks, resolvePlanClient } from "@/lib/work/links";
 import { parseRange } from "@/lib/work/range";
 import { parsePlanInput } from "@/lib/work/validate";
 
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(plans);
 }
 
-// 業務計画の作成  POST /api/work/plans  body: { date, title, plannedMinutes, startTime?, taskId?, projectId?, routineId?, sourceEventId? }
+// 業務計画の作成  POST /api/work/plans  body: { date, title, plannedMinutes, startTime?, taskId?, projectId?, clientId?, routineId?, sourceEventId? }
 export async function POST(req: NextRequest) {
   const auth = await requireWorkspace();
   if (!auth.ok) return auth.response;
@@ -33,6 +33,8 @@ export async function POST(req: NextRequest) {
   const d = parsed.data;
   const linkError = await checkLinks(auth.ctx.ownerId, d);
   if (linkError) return badRequest(linkError);
+  const client = await resolvePlanClient(auth.ctx.ownerId, d, true);
+  if ("error" in client) return badRequest(client.error);
 
   const created = await prisma.workPlan.create({
     data: {
@@ -43,6 +45,7 @@ export async function POST(req: NextRequest) {
       title: d.title!,
       taskId: d.taskId ?? null,
       projectId: d.projectId ?? null,
+      clientId: client.clientId ?? null,
       routineId: d.routineId ?? null,
       sourceEventId: d.sourceEventId ?? null,
     },

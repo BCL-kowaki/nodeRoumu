@@ -24,6 +24,35 @@ export async function checkLinks(ownerId: string, links: Links): Promise<string 
   return null;
 }
 
+// 計画のクライアントを決める：プロジェクトがあればそのクライアントにそろえる。無ければ指定されたクライアント。
+// 作るときに指定が無く、ルーティンから置いた計画なら、ルーティンのクライアント（無ければルーティンのプロジェクトのクライアント）。
+// 変えるときに何も指定が無ければ undefined（そのまま）
+export async function resolvePlanClient(
+  ownerId: string,
+  d: { projectId?: string | null; clientId?: string | null; routineId?: string | null },
+  creating: boolean
+): Promise<{ clientId: string | null | undefined } | { error: string }> {
+  if (d.projectId) {
+    const project = await prisma.workProject.findFirst({ where: { id: d.projectId, ownerId }, select: { clientId: true } });
+    if (!project) return { error: "プロジェクトが見つかりません" };
+    return { clientId: project.clientId };
+  }
+  if (d.clientId !== undefined) {
+    if (d.clientId === null) return { clientId: null };
+    if (!(await ownsClient(ownerId, d.clientId))) return { error: "クライアントが見つかりません" };
+    return { clientId: d.clientId };
+  }
+  if (!creating) return { clientId: undefined };
+  if (d.routineId) {
+    const routine = await prisma.routine.findFirst({
+      where: { id: d.routineId, ownerId },
+      select: { clientId: true, project: { select: { clientId: true } } },
+    });
+    return { clientId: routine?.clientId ?? routine?.project?.clientId ?? null };
+  }
+  return { clientId: null };
+}
+
 // プロジェクトの所属先に指定されたクライアントが、ログイン中の代表者のものか
 export async function ownsClient(ownerId: string, clientId: string): Promise<boolean> {
   return !!(await prisma.workClient.findFirst({ where: { id: clientId, ownerId }, select: { id: true } }));
@@ -39,7 +68,7 @@ export const LINK_INCLUDE = {
 export const ENTRY_INCLUDE = {
   ...LINK_INCLUDE,
   routine: { select: { id: true, title: true, projectId: true, clientId: true } },
-  plan: { select: { id: true, title: true, projectId: true } },
+  plan: { select: { id: true, title: true, projectId: true, clientId: true } },
 } as const;
 
 // ルーティンのプロジェクト・クライアントの確認と、保存するクライアントの決定

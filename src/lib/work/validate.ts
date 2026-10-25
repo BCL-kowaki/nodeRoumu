@@ -365,6 +365,7 @@ function minutesInRange(v: unknown, message: string): number {
 }
 
 export type PlanInput = LinkInput & {
+  clientId?: string | null; // クライアント（プロジェクトがあればサーバー側でそのクライアントにそろえる）
   sourceEventId?: string | null; // Google カレンダーから取り込んだ予定のID
   date?: string;
   startTime?: string | null;
@@ -394,6 +395,7 @@ export function parsePlanInput(body: unknown, mode: Mode): ParseResult<PlanInput
       out.title = requiredText(b.title, MAX_TITLE, "タイトルを入力してください", `タイトルは${MAX_TITLE}文字以内で入力してください`);
     }
     readLinks(b, out, ["taskId", "projectId", "routineId"]);
+    if (has(b, "clientId")) out.clientId = optionalId(b.clientId, "クライアント");
     if (has(b, "sourceEventId")) {
       const v = b.sourceEventId;
       if (v === null || v === "") out.sourceEventId = null;

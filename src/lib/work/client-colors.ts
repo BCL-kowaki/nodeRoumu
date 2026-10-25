@@ -26,14 +26,15 @@ export function assignClientColors(clients: { id: string; createdAt?: string }[]
 }
 
 // 計画・実績がどのクライアントのものか。プロジェクトは「直接の指定 → タスク → （実績なら）計画」の順にたどり、
-// 無ければルーティンのクライアント → ルーティンのプロジェクトのクライアント
+// 無ければ計画に直接つけたクライアント（実績なら計画のクライアント）→ ルーティンのクライアント → ルーティンのプロジェクトのクライアント
 type RoutineLink = { projectId?: string | null; clientId?: string | null };
 export function clientIdFor(
   item: {
     projectId: string | null;
+    clientId?: string | null;
     routineId?: string | null;
     task?: { projectId?: string | null } | null;
-    plan?: { projectId?: string | null } | null;
+    plan?: { projectId?: string | null; clientId?: string | null } | null;
     routine?: RoutineLink | null;
   },
   projects: { id: string; clientId: string }[],
@@ -42,6 +43,8 @@ export function clientIdFor(
   const projectClient = (id: string | null | undefined) => (id ? projects.find((p) => p.id === id)?.clientId ?? null : null);
   const fromProject = projectClient(item.projectId ?? item.task?.projectId ?? item.plan?.projectId);
   if (fromProject) return fromProject;
+  const direct = item.clientId ?? item.plan?.clientId;
+  if (direct) return direct;
   const routine = item.routine ?? (item.routineId ? routines.find((r) => r.id === item.routineId) : undefined);
   if (!routine) return null;
   return routine.clientId ?? projectClient(routine.projectId);

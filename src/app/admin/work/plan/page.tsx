@@ -343,6 +343,7 @@ export default function WorkPlanPage() {
           date={date}
           tasks={tasks}
           projects={projects}
+          clients={clients}
           onClose={() => setEditingPlan(null)}
           onSaved={() => {
             setEditingPlan(null);

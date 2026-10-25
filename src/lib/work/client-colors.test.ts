@@ -56,6 +56,11 @@ describe("clientIdFor（計画・実績のクライアント）", () => {
     expect(clientIdFor({ projectId: null, routine: { projectId: null, clientId: "c9" } }, projects, routines)).toBe("c9");
     expect(clientIdFor({ projectId: null, routine: { projectId: "p2", clientId: null } }, projects, routines)).toBe("c2");
   });
+  it("プロジェクトが無ければ、計画に直接つけたクライアント（実績なら計画のクライアント）をルーティンより優先する", () => {
+    expect(clientIdFor({ projectId: null, clientId: "c5", routineId: "r1" }, projects, routines)).toBe("c5");
+    expect(clientIdFor({ projectId: null, plan: { projectId: null, clientId: "c6" }, routineId: "r1" }, projects, routines)).toBe("c6");
+    expect(clientIdFor({ projectId: "p1", clientId: "c5" }, projects, routines)).toBe("c1");
+  });
   it("どれにも当たらなければ null", () => {
     expect(clientIdFor({ projectId: null, routineId: "r3" }, projects, routines)).toBeNull();
     expect(clientIdFor({ projectId: null }, projects, routines)).toBeNull();

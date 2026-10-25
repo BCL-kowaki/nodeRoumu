@@ -88,6 +88,7 @@ export type Plan = {
   title: string;
   taskId: string | null;
   projectId: string | null;
+  clientId?: string | null;
   routineId?: string | null;
   sourceEventId?: string | null;
   task: { id: string; title: string; status: string; projectId?: string | null } | null;
@@ -109,7 +110,7 @@ export type TimeEntry = {
   task: { id: string; title: string; status: string; projectId?: string | null } | null;
   project: ProjectRef | null;
   routine: { id: string; title: string; projectId?: string | null; clientId?: string | null } | null;
-  plan: { id: string; title: string; projectId?: string | null } | null;
+  plan: { id: string; title: string; projectId?: string | null; clientId?: string | null } | null;
 };
 
 // クライアントごとの日々のメモ（日報・引き継ぎ）

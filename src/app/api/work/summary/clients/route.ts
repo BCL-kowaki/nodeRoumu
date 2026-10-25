@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
       select: {
         plannedMinutes: true,
         projectId: true,
+        clientId: true,
         task: { select: { projectId: true } },
         routine: { select: { projectId: true, clientId: true } },
       },
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
         endedAt: true,
         projectId: true,
         task: { select: { projectId: true } },
-        plan: { select: { projectId: true } },
+        plan: { select: { projectId: true, clientId: true } },
         routine: { select: { projectId: true, clientId: true } },
       },
     }),

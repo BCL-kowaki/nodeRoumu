@@ -86,6 +86,19 @@ describe("summarizeByClient（クライアント別の計画・実績）", () =>
     ]);
   });
 
+  it("計画に直接つけたクライアントは、プロジェクトが無いときにルーティンより優先して数える。その計画の実績も同じ", () => {
+    const plans = [
+      { plannedMinutes: 30, projectId: null, task: null, clientId: "c2", routine: { projectId: null, clientId: "c1" } },
+      { plannedMinutes: 20, projectId: "p1", task: null, clientId: "c2" },
+    ];
+    const entries = [{ ...entry(25, {}), plan: { projectId: null, clientId: "c2" } }];
+    const r = summarizeByClient({ plans, entries, projects, clients: ["c1", "c2"], now });
+    expect(r.clients).toEqual([
+      { clientId: "c2", plannedMin: 30, actualMin: 25, projects: [{ projectId: null, plannedMin: 30, actualMin: 25 }] },
+      { clientId: "c1", plannedMin: 20, actualMin: 0, projects: [{ projectId: "p1", plannedMin: 20, actualMin: 0 }] },
+    ]);
+  });
+
   it("計測中のタイマーは、現在時刻までの分数で数える", () => {
     const entries = [
       { minutes: null, startedAt: "2026-10-06T04:30:00Z", endedAt: null, projectId: "p1", task: null, plan: null },

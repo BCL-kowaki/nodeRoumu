@@ -5,7 +5,7 @@ import { toJstTime } from "@/lib/work/entry-time";
 import { formatMinutes } from "@/lib/work/labels";
 import { timeToMinutes } from "@/lib/work/timeline";
 import ProjectOptions, { TaskOptions } from "./ProjectOptions";
-import { api, entryTitle, inputClass, labelClass, type Plan, type Project, type Routine, type Task, type TimeEntry } from "./types";
+import { api, entryTitle, inputClass, labelClass, type Client, type Plan, type Project, type Routine, type Task, type TimeEntry } from "./types";
 
 function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -62,6 +62,7 @@ export function PlanEditor({
   date,
   tasks,
   projects,
+  clients,
   onClose,
   onSaved,
 }: {
@@ -69,15 +70,19 @@ export function PlanEditor({
   date: string;
   tasks: Task[];
   projects: Project[];
+  clients: Client[];
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const clientOfProject = (id: string) => projects.find((p) => p.id === id)?.clientId ?? "";
   const [form, setForm] = useState({
     title: plan?.title ?? "",
     startTime: plan?.startTime ?? "",
     plannedMinutes: plan ? String(plan.plannedMinutes) : "60",
     taskId: plan?.taskId ?? "",
     projectId: plan?.projectId ?? "",
+    // プロジェクトがあればそのクライアント、無ければ計画に直接つけたクライアント
+    clientId: (plan?.projectId ? clientOfProject(plan.projectId) : "") || plan?.clientId || "",
   });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -86,13 +91,16 @@ export function PlanEditor({
   // タスクを選んだら、タイトルが空ならタスク名を入れる
   const pickTask = (taskId: string) => {
     const t = tasks.find((x) => x.id === taskId);
-    setForm((f) => ({
-      ...f,
-      taskId,
-      title: f.title || t?.title || "",
-      projectId: f.projectId || t?.projectId || "",
-    }));
+    setForm((f) => {
+      const projectId = f.projectId || t?.projectId || "";
+      return { ...f, taskId, title: f.title || t?.title || "", projectId, clientId: projectId ? clientOfProject(projectId) : f.clientId };
+    });
   };
+  // クライアントを変えたら、別のクライアントのプロジェクトは外す
+  const pickClient = (clientId: string) =>
+    setForm((f) => ({ ...f, clientId, projectId: f.projectId && clientOfProject(f.projectId) !== clientId ? "" : f.projectId }));
+  // プロジェクトを選んだら、クライアントもそのプロジェクトのものにそろえる
+  const pickProject = (projectId: string) => setForm((f) => ({ ...f, projectId, clientId: projectId ? clientOfProject(projectId) : f.clientId }));
 
   const save = async () => {
     const minutes = toMinutes(form.plannedMinutes);
@@ -107,6 +115,7 @@ export function PlanEditor({
         plannedMinutes: minutes,
         taskId: form.taskId || null,
         projectId: form.projectId || null,
+        clientId: form.clientId || null,
       });
       if (plan) await api(`/api/work/plans/${plan.id}`, { method: "PUT", body });
       else await api("/api/work/plans", { method: "POST", body });
@@ -154,12 +163,29 @@ export function PlanEditor({
             <input id="plan-minutes" inputMode="numeric" className={inputClass} value={form.plannedMinutes} onChange={(e) => set("plannedMinutes", e.target.value)} />
           </div>
         </div>
-        <div>
-          <label className={labelClass} htmlFor="plan-project">プロジェクト（任意）</label>
-          <select id="plan-project" className={inputClass} value={form.projectId} onChange={(e) => set("projectId", e.target.value)}>
-            <option value="">（なし）</option>
-            <ProjectOptions projects={projects.filter((p) => p.status === "active" || p.status === "on_hold" || p.id === form.projectId)} />
-          </select>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div>
+            <label className={labelClass} htmlFor="plan-client">クライアント（任意）</label>
+            <select id="plan-client" className={inputClass} value={form.clientId} onChange={(e) => pickClient(e.target.value)}>
+              <option value="">（なし）</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="plan-project">プロジェクト（任意）</label>
+            <select id="plan-project" className={inputClass} value={form.projectId} onChange={(e) => pickProject(e.target.value)}>
+              <option value="">（なし）</option>
+              <ProjectOptions
+                projects={projects.filter(
+                  (p) => (p.status === "active" || p.status === "on_hold" || p.id === form.projectId) && (!form.clientId || p.clientId === form.clientId)
+                )}
+              />
+            </select>
+          </div>
         </div>
         {error && <div className="text-sm text-danger bg-danger-light rounded p-3 text-center">{error}</div>}
         <Buttons saving={saving} onSave={save} onClose={onClose} onDelete={plan ? remove : undefined} deleteLabel="この計画を削除" />

@@ -1,20 +1,21 @@
 // クライアント別の計画・実績の集計（決まった答えになる処理なのでテストで固定）
 // 計画・実績はプロジェクトを通してクライアントに振り分ける。
 // プロジェクトは「直接の指定 → タスクのプロジェクト → （実績なら）計画・ルーティンのプロジェクト」の順にたどる。
-// プロジェクトにたどり着かないルーティンの実績は、ルーティンのクライアントの「プロジェクトなし」に数える。
+// プロジェクトにたどり着かないものは、計画に直接つけたクライアント → ルーティンのクライアントの「プロジェクトなし」に数える。
 import { entryMinutes, type EntryLike } from "./time";
 
 type RoutineLink = { projectId: string | null; clientId: string | null } | null;
 type PlanLike = {
   plannedMinutes: number;
   projectId: string | null;
+  clientId?: string | null; // 計画に直接つけたクライアント（プロジェクトが無いときに使う）
   task: { projectId: string | null } | null;
   routine?: RoutineLink;
 };
 type ClientEntryLike = EntryLike & {
   projectId: string | null;
   task: { projectId: string | null } | null;
-  plan: { projectId: string | null } | null;
+  plan: { projectId: string | null; clientId?: string | null } | null;
   routine?: RoutineLink;
 };
 
@@ -50,14 +51,14 @@ export function summarizeByClient(input: {
   };
 
   for (const p of input.plans) {
-    add(p.projectId ?? p.task?.projectId ?? p.routine?.projectId ?? null, "plannedMin", p.plannedMinutes, p.routine?.clientId ?? null);
+    add(p.projectId ?? p.task?.projectId ?? p.routine?.projectId ?? null, "plannedMin", p.plannedMinutes, p.clientId ?? p.routine?.clientId ?? null);
   }
   for (const e of input.entries) {
     add(
       e.projectId ?? e.task?.projectId ?? e.plan?.projectId ?? e.routine?.projectId ?? null,
       "actualMin",
       entryMinutes(e, input.now),
-      e.routine?.clientId ?? null
+      e.plan?.clientId ?? e.routine?.clientId ?? null
     );
   }
 

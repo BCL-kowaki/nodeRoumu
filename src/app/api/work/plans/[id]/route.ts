@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { jstDateToDb } from "@/lib/date-jst";
 import { badRequest, notFound, requireWorkspace } from "@/lib/work/auth";
-import { LINK_INCLUDE, checkLinks } from "@/lib/work/links";
+import { LINK_INCLUDE, checkLinks, resolvePlanClient } from "@/lib/work/links";
 import { parsePlanInput } from "@/lib/work/validate";
 import { removePlanEvent, resyncPlanEvent } from "@/lib/work/plan-calendar";
 
@@ -23,6 +23,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (!current) return notFound();
   const linkError = await checkLinks(auth.ctx.ownerId, d);
   if (linkError) return badRequest(linkError);
+  const client = await resolvePlanClient(auth.ctx.ownerId, d, false);
+  if ("error" in client) return badRequest(client.error);
 
   const updated = await prisma.workPlan.update({
     where: { id: current.id },
@@ -33,6 +35,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       title: d.title,
       taskId: d.taskId,
       projectId: d.projectId,
+      clientId: client.clientId,
       routineId: d.routineId,
     },
     include: LINK_INCLUDE,

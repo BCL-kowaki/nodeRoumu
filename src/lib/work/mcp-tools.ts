@@ -94,6 +94,7 @@ type PlanRow = {
   plannedMinutes: number;
   taskId: string | null;
   projectId: string | null;
+  clientId?: string | null;
   routineId?: string | null;
   sourceEventId?: string | null;
   task?: Ref;
@@ -109,6 +110,7 @@ const slimPlan = (p: PlanRow) => ({
   task: refName(p.task),
   projectId: p.projectId ?? undefined,
   project: refName(p.project),
+  clientId: p.clientId ?? undefined,
   routineId: p.routineId ?? undefined,
   fromGoogleEvent: p.sourceEventId ? true : undefined,
 });
@@ -422,6 +424,7 @@ export function buildMcpServer(ctx: McpContext, onWrite?: (tool: string) => void
         plannedMinutes: z.number().int().min(1).max(1440),
         taskId: z.string().optional(),
         projectId: z.string().optional(),
+        clientId: z.string().optional().describe("クライアントID（プロジェクトを付けたときは、そのプロジェクトのクライアントになる）"),
         routineId: z.string().optional(),
       },
       annotations: write,
@@ -436,13 +439,15 @@ export function buildMcpServer(ctx: McpContext, onWrite?: (tool: string) => void
     "update_plan",
     {
       title: "計画を変更",
-      description: "開始時刻・長さ・タイトルなどを変える（送った項目だけ）。Google カレンダーに書き出し済みの計画は、カレンダーの予定も更新される。",
+      description: "開始時刻・長さ・タイトル・プロジェクト・クライアントなどを変える（送った項目だけ）。Google カレンダーに書き出し済みの計画は、カレンダーの予定も更新される。",
       inputSchema: {
         planId: id("計画"),
         title: z.string().min(1).max(200).optional(),
         startTime: time.nullable().optional(),
         plannedMinutes: z.number().int().min(1).max(1440).optional(),
         date: date.optional(),
+        projectId: z.string().nullable().optional().describe("プロジェクトID（外すときは null）"),
+        clientId: z.string().nullable().optional().describe("クライアントID（外すときは null。プロジェクトがある計画は、そのプロジェクトのクライアントになる）"),
       },
       annotations: writeExternal,
     },
