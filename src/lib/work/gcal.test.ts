@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  mergeCalendarEvents,
+  parseImportCalendar,
   PLAN_CALENDAR_NAME,
   calendarRange,
   checkCalendarAccount,
@@ -125,5 +127,67 @@ describe("needsRefresh（アクセストークンの期限）", () => {
 describe("定数", () => {
   it("専用カレンダーの名前", () => {
     expect(PLAN_CALENDAR_NAME).toBe("業務計画");
+  });
+});
+
+describe("parseImportCalendar（取り込むカレンダーの登録）", () => {
+  it("カレンダー ID と表示名を受け取る。表示名が無ければ ID を使う", () => {
+    expect(parseImportCalendar({ calendarId: " kowaki@gmail.com ", label: " 個人 " })).toEqual({
+      ok: true,
+      data: { calendarId: "kowaki@gmail.com", label: "個人" },
+    });
+    expect(parseImportCalendar({ calendarId: "abc123@group.calendar.google.com" })).toEqual({
+      ok: true,
+      data: { calendarId: "abc123@group.calendar.google.com", label: "abc123@group.calendar.google.com" },
+    });
+  });
+  it.each([
+    ["空", { calendarId: "" }, "カレンダー ID を入力してください"],
+    ["@ が無い", { calendarId: "primary" }, "カレンダー ID の形式が正しくありません（例: name@gmail.com）"],
+    ["空白を含む", { calendarId: "a b@gmail.com" }, "カレンダー ID の形式が正しくありません（例: name@gmail.com）"],
+    ["表示名が長い", { calendarId: "a@gmail.com", label: "あ".repeat(41) }, "表示名は40文字以内で入力してください"],
+  ])("%s ときはエラー", (_l, body, error) => {
+    expect(parseImportCalendar(body)).toEqual({ ok: false, error });
+  });
+});
+
+describe("expandEventToDays（取り込んだカレンダーの予定）", () => {
+  it("予定名が見えない予定（空き時間だけの共有）は、指定した名前にする", () => {
+    const r = expandEventToDays(
+      { id: "e1", start: { dateTime: "2026-10-29T10:00:00+09:00" }, end: { dateTime: "2026-10-29T11:00:00+09:00" } },
+      "2026-10-29",
+      "2026-10-29",
+      { untitled: "予定あり" }
+    );
+    expect(r[0].title).toBe("予定あり");
+  });
+});
+
+describe("mergeCalendarEvents（複数のカレンダーの予定をまとめる）", () => {
+  const ev = (id: string, o: Partial<{ uid: string; date: string; startTime: string | null; title: string }> = {}) => ({
+    id,
+    title: o.title ?? id,
+    date: o.date ?? "2026-10-29",
+    allDay: false,
+    startTime: o.startTime === undefined ? "10:00" : o.startTime,
+    endTime: "11:00",
+    uid: o.uid,
+  });
+  it("取り込んだカレンダーの予定に表示名を付け、日付・時刻順に並べる", () => {
+    const r = mergeCalendarEvents([
+      { label: null, events: [ev("a", { startTime: "13:00" })] },
+      { label: "個人", events: [ev("b", { startTime: "09:00" })] },
+    ]);
+    expect(r.map((e) => [e.id, e.calendar])).toEqual([
+      ["b", "個人"],
+      ["a", undefined],
+    ]);
+  });
+  it("同じ予定（uid と日時が同じ）が複数のカレンダーにあれば、先のカレンダー（会社）のものだけ残す", () => {
+    const r = mergeCalendarEvents([
+      { label: null, events: [ev("a", { uid: "x@google.com" })] },
+      { label: "取引先", events: [ev("b", { uid: "x@google.com" }), ev("c", { uid: "x@google.com", date: "2026-10-30" })] },
+    ]);
+    expect(r.map((e) => e.id)).toEqual(["a", "c"]);
   });
 });

@@ -32,7 +32,7 @@ import { assignClientColors, clientIdFor } from "@/lib/work/client-colors";
 import { useCollapsedClients } from "./useCollapsedClients";
 import { entryTitle, type CheckStatus, type Client, type Plan, type Project, type Routine, type TimeEntry } from "./types";
 
-export type DayGoogleEvent = { id: string; title: string; allDay: boolean; startTime: string | null; endTime: string | null };
+export type DayGoogleEvent = { id: string; title: string; allDay: boolean; startTime: string | null; endTime: string | null; calendar?: string };
 
 // その日に実施するルーティン（実施状況つき）
 export type DayRoutine = { routine: Routine; status: CheckStatus };
@@ -777,13 +777,15 @@ export default function DayTimeline({
                         left: `calc(${(lay.col / lay.cols) * 100}% + 2px)`,
                         width: `calc(${100 / lay.cols}% - 4px)`,
                       }}
-                      title={`${e.title}（${e.startTime}〜${e.endTime}）${imported ? "・計画に取り込み済み" : "・押すと計画に取り込む"}`}
+                      title={`${e.title}（${e.startTime}〜${e.endTime}）${e.calendar ? `［${e.calendar}］` : ""}${imported ? "・計画に取り込み済み" : "・押すと計画に取り込む"}`}
                       aria-label={`Google の予定「${e.title}」${e.startTime}〜${e.endTime}${imported ? "（計画に取り込み済み）" : "。押すと計画に取り込む"}`}
                     >
                       <div className={`flex items-center gap-0.5 text-[11px] truncate ${imported ? "text-app-sub" : "text-app-text"}`}>
                         {imported && <Check size={10} className="shrink-0" aria-hidden />}
                         {e.title}
                       </div>
+                      {/* 取り込んだカレンダー（個人・取引先など）の予定は、どのカレンダーかを出す */}
+                      {e.calendar && <div className="text-[9px] text-app-sub truncate">{e.calendar}</div>}
                     </button>
                   );
                 })}

@@ -11,6 +11,7 @@ import {
   PLAN_CALENDAR_NAME,
   calendarRange,
   expandEventToDays,
+  mergeCalendarEvents,
   type DayEvent,
   type EventBody,
   type GoogleCalendarEvent,
@@ -166,29 +167,61 @@ async function cal(token: string, path: string, init?: RequestInit): Promise<Res
     cache: "no-store",
   });
   if (!res.ok && !(init?.method === "DELETE" && (res.status === 404 || res.status === 410))) {
-    console.error(`Google Calendar API エラー: ${init?.method ?? "GET"} ${path.split("?")[0]} → ${res.status}`);
+    // カレンダー ID（Gmail のアドレスなど）は記録に残さない
+    const safePath = path.split("?")[0].replace(/\/calendars\/[^/]+/, "/calendars/…");
+    console.error(`Google Calendar API エラー: ${init?.method ?? "GET"} ${safePath} → ${res.status}`);
     throw new GcalError(res.status);
   }
   return res;
 }
 
-// 期間内の予定（メインのカレンダー）を、日ごとの表示用に展開して返す
-export async function listDayEvents(ownerId: string, from: string, to: string): Promise<DayEvent[]> {
-  const token = await getAccessToken(ownerId);
+// 1つのカレンダーの期間内の予定（最大 250件 × 5ページ）
+async function fetchCalendarEvents(token: string, calendarId: string, from: string, to: string): Promise<GoogleCalendarEvent[]> {
   const { timeMin, timeMax } = calendarRange(from, to);
   const events: GoogleCalendarEvent[] = [];
   let pageToken: string | undefined;
   for (let page = 0; page < 5; page++) {
     const q = new URLSearchParams({ timeMin, timeMax, singleEvents: "true", orderBy: "startTime", maxResults: "250" });
     if (pageToken) q.set("pageToken", pageToken);
-    const data = (await (await cal(token, `/calendars/primary/events?${q}`)).json()) as { items?: GoogleCalendarEvent[]; nextPageToken?: string };
+    const data = (await (await cal(token, `/calendars/${encodeURIComponent(calendarId)}/events?${q}`)).json()) as {
+      items?: GoogleCalendarEvent[];
+      nextPageToken?: string;
+    };
     events.push(...(data.items ?? []));
     pageToken = data.nextPageToken;
     if (!pageToken) break;
   }
-  return events
-    .flatMap((e) => expandEventToDays(e, from, to))
-    .sort((a, b) => a.date.localeCompare(b.date) || (a.startTime ?? "").localeCompare(b.startTime ?? ""));
+  return events;
+}
+
+// 期間内の予定を、日ごとの表示用に展開して返す。会社のメインのカレンダーに、登録した取り込み用のカレンダーを加える。
+// 取り込み用のカレンダーが読めない（共有が外れた等）ときは、そのカレンダーだけ飛ばす（メインの予定は出す）
+export async function listDayEvents(ownerId: string, from: string, to: string): Promise<DayEvent[]> {
+  const token = await getAccessToken(ownerId);
+  const imports = await prisma.googleImportCalendar.findMany({ where: { ownerId }, orderBy: { createdAt: "asc" } });
+  const expand = (events: GoogleCalendarEvent[], untitled?: string) => events.flatMap((e) => expandEventToDays(e, from, to, { untitled }));
+  const [primary, ...extra] = await Promise.all([
+    fetchCalendarEvents(token, "primary", from, to),
+    ...imports.map((c) => fetchCalendarEvents(token, c.calendarId, from, to).catch(() => null)),
+  ]);
+  return mergeCalendarEvents([
+    { label: null, events: expand(primary!) },
+    ...imports.flatMap((c, i) => (extra[i] ? [{ label: c.label, events: expand(extra[i]!, "予定あり") }] : [])),
+  ]);
+}
+
+// 取り込み用のカレンダーを読めるか（登録する前の確認）。読めなければ理由を返す
+export async function checkImportCalendar(ownerId: string, calendarId: string): Promise<string | null> {
+  try {
+    const token = await getAccessToken(ownerId);
+    await cal(token, `/calendars/${encodeURIComponent(calendarId)}/events?maxResults=1`);
+    return null;
+  } catch (e) {
+    if (e instanceof GcalError && (e.status === 404 || e.status === 403)) {
+      return "このカレンダーを読めません。カレンダーが接続中の Google アカウントに共有されているか、ID が正しいかを確認してください";
+    }
+    return gcalErrorMessage(e);
+  }
 }
 
 // 書き出し先の専用カレンダー「業務計画」。無ければ作る

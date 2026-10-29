@@ -11,6 +11,7 @@ import { formatMinutes } from "@/lib/work/labels";
 import { WEEKDAY_NAMES } from "@/lib/work/recurrence";
 import { planEventEnd } from "@/lib/work/gcal";
 import PageTitle from "@/components/PageTitle";
+import ImportCalendars from "@/components/work/ImportCalendars";
 
 type GStatus = {
   configured: boolean;
@@ -22,7 +23,7 @@ type GStatus = {
   driveGranted: boolean;
   lastSyncedAt: string | null;
 };
-type DayEvent = { id: string; title: string; date: string; allDay: boolean; startTime: string | null; endTime: string | null; htmlLink?: string };
+type DayEvent = { id: string; title: string; date: string; allDay: boolean; startTime: string | null; endTime: string | null; htmlLink?: string; calendar?: string };
 
 const ERRORS: Record<string, string> = {
   not_configured: "Google の設定（クライアントID など）が見つかりません",
@@ -150,6 +151,7 @@ function SchedulePage() {
             <button onClick={disconnect} disabled={busy} className="ml-auto text-[11px] text-app-sub bg-transparent border-none cursor-pointer p-0">
               接続を解除
             </button>
+            {gs.status === "active" && <ImportCalendars connectedEmail={gs.email ?? null} onChanged={load} />}
             {gs.status === "active" && !gs.driveGranted && (
               <div className="w-full mt-1 text-xs text-app-text bg-accent-light rounded p-2.5 leading-relaxed">
                 タスクに資料を添付するには、Google ドライブの権限を追加するため一度接続し直してください（カレンダーの設定はそのまま残ります）。
@@ -185,7 +187,7 @@ function SchedulePage() {
         const items = [
           ...events
             .filter((e) => e.date === d)
-            .map((e, i) => ({ key: `g-${e.id}-${i}`, kind: "google" as const, sort: e.allDay ? "" : e.startTime ?? "", time: e.allDay ? "終日" : `${e.startTime}〜${e.endTime}`, title: e.title })),
+            .map((e, i) => ({ key: `g-${e.id}-${i}`, kind: "google" as const, sort: e.allDay ? "" : e.startTime ?? "", time: e.allDay ? "終日" : `${e.startTime}〜${e.endTime}`, title: e.title, calendar: e.calendar })),
           ...plans
             .filter((p) => p.date.slice(0, 10) === d)
             .map((p) => ({
@@ -194,6 +196,7 @@ function SchedulePage() {
               sort: p.startTime ?? "",
               time: p.startTime ? `${p.startTime}〜${planEventEnd(d, p.startTime, p.plannedMinutes).time}` : formatMinutes(p.plannedMinutes),
               title: p.title,
+              calendar: undefined as string | undefined,
             })),
         ].sort((x, y) => x.sort.localeCompare(y.sort));
         return (
@@ -208,7 +211,7 @@ function SchedulePage() {
                 <div key={it.key} className="flex items-center gap-2 py-1.5 border-b border-app-border last:border-b-0">
                   <div className="text-[11px] text-app-sub w-[84px] shrink-0 tabular-nums">{it.time}</div>
                   <div className="flex-1 min-w-0 text-sm text-app-text truncate">{it.title}</div>
-                  {it.kind === "google" ? <Badge type="default">Google</Badge> : <Badge type="success">計画</Badge>}
+                  {it.kind === "google" ? <Badge type="default">{it.calendar ?? "Google"}</Badge> : <Badge type="success">計画</Badge>}
                 </div>
               ))
             )}

@@ -49,6 +49,7 @@ export function planEventBody(plan: PlanForCalendar): EventBody | null {
 
 export type GoogleCalendarEvent = {
   id: string;
+  iCalUID?: string;
   status?: string;
   summary?: string;
   htmlLink?: string;
@@ -64,6 +65,8 @@ export type DayEvent = {
   startTime: string | null;
   endTime: string | null;
   htmlLink?: string;
+  uid?: string; // 同じ予定を複数のカレンダーから取り込んだときに見分けるための ID（iCalUID）
+  calendar?: string; // 取り込んだカレンダーの表示名（会社のメインのカレンダーは無し）
 };
 
 // 時刻つきの日時文字列を、日本時間の { date, time } にする（UTC・他のタイムゾーンで返っても揃える）
@@ -75,22 +78,24 @@ function toJst(dateTime: string): { date: string; time: string } {
 // Google の予定を、表示期間 [from, to]（日本時間の日付）の日ごとの表示用に展開する
 // - 時刻つき: 開始日に入れる（日をまたぐ予定も開始日のみ）
 // - 終日: 開始日〜終了日の前日まで日ごとに展開する（Google の終了日は「含まない」日付）
-export function expandEventToDays(ev: GoogleCalendarEvent, from: string, to: string): DayEvent[] {
+export function expandEventToDays(ev: GoogleCalendarEvent, from: string, to: string, opts: { untitled?: string } = {}): DayEvent[] {
   if (ev.status === "cancelled") return [];
-  const title = ev.summary?.trim() || "（タイトルなし）";
+  // 予定名が無いもの：自分のカレンダーは「（タイトルなし）」、空き時間だけ共有されたカレンダーなどは指定した名前
+  const title = ev.summary?.trim() || opts.untitled || "（タイトルなし）";
+  const uid = ev.iCalUID;
 
   if (ev.start.dateTime && ev.end.dateTime) {
     const s = toJst(ev.start.dateTime);
     const e = toJst(ev.end.dateTime);
     if (s.date < from || s.date > to) return [];
-    return [{ id: ev.id, title, date: s.date, allDay: false, startTime: s.time, endTime: e.time, htmlLink: ev.htmlLink }];
+    return [{ id: ev.id, title, date: s.date, allDay: false, startTime: s.time, endTime: e.time, htmlLink: ev.htmlLink, ...(uid ? { uid } : {}) }];
   }
 
   if (ev.start.date) {
     const endExclusive = ev.end.date ?? addDays(ev.start.date, 1);
     const days: DayEvent[] = [];
     for (let d = ev.start.date; d < endExclusive; d = addDays(d, 1)) {
-      if (d >= from && d <= to) days.push({ id: ev.id, title, date: d, allDay: true, startTime: null, endTime: null, htmlLink: ev.htmlLink });
+      if (d >= from && d <= to) days.push({ id: ev.id, title, date: d, allDay: true, startTime: null, endTime: null, htmlLink: ev.htmlLink, ...(uid ? { uid } : {}) });
     }
     return days;
   }
@@ -122,4 +127,36 @@ export function checkCalendarAccount(
 export function needsRefresh(expiresAt: Date | null, now: Date): boolean {
   if (!expiresAt) return true;
   return expiresAt.getTime() - now.getTime() < REFRESH_MARGIN_MS;
+}
+
+// 取り込むカレンダーの登録（カレンダー ID は Gmail のアドレスや xxx@group.calendar.google.com の形）
+const MAX_CAL_LABEL = 40;
+export function parseImportCalendar(body: unknown): { ok: true; data: { calendarId: string; label: string } } | { ok: false; error: string } {
+  const b = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+  const calendarId = typeof b.calendarId === "string" ? b.calendarId.trim() : "";
+  if (!calendarId) return { ok: false, error: "カレンダー ID を入力してください" };
+  if (calendarId.length > 255 || !/^[^\s@]+@[^\s@]+$/.test(calendarId)) {
+    return { ok: false, error: "カレンダー ID の形式が正しくありません（例: name@gmail.com）" };
+  }
+  const label = typeof b.label === "string" ? b.label.trim() : "";
+  if (label.length > MAX_CAL_LABEL) return { ok: false, error: `表示名は${MAX_CAL_LABEL}文字以内で入力してください` };
+  return { ok: true, data: { calendarId, label: label || calendarId } };
+}
+
+// 複数のカレンダーの予定を1つにまとめる。取り込んだカレンダーの予定には表示名を付ける。
+// 同じ予定（uid・日付・開始時刻が同じ）は、先に渡したカレンダー（会社のメイン）のものだけ残す。日付・時刻順
+export function mergeCalendarEvents(lists: { label: string | null; events: DayEvent[] }[]): DayEvent[] {
+  const seen = new Set<string>();
+  const out: DayEvent[] = [];
+  for (const { label, events } of lists) {
+    for (const e of events) {
+      if (e.uid) {
+        const key = `${e.uid}|${e.date}|${e.startTime ?? ""}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+      }
+      out.push(label ? { ...e, calendar: label } : e);
+    }
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date) || (a.startTime ?? "").localeCompare(b.startTime ?? ""));
 }

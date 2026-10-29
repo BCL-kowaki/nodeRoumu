@@ -40,19 +40,20 @@ model Employee {
   dakoku     Dakoku[]
 
   // 業務管理（代表者のみ利用）
-  workProjects        WorkProject[]
-  workClients         WorkClient[]
-  workDailyNotes      WorkDailyNote[]
-  taskAttachments     TaskAttachment[]
-  apiTokens           ApiToken[]
-  attendanceChanges   AttendanceChange[]
-  noteShares          NoteShare[]
-  workTasks           WorkTask[]
-  routines            Routine[]
-  workPlans           WorkPlan[]
-  timeEntries         TimeEntry[]
-  githubRepos         GithubRepo[]
-  integrationAccounts IntegrationAccount[]
+  workProjects          WorkProject[]
+  workClients           WorkClient[]
+  workDailyNotes        WorkDailyNote[]
+  googleImportCalendars GoogleImportCalendar[]
+  taskAttachments       TaskAttachment[]
+  apiTokens             ApiToken[]
+  attendanceChanges     AttendanceChange[]
+  noteShares            NoteShare[]
+  workTasks             WorkTask[]
+  routines              Routine[]
+  workPlans             WorkPlan[]
+  timeEntries           TimeEntry[]
+  githubRepos           GithubRepo[]
+  integrationAccounts   IntegrationAccount[]
 }
 
 model Attendance {
@@ -503,6 +504,20 @@ model GithubRepo {
 
   @@unique([ownerId, githubId])
   @@index([projectId])
+}
+
+// 予定を取り込む Google カレンダー（会社のメイン以外。個人の Gmail や取引先から共有されたカレンダー）。
+// 読み取りは接続中の Google アカウントの権限で行う（共有されていないカレンダーは読めない）
+model GoogleImportCalendar {
+  id         String   @id @default(cuid())
+  ownerId    String
+  calendarId String // 例: name@gmail.com
+  label      String // 画面に出す名前（例: 個人）
+  createdAt  DateTime @default(now())
+
+  owner Employee @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, calendarId])
 }
 
 // 外部サービス（Google カレンダー）との接続情報。トークンは必ず暗号化して保存する（src/lib/crypto.ts）
