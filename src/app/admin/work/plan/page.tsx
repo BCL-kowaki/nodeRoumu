@@ -25,7 +25,7 @@ import {
 } from "@/components/work/types";
 import { dayOfWeek } from "@/lib/attendance-status";
 import { addDays, todayJst } from "@/lib/date-jst";
-import { sumDaySummaries, weekRange } from "@/lib/work/day-breakdown";
+import { monthRange, shiftMonth, sumDaySummaries, weekRange } from "@/lib/work/day-breakdown";
 import { formatMinutes } from "@/lib/work/labels";
 import { WEEKDAY_NAMES } from "@/lib/work/recurrence";
 import PageTitle from "@/components/PageTitle";
@@ -34,7 +34,7 @@ import PageTitle from "@/components/PageTitle";
 const VIEW_KEY = "node-portal:plan-view";
 const SPAN_KEY = "node-portal:plan-span";
 type View = "timeline" | "list";
-type Span = "day" | "week";
+type Span = "day" | "week" | "month";
 const remember = (key: string, value: string) => {
   try {
     localStorage.setItem(key, value);
@@ -70,8 +70,10 @@ export default function WorkPlanPage() {
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null | "new">(null);
 
   // 週の一覧では、その日を含む週（月曜〜日曜）を読む。タイムラインはいつも1日
-  const isWeek = view === "list" && span === "week";
-  const range = isWeek ? weekRange(date) : { from: date, to: date };
+  // isWeek は「1日より長い期間（週・月）」の意味で使う。isMonth は月のカレンダー表示
+  const isMonth = view === "list" && span === "month";
+  const isWeek = view === "list" && (span === "week" || isMonth);
+  const range = isMonth ? monthRange(date) : isWeek ? weekRange(date) : { from: date, to: date };
 
   // クライアントごとのメモ（日報）と前回からの引き継ぎ。失敗しても画面は使えるようにする
   const loadNotes = useCallback(async () => {
@@ -94,7 +96,9 @@ export default function WorkPlanPage() {
         api<Client[]>("/api/work/clients"),
         api<Routine[]>("/api/work/routines"),
         api<{ days: RoutineDay[] }>(`/api/work/routines/checks?${q}`),
-        isWeek ? Promise.resolve([] as Task[]) : api<Task[]>(`/api/work/tasks?status=done&completedOn=${range.from}`),
+        isWeek && !isMonth
+          ? Promise.resolve([] as Task[])
+          : api<Task[]>(`/api/work/tasks?status=done&completedFrom=${range.from}&completedTo=${range.to}`),
       ]);
       setDoneTasks(dt);
       setPlans(p);
@@ -123,7 +127,7 @@ export default function WorkPlanPage() {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range.from, range.to, isWeek]);
+  }, [range.from, range.to, isWeek, isMonth]);
 
   useEffect(() => {
     load();
@@ -132,7 +136,8 @@ export default function WorkPlanPage() {
   useEffect(() => {
     try {
       if (localStorage.getItem(VIEW_KEY) === "list") setView("list");
-      if (localStorage.getItem(SPAN_KEY) === "week") setSpan("week");
+      const savedSpan = localStorage.getItem(SPAN_KEY);
+      if (savedSpan === "week" || savedSpan === "month") setSpan(savedSpan);
     } catch {
       // 保存できない環境ではタイムラインで始める
     }
@@ -151,9 +156,16 @@ export default function WorkPlanPage() {
   const today = todayJst();
   const isToday = date === today;
   const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}（${WEEKDAY_NAMES[dayOfWeek(d)]}）`;
-  const label = isWeek ? `${md(range.from)}〜${md(range.to)}` : md(date);
+  const label = isMonth
+    ? `${date.slice(0, 4)}年${Number(date.slice(5, 7))}月`
+    : isWeek
+      ? `${md(range.from)}〜${md(range.to)}`
+      : md(date);
   const inRange = range.from <= today && today <= range.to;
   const step = isWeek ? 7 : 1;
+  // ← → で前後へ（月は前後の月の1日へ）
+  const move = (dir: 1 | -1) => setDate(isMonth ? shiftMonth(date, dir) : addDays(date, dir * step));
+  const unit = isMonth ? "月" : isWeek ? "週" : "日";
 
   // タスク・ルーティン・Google の予定を時間に置く → その時間の計画を作る
   const createPlan = async (plan: NewPlan) => {
@@ -210,11 +222,11 @@ export default function WorkPlanPage() {
       <div className="flex flex-wrap items-center gap-2">
         <PageTitle className="mr-auto">計画・実績</PageTitle>
         <div className="flex items-center gap-1">
-          <button onClick={() => setDate(addDays(date, -step))} aria-label={isWeek ? "前の週" : "前の日"} className="px-2 py-1 text-sm text-primary bg-transparent border-none cursor-pointer">←</button>
+          <button onClick={() => move(-1)} aria-label={`前の${unit}`} className="px-2 py-1 text-sm text-primary bg-transparent border-none cursor-pointer">←</button>
           <div className="text-sm font-bold min-w-[96px] text-center">{label}</div>
-          <button onClick={() => setDate(addDays(date, step))} aria-label={isWeek ? "次の週" : "次の日"} className="px-2 py-1 text-sm text-primary bg-transparent border-none cursor-pointer">→</button>
+          <button onClick={() => move(1)} aria-label={`次の${unit}`} className="px-2 py-1 text-sm text-primary bg-transparent border-none cursor-pointer">→</button>
           {!inRange && (
-            <button onClick={() => setDate(today)} className="ml-1 px-2 py-1 rounded border border-primary text-primary text-xs bg-white cursor-pointer">{isWeek ? "今週" : "今日"}</button>
+            <button onClick={() => setDate(today)} className="ml-1 px-2 py-1 rounded border border-primary text-primary text-xs bg-white cursor-pointer">{isMonth ? "今月" : isWeek ? "今週" : "今日"}</button>
           )}
         </div>
       </div>
@@ -273,6 +285,7 @@ export default function WorkPlanPage() {
                       options={[
                         { v: "day", label: "日" },
                         { v: "week", label: "週" },
+                        { v: "month", label: "月" },
                       ]}
                     />
                   )}
@@ -290,6 +303,8 @@ export default function WorkPlanPage() {
               routines={allRoutines}
               now={new Date()}
               days={isWeek ? summaryDays : undefined}
+              month={isMonth ? date : undefined}
+              completedTasks={isMonth ? doneTasks : undefined}
               date={isWeek ? undefined : date}
               notes={isWeek ? undefined : dailyNotes}
               onNotesChanged={loadNotes}

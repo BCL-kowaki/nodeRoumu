@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { breakdownByClient, compareByClient, sumDaySummaries, weekRange } from "./day-breakdown";
+import { breakdownByClient, compareByClient, minutesByDayClient, monthGrid, monthRange, shiftMonth, sumDaySummaries, weekRange } from "./day-breakdown";
 
 describe("breakdownByClient（1日の計画・実績の内訳）", () => {
   it("クライアントごとに合計し、時間の長い順に並べる。クライアントなしは最後", () => {
@@ -111,5 +111,44 @@ describe("sumDaySummaries（期間の合計）", () => {
   });
   it("出勤簿の記録が1日も無ければ null", () => {
     expect(sumDaySummaries([d(60, 30, null, null)])).toEqual({ plannedMin: 60, actualMin: 30, attendanceMin: null, unrecordedMin: null });
+  });
+});
+
+describe("monthRange / shiftMonth（月の範囲と月送り）", () => {
+  it("その日を含む月の1日〜末日", () => {
+    expect(monthRange("2026-10-29")).toEqual({ from: "2026-10-01", to: "2026-10-31" });
+    expect(monthRange("2028-02-10")).toEqual({ from: "2028-02-01", to: "2028-02-29" }); // うるう年
+  });
+  it("前後の月の1日（年をまたぐ）", () => {
+    expect(shiftMonth("2026-10-29", 1)).toBe("2026-11-01");
+    expect(shiftMonth("2026-01-31", -1)).toBe("2025-12-01");
+    expect(shiftMonth("2026-12-15", 1)).toBe("2027-01-01");
+  });
+});
+
+describe("monthGrid（月のカレンダーのマス。月曜はじまり）", () => {
+  it("週ごとに7マス。月の前後は null で埋める", () => {
+    const g = monthGrid("2026-10-15"); // 2026-10-01 は木曜
+    expect(g[0]).toEqual([null, null, null, "2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04"]);
+    expect(g[g.length - 1]).toEqual(["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", null]);
+    expect(g.every((w) => w.length === 7)).toBe(true);
+    expect(g.flat().filter(Boolean)).toHaveLength(31);
+  });
+});
+
+describe("minutesByDayClient（日ごと・クライアントごとの分数）", () => {
+  it("日付とクライアントで足し、時間の長いクライアント順に並べる。0分は除く", () => {
+    const m = minutesByDayClient([
+      { date: "2026-10-01", clientId: "a", minutes: 30 },
+      { date: "2026-10-01", clientId: "b", minutes: 60 },
+      { date: "2026-10-01", clientId: "a", minutes: 40 },
+      { date: "2026-10-02", clientId: null, minutes: 15 },
+      { date: "2026-10-02", clientId: "a", minutes: 0 },
+    ]);
+    expect(m.get("2026-10-01")).toEqual([
+      { clientId: "a", minutes: 70 },
+      { clientId: "b", minutes: 60 },
+    ]);
+    expect(m.get("2026-10-02")).toEqual([{ clientId: null, minutes: 15 }]);
   });
 });

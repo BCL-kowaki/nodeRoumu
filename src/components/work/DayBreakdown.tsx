@@ -3,7 +3,8 @@
 import { useMemo, type ReactNode } from "react";
 import Card from "@/components/Card";
 import { assignClientColors, clientIdFor } from "@/lib/work/client-colors";
-import { breakdownByClient, compareByClient, type BreakdownGroup, type BreakdownRow, type ClientDiff } from "@/lib/work/day-breakdown";
+import { breakdownByClient, compareByClient, minutesByDayClient, monthGrid, type BreakdownGroup, type BreakdownRow, type ClientDiff } from "@/lib/work/day-breakdown";
+import { toJstDateStr, todayJst } from "@/lib/date-jst";
 import { formatMinutes } from "@/lib/work/labels";
 import { entryMinutes } from "@/lib/work/time";
 import { dayOfWeek } from "@/lib/attendance-status";
@@ -36,6 +37,8 @@ export default function DayBreakdown({
   doneTasks,
   onOpenTask,
   onTasksChanged,
+  month,
+  completedTasks,
 }: {
   plans: Plan[];
   entries: TimeEntry[];
@@ -55,6 +58,9 @@ export default function DayBreakdown({
   doneTasks?: Task[];
   onOpenTask?: (t: Task) => void;
   onTasksChanged?: () => void;
+  // 月の一覧のときだけ渡す：その月の日付（どの日でも可）と、その月に完了したタスク
+  month?: string;
+  completedTasks?: Task[];
 }) {
   const colors = useMemo(() => assignClientColors(clients), [clients]);
   const order = clients.map((c) => c.id);
@@ -135,21 +141,161 @@ export default function DayBreakdown({
           colors={colors}
         />
       )}
-      {days && days.length > 0 && <ByDay days={days} onOpenDay={onOpenDay} />}
+      {month && days ? (
+        <MonthCalendar
+          month={month}
+          days={days}
+          actualByDay={minutesByDayClient(
+            entries.map((e) => ({ date: e.date.slice(0, 10), clientId: clientIdFor(e, projects, routines), minutes: entryMinutes(e, now) }))
+          )}
+          colors={colors}
+          onOpenDay={onOpenDay}
+        />
+      ) : (
+        days && days.length > 0 && <ByDay days={days} onOpenDay={onOpenDay} />
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
-        <Section kind="plan" title="計画" caption="何をどれだけ計画したか" data={planned} empty="この日の計画はまだありません" {...props} />
+        <Section kind="plan" title="計画" caption="何をどれだけ計画したか" data={planned} empty={days ? "この期間の計画はまだありません" : "この日の計画はまだありません"} {...props} />
         <Section
           kind="actual"
           title="実績"
           caption={withNotes ? "何に何時間使ったか・引き継ぎメモ" : "実際に何に何時間使ったか"}
           data={actual}
-          empty="この日の実績はまだありません"
+          empty={days ? "この期間の実績はまだありません" : "この日の実績はまだありません"}
           renderNote={renderNote}
           extraClients={extraClients}
           {...props}
         />
       </div>
+      {month && completedTasks && <CompletedTasks tasks={completedTasks} clients={clients} projects={projects} colors={colors} />}
     </div>
+  );
+}
+
+// 月のカレンダー（月曜はじまり）。各日のマスに計画・実績の時間と、実績をクライアントの色で分けた帯を出す。押すとその日の一覧へ
+function MonthCalendar({
+  month,
+  days,
+  actualByDay,
+  colors,
+  onOpenDay,
+}: {
+  month: string;
+  days: DaySummary[];
+  actualByDay: Map<string, { clientId: string | null; minutes: number }[]>;
+  colors: Map<string, string>;
+  onOpenDay?: (date: string) => void;
+}) {
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  const today = todayJst();
+  const short = (m: number) => (m === 0 ? "" : m % 60 === 0 ? `${m / 60}h` : `${(m / 60).toFixed(1)}h`);
+  return (
+    <Card className="!p-0 overflow-hidden">
+      <div className="px-4 py-3 border-b border-app-border flex flex-wrap items-baseline gap-x-3">
+        <div className="text-sm font-bold text-app-text">月のカレンダー</div>
+        <div className="text-[11px] text-app-sub">各日の「計」は計画、「実」は実績。帯は実績をクライアントの色で分けたもの。日付を押すとその日の一覧を開きます</div>
+      </div>
+      <div className="grid grid-cols-7 text-center text-[10px] text-app-sub bg-app-bg border-b border-app-border">
+        {["月", "火", "水", "木", "金", "土", "日"].map((w, i) => (
+          <div key={w} className={`py-1 ${i === 5 ? "text-[#2F6FDB]" : i === 6 ? "text-danger" : ""}`}>
+            {w}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7">
+        {monthGrid(month)
+          .flat()
+          .map((d, i) => {
+            if (!d) return <div key={`e${i}`} className="min-h-[64px] sm:min-h-[84px] border-b border-r border-app-border bg-app-bg/40" />;
+            const s = byDate.get(d);
+            const parts = actualByDay.get(d) ?? [];
+            const actual = parts.reduce((n, p) => n + p.minutes, 0);
+            const dow = dayOfWeek(d);
+            return (
+              <button
+                key={d}
+                type="button"
+                onClick={() => onOpenDay?.(d)}
+                disabled={!onOpenDay}
+                aria-label={`${Number(d.slice(5, 7))}月${Number(d.slice(8, 10))}日 計画${fmt(s?.plannedMin ?? 0)} 実績${fmt(actual)}`}
+                className={`min-h-[64px] sm:min-h-[84px] p-1 sm:p-1.5 flex flex-col gap-0.5 text-left border-0 border-b border-r border-app-border bg-white cursor-pointer hover:bg-app-bg disabled:cursor-default ${
+                  d === today ? "ring-2 ring-inset ring-accent" : ""
+                }`}
+              >
+                <span className={`text-[11px] font-bold tabular-nums ${dow === 0 ? "text-danger" : dow === 6 ? "text-[#2F6FDB]" : "text-app-text"}`}>
+                  {Number(d.slice(8, 10))}
+                </span>
+                {(s?.plannedMin ?? 0) > 0 && <span className="text-[9px] sm:text-[10px] text-app-sub tabular-nums leading-tight">計 {short(s!.plannedMin)}</span>}
+                {actual > 0 && <span className="text-[9px] sm:text-[10px] font-bold text-app-text tabular-nums leading-tight">実 {short(actual)}</span>}
+                {actual > 0 && (
+                  <span className="mt-auto flex h-1.5 w-full rounded-full overflow-hidden bg-app-bg" aria-hidden>
+                    {parts.map((p) => (
+                      <span
+                        key={p.clientId ?? "none"}
+                        style={{ width: `${(p.minutes / actual) * 100}%`, background: (p.clientId && colors.get(p.clientId)) || NO_CLIENT }}
+                      />
+                    ))}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+      </div>
+    </Card>
+  );
+}
+
+// その月に完了したタスク（クライアントごと）
+function CompletedTasks({ tasks, clients, projects, colors }: { tasks: Task[]; clients: Client[]; projects: Project[]; colors: Map<string, string> }) {
+  const groups = [
+    ...clients.map((c) => ({ id: c.id as string | null, name: c.name, tasks: tasksOfClient(tasks, c.id, projects) })),
+    { id: null, name: "クライアントなし・その他", tasks: tasks.filter((t) => !t.projectId || !projects.some((p) => p.id === t.projectId)) },
+  ].filter((g) => g.tasks.length > 0);
+  return (
+    <Card className="!p-0 overflow-hidden">
+      <div className="flex items-end justify-between gap-3 px-4 py-3 border-b border-app-border">
+        <div>
+          <div className="text-sm font-bold text-app-text">完了したタスク</div>
+          <div className="text-[11px] text-app-sub">この月に完了にしたタスク（クライアントごと）</div>
+        </div>
+        <div className="text-right">
+          <div className="text-[10px] text-app-sub">合計</div>
+          <div className="text-lg font-bold text-app-text tabular-nums leading-tight">{tasks.length}件</div>
+        </div>
+      </div>
+      {groups.length === 0 ? (
+        <div className="px-4 py-8 text-center text-xs text-app-sub">この月に完了したタスクはまだありません</div>
+      ) : (
+        <ul className="list-none m-0 p-0 md:grid md:grid-cols-2">
+          {groups.map((g) => (
+            <li key={g.id ?? "__none__"} className="px-4 py-3 border-b border-app-border md:odd:border-r">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: (g.id && colors.get(g.id)) || NO_CLIENT }} aria-hidden />
+                <span className="flex-1 min-w-0 truncate text-xs font-bold text-app-text">{g.name}</span>
+                <span className="text-xs font-bold text-app-text tabular-nums">{g.tasks.length}件</span>
+              </div>
+              <ul className="list-none m-0 p-0 pl-[18px] flex flex-col gap-0.5">
+                {[...g.tasks]
+                  .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""))
+                  .map((t) => (
+                    <li key={t.id} className="flex items-baseline gap-2 text-[12.5px] text-app-text">
+                      <span className="flex-1 min-w-0 truncate">✓ {t.title}</span>
+                      {t.completedAt && (
+                        <span className="shrink-0 text-[10px] text-app-sub tabular-nums">
+                          {(() => {
+                            const d = toJstDateStr(new Date(t.completedAt));
+                            return `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+                          })()}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }
 

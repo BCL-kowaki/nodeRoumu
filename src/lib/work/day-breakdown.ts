@@ -77,3 +77,43 @@ export function sumDaySummaries(days: DayTotals[]): DayTotals {
     unrecordedMin: sumOrNull(days.map((d) => d.unrecordedMin)),
   };
 }
+
+// その日を含む月（1日〜末日）
+export function monthRange(date: string): { from: string; to: string } {
+  const from = `${date.slice(0, 7)}-01`;
+  return { from, to: addDays(shiftMonth(from, 1), -1) };
+}
+
+// n か月前後の月の1日
+export function shiftMonth(date: string, n: number): string {
+  const y = Number(date.slice(0, 4));
+  const m = Number(date.slice(5, 7)) - 1 + n;
+  const yy = y + Math.floor(m / 12);
+  const mm = ((m % 12) + 12) % 12;
+  return `${yy}-${String(mm + 1).padStart(2, "0")}-01`;
+}
+
+// 月のカレンダーのマス（月曜はじまりの週ごとに7マス。月の前後は null）
+export function monthGrid(date: string): (string | null)[][] {
+  const { from, to } = monthRange(date);
+  const cells: (string | null)[] = Array((dayOfWeek(from) + 6) % 7).fill(null);
+  for (let d = from; d <= to; d = addDays(d, 1)) cells.push(d);
+  while (cells.length % 7) cells.push(null);
+  return Array.from({ length: cells.length / 7 }, (_, i) => cells.slice(i * 7, i * 7 + 7));
+}
+
+// 日ごと・クライアントごとの分数（カレンダーのマスに色の帯を出すため）。時間の長いクライアント順、0分は除く
+export function minutesByDayClient(
+  rows: { date: string; clientId: string | null; minutes: number }[]
+): Map<string, { clientId: string | null; minutes: number }[]> {
+  const byDay = new Map<string, Map<string | null, number>>();
+  for (const r of rows) {
+    if (r.minutes <= 0) continue;
+    const day = byDay.get(r.date) ?? new Map<string | null, number>();
+    day.set(r.clientId, (day.get(r.clientId) ?? 0) + r.minutes);
+    byDay.set(r.date, day);
+  }
+  return new Map(
+    [...byDay].map(([date, m]) => [date, [...m].map(([clientId, minutes]) => ({ clientId, minutes })).sort((a, b) => b.minutes - a.minutes)])
+  );
+}
