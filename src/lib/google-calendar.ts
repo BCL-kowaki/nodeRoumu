@@ -4,6 +4,7 @@
 //   タスクの添付資料用に drive.file（アプリが作ったファイルだけ扱える）も一緒にもらう。
 // - 更新用トークンは暗号化してDBに保存し、アクセストークン（約1時間）は保存せず都度取得する。
 import { prisma } from "@/lib/prisma";
+import { addDays } from "@/lib/date-jst";
 import { decrypt, encrypt } from "@/lib/crypto";
 import { getGoogleLoginConfig, pkceChallenge } from "@/lib/google-login";
 import { DRIVE_FILE_SCOPE } from "@/lib/work/attachments";
@@ -208,6 +209,31 @@ export async function listDayEvents(ownerId: string, from: string, to: string): 
     { label: null, events: expand(primary!) },
     ...imports.flatMap((c, i) => (extra[i] ? [{ label: c.label, events: expand(extra[i]!, "予定あり") }] : [])),
   ]);
+}
+
+// 取り込み用のカレンダーの状態：読めるか、読めるなら今日から2週間の予定の件数（設定画面で、取り込めているかを確かめるため）
+export async function importCalendarStatus(
+  ownerId: string,
+  calendarIds: string[],
+  today: string
+): Promise<Record<string, { readable: boolean; upcoming: number | null; message: string | null }>> {
+  const token = await getAccessToken(ownerId);
+  const to = addDays(today, 13);
+  const results = await Promise.all(
+    calendarIds.map(async (id) => {
+      try {
+        const events = await fetchCalendarEvents(token, id, today, to);
+        return [id, { readable: true, upcoming: events.filter((e) => e.status !== "cancelled").length, message: null }] as const;
+      } catch (e) {
+        const message =
+          e instanceof GcalError && (e.status === 404 || e.status === 403)
+            ? "読めません。接続中のアカウントへの共有と、カレンダー ID を確認してください"
+            : gcalErrorMessage(e);
+        return [id, { readable: false, upcoming: null, message }] as const;
+      }
+    })
+  );
+  return Object.fromEntries(results);
 }
 
 // 取り込み用のカレンダーを読めるか（登録する前の確認）。読めなければ理由を返す

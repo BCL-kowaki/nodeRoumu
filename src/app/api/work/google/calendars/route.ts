@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { checkImportCalendar, getConnection } from "@/lib/google-calendar";
+import { checkImportCalendar, getConnection, importCalendarStatus } from "@/lib/google-calendar";
+import { todayJst } from "@/lib/date-jst";
 import { badRequest, notFound, requireWorkspace } from "@/lib/work/auth";
 import { parseImportCalendar } from "@/lib/work/gcal";
 
@@ -11,12 +12,21 @@ const MAX_IMPORT_CALENDARS = 10;
 const SELECT = { id: true, calendarId: true, label: true, createdAt: true } as const;
 
 // 予定を取り込むカレンダー（会社のメイン以外）の一覧
-export async function GET() {
+// ?check=1 を付けると、それぞれ読めるかと、今日から2週間の予定の件数も返す
+export async function GET(req: NextRequest) {
   const auth = await requireWorkspace();
   if (!auth.ok) return auth.response;
-  return NextResponse.json(
-    await prisma.googleImportCalendar.findMany({ where: { ownerId: auth.ctx.ownerId }, orderBy: { createdAt: "asc" }, select: SELECT })
-  );
+  const list = await prisma.googleImportCalendar.findMany({ where: { ownerId: auth.ctx.ownerId }, orderBy: { createdAt: "asc" }, select: SELECT });
+  if (req.nextUrl.searchParams.get("check") !== "1" || list.length === 0) return NextResponse.json(list);
+  const acc = await getConnection(auth.ctx.ownerId);
+  if (!acc || acc.status !== "active") return NextResponse.json(list);
+  try {
+    const status = await importCalendarStatus(auth.ctx.ownerId, list.map((c) => c.calendarId), todayJst());
+    return NextResponse.json(list.map((c) => ({ ...c, ...status[c.calendarId] })));
+  } catch {
+    // 接続そのものの問題（再接続が必要など）は、一覧だけ返す
+    return NextResponse.json(list);
+  }
 }
 
 // 取り込むカレンダーを登録する（実際に読めるかを確かめてから）

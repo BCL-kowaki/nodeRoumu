@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CalendarPlus, X } from "lucide-react";
 import { api, inputClass } from "./types";
 
-type ImportCalendar = { id: string; calendarId: string; label: string };
+type ImportCalendar = { id: string; calendarId: string; label: string; readable?: boolean; upcoming?: number | null; message?: string | null };
 
 // 予定を取り込むカレンダー（会社のメイン以外）の登録。
 // 個人の Gmail や取引先のカレンダーを、接続中のアカウントに共有してもらってから登録する
@@ -16,7 +16,7 @@ export default function ImportCalendars({ connectedEmail, onChanged }: { connect
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    setList(await api<ImportCalendar[]>("/api/work/google/calendars").catch(() => []));
+    setList(await api<ImportCalendar[]>("/api/work/google/calendars?check=1").catch(() => []));
   }, []);
   useEffect(() => {
     load();
@@ -66,7 +66,12 @@ export default function ImportCalendars({ connectedEmail, onChanged }: { connect
           {list.map((c) => (
             <li key={c.id} className="flex items-center gap-2 rounded border border-app-border px-2.5 py-1.5">
               <span className="text-xs font-bold text-app-text shrink-0">{c.label}</span>
-              {c.label !== c.calendarId && <span className="flex-1 min-w-0 truncate text-[11px] text-app-sub">{c.calendarId}</span>}
+              {c.label !== c.calendarId && <span className="min-w-0 truncate text-[11px] text-app-sub">{c.calendarId}</span>}
+              {/* 取り込めているか（読めるか・今日から2週間の予定の件数） */}
+              {c.readable === true && (
+                <span className="shrink-0 text-[10px] text-primary-dark bg-primary-light rounded px-1.5">読めています・2週間で{c.upcoming ?? 0}件</span>
+              )}
+              {c.readable === false && <span className="min-w-0 text-[10px] text-danger bg-danger-light rounded px-1.5">{c.message}</span>}
               <button
                 type="button"
                 onClick={() => remove(c)}
