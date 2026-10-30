@@ -546,6 +546,21 @@ export default function ShukkinPage() {
                 </select>
               </div>
             </div>
+            {/* 状態は出勤なのに時刻が空の日（固定シフトが入る前に出勤にした日など）は、固定シフトをまとめて入れられる */}
+            {canEditTime &&
+              rec &&
+              selE?.shiftStart &&
+              selE?.shiftEnd &&
+              isWorkingStatus(rec.status) &&
+              (!rec.startTime || !rec.endTime) && (
+                <button
+                  onClick={() => save(date, { employeeId: selEmp, date, ...shiftTimesForStatus(rec.status ?? "", rec, selE) })}
+                  disabled={savingDate === date}
+                  className="mt-1.5 mr-3 px-2.5 py-1 rounded border border-primary text-primary text-[11px] font-bold bg-white cursor-pointer disabled:opacity-50"
+                >
+                  固定シフト（{selE.shiftStart}〜{selE.shiftEnd}）を入れる
+                </button>
+              )}
             {/* 打刻履歴ボタン（レコードがある日のみ） */}
             {display.hasRecord && (
               <button
