@@ -78,6 +78,21 @@ export function isWorkingStatus(status: string | null | undefined): boolean {
   return status === "normal" || status === "late" || status === "early_leave";
 }
 
+// 状態を出勤扱い（出勤・遅刻・早退）にしたときに入れる固定シフト。空の時刻・休憩だけを埋め、入力済みの値は変えない。
+// 固定シフトが無い従業員や、出勤扱いでない状態では何も入れない
+export function shiftTimesForStatus(
+  status: string,
+  current: { startTime: string | null; endTime: string | null; breakMinutes: number | null } | undefined,
+  shift: { shiftStart: string | null; shiftEnd: string | null; shiftBreak: number | null }
+): { startTime?: string; endTime?: string; breakMinutes?: number } {
+  if (!isWorkingStatus(status) || !shift.shiftStart || !shift.shiftEnd) return {};
+  const out: { startTime?: string; endTime?: string; breakMinutes?: number } = {};
+  if (!current?.startTime) out.startTime = shift.shiftStart;
+  if (!current?.endTime) out.endTime = shift.shiftEnd;
+  if ((current?.breakMinutes === null || current?.breakMinutes === undefined) && shift.shiftBreak !== null) out.breakMinutes = shift.shiftBreak;
+  return out;
+}
+
 // 出勤日として数えるか（記録が無い日は数えない）
 export function isCountableDay(rec: AttendanceLike | undefined, closed: boolean): boolean {
   if (!rec) return false;

@@ -10,6 +10,7 @@ import {
   closedDayName,
   isClosedDay as isClosed,
   isWorkingStatus,
+  shiftTimesForStatus,
   workHoursLabel,
 } from "@/lib/attendance-status";
 import PageTitle from "@/components/PageTitle";
@@ -290,6 +291,18 @@ export default function ShukkinPage() {
       body.endTime = null;
       body.breakMinutes = null;
       clearDraft(date);
+    }
+    // 出勤・遅刻・早退にしたときは、空の時刻・休憩に固定シフトを入れる（入力中の値・入力済みの値はそのまま）
+    if (selE && isWorkingStatus(val)) {
+      const rec = getRec(date);
+      const draft = drafts[date] ?? {};
+      const current = {
+        startTime: draft.startTime || rec?.startTime || null,
+        endTime: draft.endTime || rec?.endTime || null,
+        breakMinutes: draft.breakMinutes !== undefined && draft.breakMinutes !== "" ? Number(draft.breakMinutes) : rec?.breakMinutes ?? null,
+      };
+      Object.assign(body, shiftTimesForStatus(val, current, selE));
+      for (const f of TIME_FIELDS) if (draft[f] !== undefined && draft[f] !== "") body[f] = draft[f];
     }
     await save(date, body);
   };

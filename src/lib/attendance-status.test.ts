@@ -1,15 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  autoStatus,
-  closedDayName,
-  dayOfWeek,
-  isClosedDay,
-  isCountableDay,
-  isWorkingStatus,
-  workHoursLabel,
-  workMinutes,
-  type ClosedWeekdays,
-} from "./attendance-status";
+import { autoStatus, closedDayName, dayOfWeek, isClosedDay, isCountableDay, isWorkingStatus, workHoursLabel, workMinutes, type ClosedWeekdays, shiftTimesForStatus } from "./attendance-status";
 
 // 土日定休
 const rates: ClosedWeekdays = {
@@ -96,5 +86,32 @@ describe("workMinutes / workHoursLabel（実働時間）", () => {
     expect(workHoursLabel({ status: null, startTime: "11:30", endTime: "11:00", breakMinutes: 0 })).toBe("0");
     expect(workHoursLabel({ status: null, startTime: "09:00", endTime: null })).toBe("");
     expect(workHoursLabel(undefined)).toBe("");
+  });
+});
+
+describe("shiftTimesForStatus（状態を出勤にしたとき固定シフトを入れる）", () => {
+  const shift = { shiftStart: "09:00", shiftEnd: "18:00", shiftBreak: 60 };
+  it("出勤・遅刻・早退にしたとき、空の時刻・休憩に固定シフトを入れる", () => {
+    expect(shiftTimesForStatus("normal", undefined, shift)).toEqual({ startTime: "09:00", endTime: "18:00", breakMinutes: 60 });
+    expect(shiftTimesForStatus("late", { startTime: null, endTime: null, breakMinutes: null }, shift)).toEqual({
+      startTime: "09:00",
+      endTime: "18:00",
+      breakMinutes: 60,
+    });
+  });
+  it("すでに入っている時刻・休憩は変えない（空の項目だけ入れる）", () => {
+    expect(shiftTimesForStatus("normal", { startTime: "10:00", endTime: null, breakMinutes: 45 }, shift)).toEqual({ endTime: "18:00" });
+    expect(shiftTimesForStatus("normal", { startTime: "10:00", endTime: "19:00", breakMinutes: 30 }, shift)).toEqual({});
+  });
+  it("出勤扱いでない状態や、固定シフトが無い従業員には何も入れない", () => {
+    expect(shiftTimesForStatus("absent", undefined, shift)).toEqual({});
+    expect(shiftTimesForStatus("", undefined, shift)).toEqual({});
+    expect(shiftTimesForStatus("normal", undefined, { shiftStart: null, shiftEnd: null, shiftBreak: null })).toEqual({});
+  });
+  it("休憩が決まっていないシフトは、時刻だけ入れる", () => {
+    expect(shiftTimesForStatus("normal", undefined, { shiftStart: "09:00", shiftEnd: "13:00", shiftBreak: null })).toEqual({
+      startTime: "09:00",
+      endTime: "13:00",
+    });
   });
 });
